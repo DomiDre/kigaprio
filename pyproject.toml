@@ -1,0 +1,30 @@
+[project]
+name = "kigaprio"
+version = "0.1.0"
+description = "Small web application to collect images with priorites, analyze them and then generate prio list in an excel sheet"
+readme = "README.md"
+authors = [
+    { name = "DomiDre", email = "dominique.dresen@gmail.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "fastapi>=0.116.1",
+    "pandas>=2.3.2",
+    "pillow>=11.3.0",
+    "pydantic-settings>=2.10.1",
+    "pypdf2>=3.0.1",
+    "python-multipart>=0.0.20",
+    "uvicorn[standard]>=0.35.0",
+]
+
+# [project.scripts]
+# kigaprio = "kigaprio:main"
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.setuptools]
+packages = [{include = "kigaprio", from = "src"}]
+
