@@ -9,7 +9,6 @@
 			labels?: string[];
 			confidence?: number;
 			description?: string;
-			[key: string]: any;
 		};
 		error?: string;
 	}
@@ -392,4 +391,3 @@
 		transform: scaleX(-1); /* Mirror effect for front camera */
 	}
 </style>
-

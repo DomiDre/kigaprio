@@ -21,7 +21,7 @@ ENV PATH="/home/ubuntu/.local/bin:$PATH"
 WORKDIR /app
 
 # Copy project files
-COPY --chown=ubuntu:ubuntu pyproject.toml uv.lock ./
+COPY --chown=ubuntu:ubuntu pyproject.toml uv.lock .python-version ./
 
 # Create a minimal __init__.py to avoid sync issues
 RUN mkdir -p src/kigaprio && touch src/kigaprio/__init__.py && touch README.md
