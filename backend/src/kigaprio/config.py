@@ -1,12 +1,13 @@
 """Configuration settings for the application."""
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings."""
 
+    model_config = SettingsConfigDict(env_file=".env")
     # Environment
     ENV: str = Field(default="development", description="Environment")
     LOG_LEVEL: str = Field(default="info", description="Log level")
@@ -34,10 +35,6 @@ class Settings(BaseSettings):
         default=4, description="Max concurrent file processes"
     )
     PROCESS_TIMEOUT: int = Field(default=300, description="Process timeout in seconds")
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 # Create global settings instance

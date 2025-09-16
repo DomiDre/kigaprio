@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-import PyPDF2
+import pypdf
 from PIL import Image
 
 
@@ -56,7 +56,7 @@ class FileProcessor:
 
         try:
             with open(file_path, "rb") as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_reader = pypdf.PdfReader(file)
 
                 page_count = len(pdf_reader.pages)
                 text_content = ""
