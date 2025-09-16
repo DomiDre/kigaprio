@@ -1,13 +1,14 @@
 """Excel generation service."""
 
-from typing import List, Dict, Any
+from typing import Any
+
 import pandas as pd
 
 
 class ExcelGenerator:
     """Service for generating Excel reports."""
 
-    def generate_report(self, results: List[Dict[str, Any]], output_path: str) -> str:
+    def generate_report(self, results: list[dict[str, Any]], output_path: str) -> str:
         """Generate Excel report from analysis results."""
 
         # Prepare data for DataFrame
@@ -71,12 +72,12 @@ class ExcelGenerator:
             worksheet = writer.sheets["Analysis Results"]
             for column in worksheet.columns:
                 max_length = 0
-                column = [cell for cell in column]
+                column = column.list()
                 for cell in column:
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except ValueError:
                         pass
                 adjusted_width = min(max_length + 2, 50)
                 worksheet.column_dimensions[

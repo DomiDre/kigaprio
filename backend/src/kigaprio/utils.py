@@ -1,11 +1,11 @@
-from fastapi import HTTPException, UploadFile
-from typing import List
 from pathlib import Path
+
+from fastapi import HTTPException, UploadFile
 
 from kigaprio.config import settings
 
 
-async def validate_file(files: List[UploadFile]) -> List[UploadFile]:
+async def validate_file(files: list[UploadFile]) -> list[UploadFile]:
     """Validate uploaded files."""
 
     for file in files:

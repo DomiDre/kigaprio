@@ -1,26 +1,26 @@
 """Analysis endpoints."""
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
-from typing import List
-from pathlib import Path
 import uuid
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse
 
 from kigaprio.config import settings
-from kigaprio.services.file_processor import FileProcessor
-from kigaprio.services.excel_generator import ExcelGenerator
 from kigaprio.models.schemas import (
     AnalysisRequest,
     AnalysisResponse,
-    JobStatusResponse,
-    JobStatus,
     ErrorResponse,
+    JobStatus,
 )
+from kigaprio.services.excel_generator import ExcelGenerator
+from kigaprio.services.file_processor import FileProcessor
 
 router = APIRouter()
 
 # In-memory storage for analysis jobs (use Redis in production)
-analysis_jobs = {}
+analysis_jobs: dict[str, dict[str, Any]] = {}
 
 
 @router.post(
@@ -32,12 +32,12 @@ analysis_jobs = {}
     summary="Start Analysis",
     description="""
     Start background analysis of uploaded files.
-    
+
     **Process:**
     1. Validates that all file paths exist
     2. Creates a background job with unique ID
     3. Returns job ID for status tracking
-    
+
     **Analysis includes:**
     - **Images:** Dimensions, format, color information, transparency
     - **PDFs:** Page count, text extraction, metadata
@@ -78,40 +78,6 @@ async def start_analysis(
 
 
 @router.get(
-    "/analyze/{job_id}/status",
-    response_model=JobStatusResponse,
-    responses={
-        404: {"model": ErrorResponse, "description": "Job not found"},
-    },
-    summary="Get Analysis Status",
-    description="""
-    Check the status of an analysis job.
-    
-    **Status values:**
-    - **processing:** Job is currently running
-    - **completed:** Job finished successfully
-    - **failed:** Job encountered an error
-    
-    **Progress:** Percentage completion (0-100)
-    """,
-)
-async def get_analysis_status(job_id: str) -> JobStatusResponse:
-    """Get analysis job status."""
-
-    if job_id not in analysis_jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    job = analysis_jobs[job_id]
-    return JobStatusResponse(
-        status=job["status"],
-        files=job["files"],
-        progress=job["progress"],
-        results=job["results"],
-        error=job["error"],
-    )
-
-
-@router.get(
     "/analyze/{job_id}/download",
     responses={
         200: {
@@ -126,11 +92,11 @@ async def get_analysis_status(job_id: str) -> JobStatusResponse:
     summary="Download Results",
     description="""
     Download analysis results as an Excel file.
-    
+
     **Requirements:**
     - Job must be in 'completed' status
     - Results file must exist
-    
+
     **Excel format:**
     - Multiple sheets with detailed analysis
     - Auto-formatted columns
@@ -158,7 +124,7 @@ async def download_results(job_id: str):
     )
 
 
-async def process_files(job_id: str, file_paths: List[str]):
+async def process_files(job_id: str, file_paths: list[str]):
     """Background task to process files."""
 
     try:

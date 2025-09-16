@@ -1,12 +1,12 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import os
+from fastapi.staticfiles import StaticFiles
 
-from kigaprio.api.routes import health, upload, analyze
+from kigaprio.api.routes import analyze, health, upload
 from kigaprio.config import settings
 
 # Create FastAPI app

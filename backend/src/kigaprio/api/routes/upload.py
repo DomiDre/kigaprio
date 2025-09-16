@@ -1,15 +1,15 @@
 """File upload endpoints."""
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from typing import List
-import aiofiles
-from pathlib import Path
-import uuid
 import os
+import uuid
+from pathlib import Path
+
+import aiofiles
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from kigaprio.config import settings
+from kigaprio.models.schemas import ErrorResponse, FileInfo, UploadResponse
 from kigaprio.utils import validate_file
-from kigaprio.models.schemas import UploadResponse, FileInfo, ErrorResponse
 
 router = APIRouter()
 
@@ -28,18 +28,18 @@ router = APIRouter()
     summary="Upload Files",
     description="""
     Upload multiple files for analysis.
-    
+
     **Supported file types:**
     - Images: JPG, JPEG, PNG, GIF, BMP, TIFF
     - Documents: PDF
-    
+
     **Limitations:**
     - Maximum file size: 50MB per file
     - Multiple files can be uploaded simultaneously
     """,
 )
 async def upload_files(
-    files: List[UploadFile] = File(..., description="Files to upload for analysis"),
+    files: list[UploadFile] = File(..., description="Files to upload for analysis"),
 ) -> UploadResponse:
     """Upload multiple files for analysis."""
 

@@ -1,8 +1,7 @@
 """Configuration settings for the application."""
 
-from typing import List
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -14,7 +13,7 @@ class Settings(BaseSettings):
 
     # API Settings
     API_PREFIX: str = Field(default="/api", description="API prefix")
-    ALLOWED_ORIGINS: List[str] = Field(
+    ALLOWED_ORIGINS: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
         description="Allowed CORS origins",
     )
@@ -23,7 +22,7 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = Field(
         default=50 * 1024 * 1024, description="Max file size in bytes (50MB)"
     )
-    ALLOWED_EXTENSIONS: List[str] = Field(
+    ALLOWED_EXTENSIONS: list[str] = Field(
         default=[".jpg", ".jpeg", ".png", ".pdf", ".gif", ".bmp", ".tiff"],
         description="Allowed file extensions",
     )
