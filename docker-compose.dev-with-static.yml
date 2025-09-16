@@ -1,17 +1,21 @@
+version: '3.8'
+
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: development  # Assuming you have a development stage
+      target: development
     container_name: kigaprio-backend-dev
     volumes:
       - ./backend/src:/app/src
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/uv.lock:/app/uv.lock:ro
+      - frontend-static:/app/static:ro  # Read-only mount of built files
     environment:
       - ENV=development
       - DEBUG=true
+      - SERVE_STATIC=true  # Flag to enable static serving
       - CORS_ORIGINS=http://localhost:5173,http://localhost:8000
       - DATABASE_URL=${DATABASE_URL:-postgresql://user:password@db:5432/kigaprio}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
@@ -24,6 +28,7 @@ services:
     networks:
       - kigaprio-dev
 
+  # Vite dev server for hot-reload development
   frontend:
     build:
       context: ./frontend
@@ -31,14 +36,39 @@ services:
       target: development
     container_name: kigaprio-frontend-dev
     volumes:
-      # Mount entire frontend directory for hot reload
       - ./frontend:/app
-      - /app/node_modules  # Exclude node_modules from host mount
+      - /app/node_modules
     environment:
       - PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
     ports:
-      - "5173:5173"  # Vite dev server
+      - "5173:5173"
+    networks:
+      - kigaprio-dev
+
+  # Optional: Build frontend periodically for testing static serving
+  frontend-builder:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: kigaprio-frontend-builder
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - frontend-static:/app/build
+    command: |
+      sh -c "
+        echo 'Building frontend for static serving...'
+        npm run build
+        echo 'Build complete! Static files available at http://localhost:8000'
+        # Watch for changes and rebuild every 30 seconds (optional)
+        while true; do
+          sleep 30
+          echo 'Rebuilding frontend...'
+          npm run build
+        done
+      "
     networks:
       - kigaprio-dev
 
@@ -66,6 +96,7 @@ services:
 
 volumes:
   postgres-data-dev:
+  frontend-static:
 
 networks:
   kigaprio-dev:
