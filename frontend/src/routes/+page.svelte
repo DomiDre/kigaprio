@@ -32,73 +32,103 @@
 		try {
 			error = null;
 			isVideoReady = false;
+			cameraActive = true; // Set this immediately to show the video container
 
-			// Try exact constraint first, then fall back to ideal
+			// Simple constraints for better mobile compatibility
 			let constraints: MediaStreamConstraints = {
 				video: {
-					facingMode: { exact: facingMode },
-					width: { ideal: 1920 },
-					height: { ideal: 1080 }
+					facingMode: facingMode,
+					width: { ideal: 1280 },
+					height: { ideal: 720 }
 				},
 				audio: false
 			};
 
+			// Get user media
 			try {
 				stream = await navigator.mediaDevices.getUserMedia(constraints);
-			} catch {
-				// Fallback to ideal if exact doesn't work
+			} catch (err) {
+				console.log('First attempt failed, trying basic constraints');
+				// Fallback to most basic constraints
 				constraints = {
-					video: {
-						facingMode: { ideal: facingMode },
-						width: { ideal: 1920 },
-						height: { ideal: 1080 }
-					},
+					video: true,
 					audio: false
 				};
 				stream = await navigator.mediaDevices.getUserMedia(constraints);
 			}
 
 			if (videoElement && stream) {
+				// Set srcObject
 				videoElement.srcObject = stream;
 
-				// Set up event listeners with timeout fallback
+				// Important for iOS Safari
+				videoElement.setAttribute('autoplay', '');
+				videoElement.setAttribute('muted', '');
+				videoElement.setAttribute('playsinline', '');
+
+				// Wait for video to be ready
 				await new Promise<void>((resolve) => {
 					if (!videoElement) return resolve();
 
 					let resolved = false;
 
-					// Timeout fallback - if metadata doesn't load in 3 seconds, proceed anyway
+					// Set a timeout to proceed anyway after 2 seconds
 					const timeout = setTimeout(() => {
 						if (!resolved) {
 							resolved = true;
-							console.log('Video metadata timeout - proceeding anyway');
+							console.log('Video ready timeout - proceeding');
 							isVideoReady = true;
-							cameraActive = true;
 							resolve();
 						}
-					}, 3000);
+					}, 2000);
 
-					// Try multiple events for better mobile compatibility
-					const handleReady = () => {
-						if (!resolved) {
+					// Handle video ready
+					const handleVideoReady = () => {
+						if (!resolved && videoElement) {
 							resolved = true;
 							clearTimeout(timeout);
+							console.log('Video is ready');
 							isVideoReady = true;
-							cameraActive = true;
 							resolve();
 						}
 					};
 
-					// Listen to multiple events for better compatibility
-					videoElement.onloadedmetadata = handleReady;
-					videoElement.oncanplay = handleReady;
-					videoElement.onplaying = handleReady;
+					// Try to detect when video is playing
+					const checkVideoPlaying = () => {
+						if (videoElement && videoElement.readyState >= 3) {
+							handleVideoReady();
+						}
+					};
 
-					// Try to play immediately
-					videoElement.play().catch((err) => {
-						console.error('Error playing video:', err);
-						// Even if play fails, still show the video
-						handleReady();
+					// Listen to multiple events
+					videoElement.onloadedmetadata = () => {
+						console.log('Metadata loaded');
+						if (videoElement) {
+							videoElement
+								.play()
+								.then(() => {
+									console.log('Video playing');
+									checkVideoPlaying();
+								})
+								.catch((err) => {
+									console.error('Play error:', err);
+									// Even if play fails, mark as ready
+									handleVideoReady();
+								});
+						}
+					};
+
+					videoElement.oncanplay = checkVideoPlaying;
+					videoElement.onplaying = handleVideoReady;
+
+					// Also check readyState immediately
+					if (videoElement.readyState >= 3) {
+						handleVideoReady();
+					}
+
+					// Try to play immediately (might work on some devices)
+					videoElement.play().catch(() => {
+						// Ignore errors here, will be handled by events
 					});
 				});
 			}
@@ -106,6 +136,7 @@
 			const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
 			error = `Camera access error: ${errorMessage}`;
 			console.error('Error accessing camera:', err);
+			cameraActive = false;
 		}
 	}
 
@@ -133,21 +164,25 @@
 
 	// Capture photo
 	function capturePhoto(): void {
-		if (!videoElement || !canvasElement || !isVideoReady) return;
+		if (!videoElement || !canvasElement) return;
 
 		const context: CanvasRenderingContext2D | null = canvasElement.getContext('2d');
 		if (!context) return;
 
-		canvasElement.width = videoElement.videoWidth;
-		canvasElement.height = videoElement.videoHeight;
+		// Use actual video dimensions or fallback
+		const width = videoElement.videoWidth || videoElement.clientWidth;
+		const height = videoElement.videoHeight || videoElement.clientHeight;
+
+		canvasElement.width = width;
+		canvasElement.height = height;
 
 		// Handle mirroring for front camera
 		if (facingMode === 'user') {
-			context.translate(canvasElement.width, 0);
+			context.translate(width, 0);
 			context.scale(-1, 1);
 		}
 
-		context.drawImage(videoElement, 0, 0);
+		context.drawImage(videoElement, 0, 0, width, height);
 
 		capturedImage = canvasElement.toDataURL('image/jpeg', 0.8);
 		stopCamera();
@@ -304,18 +339,22 @@
 			{#if cameraActive}
 				<!-- Camera View -->
 				<div class="relative overflow-hidden rounded-xl bg-black">
+					<!-- Video element - always visible when camera is active -->
 					<video
 						bind:this={videoElement}
 						autoplay
 						playsinline
 						muted
-						class="h-auto max-h-[500px] w-full object-cover"
+						webkit-playsinline
+						class="h-auto w-full object-cover"
 						class:mirror={facingMode === 'user'}
-						style="display: {isVideoReady ? 'block' : 'none'}"
+						class:opacity-0={!isVideoReady}
+						style="min-height: 300px; max-height: 500px;"
 					/>
 
+					<!-- Loading overlay - shown while video is loading -->
 					{#if !isVideoReady}
-						<div class="flex h-[400px] items-center justify-center">
+						<div class="absolute inset-0 flex items-center justify-center bg-black">
 							<div class="text-center">
 								<div
 									class="mx-auto mb-2 h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"
@@ -326,63 +365,62 @@
 					{/if}
 
 					<!-- Camera Controls Overlay -->
-					{#if isVideoReady}
-						<div
-							class="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/70 to-transparent p-4"
-						>
-							<div class="flex items-center justify-center gap-4">
-								<button
-									on:click={stopCamera}
-									class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
-									title="Close camera"
-								>
-									<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M6 18L18 6M6 6l12 12"
-										/>
-									</svg>
-								</button>
+					<div
+						class="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/70 to-transparent p-4"
+					>
+						<div class="flex items-center justify-center gap-4">
+							<button
+								on:click={stopCamera}
+								class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
+								title="Close camera"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M6 18L18 6M6 6l12 12"
+									/>
+								</svg>
+							</button>
 
-								<button
-									on:click={capturePhoto}
-									class="transform rounded-full bg-white p-5 text-gray-900 shadow-xl transition hover:scale-110 hover:bg-gray-100"
-								>
-									<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-										/>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-										/>
-									</svg>
-								</button>
+							<button
+								on:click={capturePhoto}
+								class="transform rounded-full bg-white p-5 text-gray-900 shadow-xl transition hover:scale-110 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={!isVideoReady}
+							>
+								<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+								</svg>
+							</button>
 
-								<button
-									on:click={switchCamera}
-									class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
-									title="Switch camera"
-								>
-									<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-										/>
-									</svg>
-								</button>
-							</div>
+							<button
+								on:click={switchCamera}
+								class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
+								title="Switch camera"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+									/>
+								</svg>
+							</button>
 						</div>
-					{/if}
+					</div>
 				</div>
 			{/if}
 
@@ -476,4 +514,11 @@
 	.mirror {
 		transform: scaleX(-1);
 	}
+
+	/* Smooth opacity transition */
+	.opacity-0 {
+		opacity: 0;
+		transition: opacity 0.3s ease-in-out;
+	}
 </style>
+
