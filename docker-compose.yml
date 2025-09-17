@@ -29,7 +29,7 @@ services:
         condition: service_completed_successfully
     networks:
       - kigaprio-prod
-      # - proxy
+      - proxy
     ports:
       - 8000:8000
     healthcheck:
@@ -96,5 +96,5 @@ volumes:
 networks:
   kigaprio-prod:
     driver: bridge
-  # proxy:
-  #   external: true
+  proxy:
+    external: true
