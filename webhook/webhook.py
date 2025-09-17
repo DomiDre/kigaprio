@@ -58,7 +58,7 @@ def deploy():
         )
         app.logger.info(f"Git pull: {result.stdout}")
 
-        subprocess.run(["just", "build-prod"], check=True, cwd=PROJECT_PATH)
+        subprocess.run(["just", "build"], check=True, cwd=PROJECT_PATH)
         app.logger.info("Build completed")
 
         subprocess.run(["just", "prod"], check=True, cwd=PROJECT_PATH)
