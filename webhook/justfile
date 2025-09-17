@@ -1,0 +1,5 @@
+serve:
+    uv run gunicorn --bind 0.0.0.0:9000 --workers 1 --daemon --pid webhook.pid webhook:app
+
+stop:
+    kill $(cat webhook.pid)
