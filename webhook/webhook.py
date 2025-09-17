@@ -61,6 +61,9 @@ def deploy():
         subprocess.run(["just", "build"], check=True, cwd=PROJECT_PATH)
         app.logger.info("Build completed")
 
+        subprocess.run(["just", "down"], check=True, cwd=PROJECT_PATH)
+        app.logger.info("Stopped old container")
+
         subprocess.run(["just", "prod"], check=True, cwd=PROJECT_PATH)
         app.logger.info("Deployment successful")
         return "Deployment successful", 200

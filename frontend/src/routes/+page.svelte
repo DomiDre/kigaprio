@@ -61,23 +61,45 @@
 			if (videoElement && stream) {
 				videoElement.srcObject = stream;
 
-				// Wait for video to be ready
+				// Set up event listeners with timeout fallback
 				await new Promise<void>((resolve) => {
 					if (!videoElement) return resolve();
 
-					videoElement.onloadedmetadata = () => {
-						videoElement
-							?.play()
-							.then(() => {
-								isVideoReady = true;
-								cameraActive = true;
-								resolve();
-							})
-							.catch((err) => {
-								console.error('Error playing video:', err);
-								resolve();
-							});
+					let resolved = false;
+
+					// Timeout fallback - if metadata doesn't load in 3 seconds, proceed anyway
+					const timeout = setTimeout(() => {
+						if (!resolved) {
+							resolved = true;
+							console.log('Video metadata timeout - proceeding anyway');
+							isVideoReady = true;
+							cameraActive = true;
+							resolve();
+						}
+					}, 3000);
+
+					// Try multiple events for better mobile compatibility
+					const handleReady = () => {
+						if (!resolved) {
+							resolved = true;
+							clearTimeout(timeout);
+							isVideoReady = true;
+							cameraActive = true;
+							resolve();
+						}
 					};
+
+					// Listen to multiple events for better compatibility
+					videoElement.onloadedmetadata = handleReady;
+					videoElement.oncanplay = handleReady;
+					videoElement.onplaying = handleReady;
+
+					// Try to play immediately
+					videoElement.play().catch((err) => {
+						console.error('Error playing video:', err);
+						// Even if play fails, still show the video
+						handleReady();
+					});
 				});
 			}
 		} catch (err) {
@@ -455,4 +477,3 @@
 		transform: scaleX(-1);
 	}
 </style>
-
