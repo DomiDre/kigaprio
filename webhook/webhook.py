@@ -76,4 +76,4 @@ if __name__ == "__main__":
     print("Starting webhook server...")
     print(f"Project path: {PROJECT_PATH}")
     print(f"Secret configured: {'Yes' if WEBHOOK_SECRET else 'No'}")
-    app.run(host="172.0.18.1", port=9000)
+    app.run(host="172.18.0.1", port=9000)
