@@ -13,6 +13,7 @@ app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 PROJECT_PATH = os.getenv("PROJECT_PATH")
+TARGET_BRANCH = os.getenv("TARGET_BRANCH", "main")
 
 assert WEBHOOK_SECRET is not None, "Webhook Secret not set"
 assert PROJECT_PATH is not None, "Project path not set"
@@ -44,6 +45,46 @@ def deploy():
     else:
         app.logger.warning("No signature provided. Aborting")
         return "Signature missing", 401
+
+    # Parse the webhook payload
+    try:
+        payload = request.get_json()
+    except Exception as e:
+        app.logger.error(f"Failed to parse JSON payload: {e}")
+        return "Invalid payload", 400
+
+    # Check if this is a push event to the target branch
+    event_type = request.headers.get("X-GitHub-Event")
+
+    # Handle push events
+    if event_type == "push":
+        ref = payload.get("ref", "")
+        branch = ref.replace("refs/heads/", "")
+
+        if branch != TARGET_BRANCH:
+            app.logger.info(f"Push to branch '{branch}' ignored (not {TARGET_BRANCH})")
+            return f"Ignored: push to {branch}", 200
+
+        app.logger.info(f"Processing push to {TARGET_BRANCH} branch")
+
+    # Handle pull request events (merged PRs)
+    elif event_type == "pull_request":
+        action = payload.get("action")
+        pr_merged = payload.get("pull_request", {}).get("merged", False)
+        base_branch = payload.get("pull_request", {}).get("base", {}).get("ref", "")
+
+        if action == "closed" and pr_merged and base_branch == TARGET_BRANCH:
+            app.logger.info(f"Processing merged PR to {TARGET_BRANCH} branch")
+        else:
+            app.logger.info(
+                f"PR event ignored: action={action}, merged={pr_merged}, base={base_branch}"
+            )
+            return f"Ignored: PR event not a merge to {TARGET_BRANCH}", 200
+
+    # Ignore other event types
+    else:
+        app.logger.info(f"Event type '{event_type}' ignored")
+        return f"Ignored: {event_type} event", 200
 
     # Run deployment commands
     try:
