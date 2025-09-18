@@ -49,8 +49,9 @@
 				setTimeout(() => startDetection(), 500);
 			}
 		} catch (error) {
-			console.error('Failed to start camera:', error);
-			dispatch('error', { message: error.message });
+			const e = error as Error; // Type assertion
+			console.error('Failed to start camera:', e);
+			dispatch('error', { message: e.message });
 		}
 	}
 

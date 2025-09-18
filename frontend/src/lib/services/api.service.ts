@@ -34,12 +34,12 @@ export class ApiService {
 			return this.validateAnalysisResult(result);
 		} catch (error) {
 			clearTimeout(timeoutId);
-
-			if (error.name === 'AbortError') {
+			const e = error as Error; // Type assertion
+			if (e.name === 'AbortError') {
 				throw new Error('Request timeout - analysis took too long');
 			}
 
-			throw error;
+			throw e;
 		}
 	}
 
