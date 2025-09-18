@@ -27,7 +27,7 @@
 			<h1 class="mb-4 text-2xl font-bold">Browser Compatibility Issue</h1>
 			<p class="mb-4">Your browser doesn't support all required features:</p>
 			<ul class="list-inside list-disc">
-				{#each issues as issue}
+				{#each issues as issue (issue)}
 					<li>{issue}</li>
 				{/each}
 			</ul>

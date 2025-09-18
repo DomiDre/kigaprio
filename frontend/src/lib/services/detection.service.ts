@@ -3,15 +3,15 @@ import type { DetectionResult, PaperDetectionConfig } from '../types/scanner.typ
 export class DetectionService {
 	private cv: any = null;
 	private config: PaperDetectionConfig = {
-		minConfidence: 45,
+		minConfidence: 20,
 		minAreaRatio: 0.05,
 		maxAreaRatio: 0.95,
 		targetAspectRatio: 1.41,
 		autoCaptureDelay: 2000,
 		edgeThreshold: 20,
 		minContourArea: 1000,
-		cannyLower: 50,  // Lowered for better edge detection
-		cannyUpper: 150  // Lowered for better edge detection
+		cannyLower: 50, // Lowered for better edge detection
+		cannyUpper: 150 // Lowered for better edge detection
 	};
 
 	async initialize(): Promise<boolean> {
@@ -98,7 +98,10 @@ export class DetectionService {
 		}
 	}
 
-	private opencvDetection(videoElement: HTMLVideoElement, canvas: HTMLCanvasElement): DetectionResult {
+	private opencvDetection(
+		videoElement: HTMLVideoElement,
+		canvas: HTMLCanvasElement
+	): DetectionResult {
 		try {
 			const ctx = canvas.getContext('2d');
 			if (!ctx) return { detected: false, confidence: 0 };
@@ -161,19 +164,21 @@ export class DetectionService {
 					continue;
 				}
 
-				if (area < imageArea * this.config.minAreaRatio ||
-					area > imageArea * this.config.maxAreaRatio) {
+				if (
+					area < imageArea * this.config.minAreaRatio ||
+					area > imageArea * this.config.maxAreaRatio
+				) {
 					continue;
 				}
 
 				// Approximate polygon
 				const perimeter = this.cv.arcLength(contour, true);
-				const approx = new this.cv.Mat();
 
 				// Try different epsilon values
 				const epsilonValues = [0.01, 0.02, 0.03, 0.04, 0.05];
 
 				for (const epsilon of epsilonValues) {
+					const approx = new this.cv.Mat();
 					this.cv.approxPolyDP(contour, approx, epsilon * perimeter, true);
 
 					// Check if it's a quadrilateral
@@ -193,11 +198,11 @@ export class DetectionService {
 								};
 							}
 						}
+						approx.delete();
 						break; // Found a quad, no need to try other epsilon values
 					}
+					approx.delete();
 				}
-
-				approx.delete();
 			}
 
 			// Cleanup
@@ -211,14 +216,16 @@ export class DetectionService {
 			hierarchy.delete();
 
 			return bestResult;
-
 		} catch (error) {
 			console.error('OpenCV detection error:', error);
 			return { detected: false, confidence: 0 };
 		}
 	}
 
-	private isValidPaperShape(corners: { x: number; y: number }[], canvas: HTMLCanvasElement): boolean {
+	private isValidPaperShape(
+		corners: { x: number; y: number }[],
+		canvas: HTMLCanvasElement
+	): boolean {
 		// Check minimum size - reduced threshold
 		const minSide = Math.min(canvas.width, canvas.height) * 0.1; // Reduced from 0.2
 
@@ -234,13 +241,20 @@ export class DetectionService {
 		// Check if corners are too close to image edges
 		const margin = 5;
 		for (const corner of corners) {
-			if (corner.x <= margin || corner.x >= canvas.width - margin ||
-				corner.y <= margin || corner.y >= canvas.height - margin) {
+			if (
+				corner.x <= margin ||
+				corner.x >= canvas.width - margin ||
+				corner.y <= margin ||
+				corner.y >= canvas.height - margin
+			) {
 				// Allow some corners to be at edge (paper might be partially out of frame)
 				// Just don't allow all corners at edge
-				const edgeCorners = corners.filter(c =>
-					c.x <= margin || c.x >= canvas.width - margin ||
-					c.y <= margin || c.y >= canvas.height - margin
+				const edgeCorners = corners.filter(
+					(c) =>
+						c.x <= margin ||
+						c.x >= canvas.width - margin ||
+						c.y <= margin ||
+						c.y >= canvas.height - margin
 				).length;
 
 				if (edgeCorners >= 4) {
@@ -255,14 +269,16 @@ export class DetectionService {
 		const avgAngle = angles.reduce((a, b) => a + b, 0) / 4;
 		const angleDeviation = Math.abs(avgAngle - 90);
 
-		if (angleDeviation > 45) { // Increased from 30
+		if (angleDeviation > 45) {
+			// Increased from 30
 			console.log(`Not rectangular enough: angle deviation = ${angleDeviation}`);
 			return false;
 		}
 
 		// Check aspect ratio - more lenient
 		const aspectRatio = this.calculateAspectRatio(corners);
-		if (aspectRatio < 0.3 || aspectRatio > 3.0) { // More lenient
+		if (aspectRatio < 0.3 || aspectRatio > 3.0) {
+			// More lenient
 			console.log(`Bad aspect ratio: ${aspectRatio}`);
 			return false;
 		}
@@ -283,7 +299,7 @@ export class DetectionService {
 
 			const dot = v1.x * v2.x + v1.y * v2.y;
 			const cross = v1.x * v2.y - v1.y * v2.x;
-			const angle = Math.atan2(Math.abs(cross), dot) * 180 / Math.PI;
+			const angle = (Math.atan2(Math.abs(cross), dot) * 180) / Math.PI;
 
 			angles.push(angle);
 		}
@@ -291,7 +307,11 @@ export class DetectionService {
 		return angles;
 	}
 
-	private calculateConfidence(corners: { x: number; y: number }[], area: number, imageArea: number): number {
+	private calculateConfidence(
+		corners: { x: number; y: number }[],
+		area: number,
+		imageArea: number
+	): number {
 		// Area score (0-40 points)
 		const areaRatio = area / imageArea;
 		let areaScore = 0;
@@ -310,25 +330,30 @@ export class DetectionService {
 		const aspectRatio = this.calculateAspectRatio(corners);
 		const aspectDiff = Math.abs(aspectRatio - this.config.targetAspectRatio);
 		let aspectScore = 30;
-		if (aspectDiff > 0) {
-			aspectScore = Math.max(0, 30 * (1 - aspectDiff / 1.0));
+		if (aspectDiff > 0.5) {
+			aspectScore = Math.max(0, 30 * (1 - aspectDiff / 1.5));
 		}
 
 		// Rectangularity score (0-30 points)
 		const angles = this.calculateAngles(corners);
-		const angleDeviation = angles.map(a => Math.abs(a - 90)).reduce((a, b) => a + b, 0) / 4;
+		const angleDeviation = angles.map((a) => Math.abs(a - 90)).reduce((a, b) => a + b, 0) / 4;
 		let rectangleScore = 30;
 		if (angleDeviation > 0) {
 			rectangleScore = Math.max(0, 30 * (1 - angleDeviation / 45));
 		}
 
 		const totalScore = areaScore + aspectScore + rectangleScore;
-		console.log(`Confidence breakdown: area=${areaScore}, aspect=${aspectScore}, rect=${rectangleScore}, total=${totalScore}`);
+		console.log(
+			`Confidence breakdown: area=${areaScore}, aspect=${aspectScore}, rect=${rectangleScore}, total=${totalScore}`
+		);
 
 		return totalScore;
 	}
 
-	private fallbackDetection(videoElement: HTMLVideoElement, canvas: HTMLCanvasElement): DetectionResult {
+	private fallbackDetection(
+		videoElement: HTMLVideoElement,
+		canvas: HTMLCanvasElement
+	): DetectionResult {
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return { detected: false, confidence: 0 };
 
@@ -350,9 +375,6 @@ export class DetectionService {
 
 		for (let y = 1; y < height - 1; y++) {
 			for (let x = 1; x < width - 1; x++) {
-				const idx = (y * width + x) * 4;
-				const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-
 				// Check horizontal and vertical gradients
 				const idxLeft = (y * width + (x - 1)) * 4;
 				const idxRight = (y * width + (x + 1)) * 4;
@@ -398,11 +420,14 @@ export class DetectionService {
 		for (let y = 0; y < height - regionSize; y += regionSize / 2) {
 			for (let x = 0; x < width - regionSize; x += regionSize / 2) {
 				// Check if this region has rectangular edge pattern
-				let topEdges = 0, bottomEdges = 0, leftEdges = 0, rightEdges = 0;
+				let topEdges = 0,
+					bottomEdges = 0,
+					leftEdges = 0,
+					rightEdges = 0;
 
 				// Count edges along boundaries
 				for (let i = 0; i < regionSize; i++) {
-					if (edges[(y) * width + (x + i)]) topEdges++;
+					if (edges[y * width + (x + i)]) topEdges++;
 					if (edges[(y + regionSize) * width + (x + i)]) bottomEdges++;
 					if (edges[(y + i) * width + x]) leftEdges++;
 					if (edges[(y + i) * width + (x + regionSize)]) rightEdges++;
@@ -471,7 +496,11 @@ export class DetectionService {
 	}
 
 	// Keep all existing helper methods unchanged
-	private findLargestConnectedRegion(pixels: boolean[], width: number, height: number): { pixels: Set<number>, size: number } {
+	private findLargestConnectedRegion(
+		pixels: boolean[],
+		width: number,
+		height: number
+	): { pixels: Set<number>; size: number } {
 		const visited = new Array(pixels.length).fill(false);
 		let largestRegion = { pixels: new Set<number>(), size: 0 };
 
@@ -487,7 +516,13 @@ export class DetectionService {
 		return largestRegion;
 	}
 
-	private floodFill(pixels: boolean[], visited: boolean[], start: number, width: number, height: number): { pixels: Set<number>, size: number } {
+	private floodFill(
+		pixels: boolean[],
+		visited: boolean[],
+		start: number,
+		width: number,
+		height: number
+	): { pixels: Set<number>; size: number } {
 		const stack = [start];
 		const region = new Set<number>();
 
@@ -502,13 +537,14 @@ export class DetectionService {
 			const y = Math.floor(idx / width);
 
 			const neighbors = [
-				{ x: x - 1, y }, { x: x + 1, y },
-				{ x, y: y - 1 }, { x, y: y + 1 }
+				{ x: x - 1, y },
+				{ x: x + 1, y },
+				{ x, y: y - 1 },
+				{ x, y: y + 1 }
 			];
 
 			for (const neighbor of neighbors) {
-				if (neighbor.x >= 0 && neighbor.x < width &&
-					neighbor.y >= 0 && neighbor.y < height) {
+				if (neighbor.x >= 0 && neighbor.x < width && neighbor.y >= 0 && neighbor.y < height) {
 					const nIdx = neighbor.y * width + neighbor.x;
 					if (pixels[nIdx] && !visited[nIdx]) {
 						stack.push(nIdx);
@@ -520,8 +556,15 @@ export class DetectionService {
 		return { pixels: region, size: region.size };
 	}
 
-	private getRegionBounds(pixels: Set<number>, width: number, height: number): { minX: number, maxX: number, minY: number, maxY: number } {
-		let minX = width, maxX = 0, minY = height, maxY = 0;
+	private getRegionBounds(
+		pixels: Set<number>,
+		width: number,
+		height: number
+	): { minX: number; maxX: number; minY: number; maxY: number } {
+		let minX = width,
+			maxX = 0,
+			minY = height,
+			maxY = 0;
 
 		for (const idx of pixels) {
 			const x = idx % width;

@@ -60,8 +60,10 @@ export class ApiService {
 		if (validated.analysis) {
 			validated.analysis = {
 				labels: Array.isArray(result.analysis.labels) ? result.analysis.labels : undefined,
-				confidence: typeof result.analysis.confidence === 'number' ? result.analysis.confidence : undefined,
-				description: typeof result.analysis.description === 'string' ? result.analysis.description : undefined,
+				confidence:
+					typeof result.analysis.confidence === 'number' ? result.analysis.confidence : undefined,
+				description:
+					typeof result.analysis.description === 'string' ? result.analysis.description : undefined,
 				name: typeof result.analysis.name === 'string' ? result.analysis.name : undefined,
 				schedule: this.validateSchedule(result.analysis.schedule)
 			};
@@ -87,12 +89,14 @@ export class ApiService {
 		return Object.keys(validated).length > 0 ? validated : undefined;
 	}
 
-	async uploadScheduleData(analysisResult: AnalysisResult): Promise<{ success: boolean; message?: string }> {
+	async uploadScheduleData(
+		analysisResult: AnalysisResult
+	): Promise<{ success: boolean; message?: string }> {
 		try {
 			const response = await fetch(`${this.baseUrl}/save-schedule`, {
 				method: 'POST',
 				headers: {
-					'Content-Type': 'application/json',
+					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify(analysisResult.analysis)
 			});

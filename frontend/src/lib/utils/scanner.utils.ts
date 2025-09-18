@@ -7,15 +7,13 @@ export function debounce<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
 	let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-	return function(this: any, ...args: Parameters<T>) {
-		const context = this;
-
+	return function (this: any, ...args: Parameters<T>) {
 		if (timeoutId !== null) {
 			clearTimeout(timeoutId);
 		}
 
 		timeoutId = setTimeout(() => {
-			func.apply(context, args);
+			func.apply(this, args);
 			timeoutId = null;
 		}, wait);
 	};
@@ -30,11 +28,9 @@ export function throttle<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
 	let inThrottle: boolean = false;
 
-	return function(this: any, ...args: Parameters<T>) {
-		const context = this;
-
+	return function (this: any, ...args: Parameters<T>) {
 		if (!inThrottle) {
-			func.apply(context, args);
+			func.apply(this, args);
 			inThrottle = true;
 
 			setTimeout(() => {
@@ -148,7 +144,7 @@ export async function getAvailableCameras(): Promise<MediaDeviceInfo[]> {
 
 	try {
 		const devices = await navigator.mediaDevices.enumerateDevices();
-		return devices.filter(device => device.kind === 'videoinput');
+		return devices.filter((device) => device.kind === 'videoinput');
 	} catch (error) {
 		console.error('Failed to enumerate devices:', error);
 		return [];
@@ -172,9 +168,7 @@ export function formatScheduleTime(time: string | undefined): string {
 export function validateScheduleData(schedule: Record<string, string>): boolean {
 	const requiredDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-	return requiredDays.every(day =>
-		schedule[day] && schedule[day].length > 0
-	);
+	return requiredDays.every((day) => schedule[day] && schedule[day].length > 0);
 }
 
 /**

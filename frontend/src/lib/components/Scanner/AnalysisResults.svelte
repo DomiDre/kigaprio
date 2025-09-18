@@ -60,7 +60,7 @@
 
 				<!-- Desktop view -->
 				<div class="hidden gap-2 text-sm md:grid md:grid-cols-7">
-					{#each days as day}
+					{#each days as day (day)}
 						<div class="text-center">
 							<div class="mb-1 font-semibold text-gray-600 dark:text-gray-400">{day}</div>
 							<div class="rounded bg-white p-2 shadow-sm dark:bg-gray-700">
@@ -72,7 +72,7 @@
 
 				<!-- Mobile view -->
 				<div class="space-y-2 md:hidden">
-					{#each days as day}
+					{#each days as day (day)}
 						<div class="flex items-center justify-between rounded bg-white p-2 dark:bg-gray-700">
 							<span class="font-semibold text-gray-600 dark:text-gray-400">{day}</span>
 							<span>{formatTime(result.analysis.schedule[day])}</span>

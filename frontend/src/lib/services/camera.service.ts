@@ -17,7 +17,7 @@ export class CameraService {
 
 		try {
 			this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-		} catch (error) {
+		} catch {
 			// Fallback to basic constraints
 			this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
 		}
@@ -27,7 +27,7 @@ export class CameraService {
 
 	async stopCamera(): Promise<void> {
 		if (this.stream) {
-			this.stream.getTracks().forEach(track => track.stop());
+			this.stream.getTracks().forEach((track) => track.stop());
 			this.stream = null;
 		}
 	}
@@ -40,7 +40,8 @@ export class CameraService {
 
 		return new Promise((resolve) => {
 			const handleReady = () => {
-				videoElement.play()
+				videoElement
+					.play()
 					.then(() => resolve())
 					.catch(() => resolve());
 			};
@@ -52,8 +53,11 @@ export class CameraService {
 		});
 	}
 
-	capturePhoto(videoElement: HTMLVideoElement, canvas: HTMLCanvasElement,
-		facingMode: CameraFacingMode): string {
+	capturePhoto(
+		videoElement: HTMLVideoElement,
+		canvas: HTMLCanvasElement,
+		facingMode: CameraFacingMode
+	): string {
 		const ctx = canvas.getContext('2d');
 		if (!ctx) throw new Error('Canvas context not available');
 

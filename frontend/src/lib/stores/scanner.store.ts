@@ -19,47 +19,54 @@ function createScannerStore() {
 		subscribe,
 		reset: () => set(initialState),
 
-		setError: (error: string | null) => update(state => ({
-			...state,
-			error,
-			isProcessing: false
-		})),
+		setError: (error: string | null) =>
+			update((state) => ({
+				...state,
+				error,
+				isProcessing: false
+			})),
 
-		setCameraActive: (active: boolean) => update(state => ({
-			...state,
-			cameraActive: active,
-			error: active ? null : state.error
-		})),
+		setCameraActive: (active: boolean) =>
+			update((state) => ({
+				...state,
+				cameraActive: active,
+				error: active ? null : state.error
+			})),
 
-		setCapturedImage: (image: string | null) => update(state => ({
-			...state,
-			capturedImage: image,
-			cameraActive: false,
-			paperDetected: false,
-			detectionConfidence: 0
-		})),
+		setCapturedImage: (image: string | null) =>
+			update((state) => ({
+				...state,
+				capturedImage: image,
+				cameraActive: false,
+				paperDetected: false,
+				detectionConfidence: 0
+			})),
 
-		setProcessing: (processing: boolean) => update(state => ({
-			...state,
-			isProcessing: processing
-		})),
+		setProcessing: (processing: boolean) =>
+			update((state) => ({
+				...state,
+				isProcessing: processing
+			})),
 
-		setAnalysisResult: (result: AnalysisResult | null) => update(state => ({
-			...state,
-			analysisResult: result,
-			isProcessing: false
-		})),
+		setAnalysisResult: (result: AnalysisResult | null) =>
+			update((state) => ({
+				...state,
+				analysisResult: result,
+				isProcessing: false
+			})),
 
-		setDetectionState: (detected: boolean, confidence: number) => update(state => ({
-			...state,
-			paperDetected: detected,
-			detectionConfidence: confidence
-		})),
+		setDetectionState: (detected: boolean, confidence: number) =>
+			update((state) => ({
+				...state,
+				paperDetected: detected,
+				detectionConfidence: confidence
+			})),
 
-		setCaptureCountdown: (countdown: number) => update(state => ({
-			...state,
-			captureCountdown: countdown
-		}))
+		setCaptureCountdown: (countdown: number) =>
+			update((state) => ({
+				...state,
+				captureCountdown: countdown
+			}))
 	};
 }
 
@@ -68,15 +75,15 @@ export const scannerStore = createScannerStore();
 // Derived stores for specific state slices
 export const isReady = derived(
 	scannerStore,
-	$state => !$state.cameraActive && !$state.capturedImage && !$state.error
+	($state) => !$state.cameraActive && !$state.capturedImage && !$state.error
 );
 
 export const canCapture = derived(
 	scannerStore,
-	$state => $state.cameraActive && !$state.isProcessing
+	($state) => $state.cameraActive && !$state.isProcessing
 );
 
 export const hasResults = derived(
 	scannerStore,
-	$state => $state.analysisResult !== null && !$state.isProcessing
+	($state) => $state.analysisResult !== null && !$state.isProcessing
 );
