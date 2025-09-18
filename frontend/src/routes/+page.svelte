@@ -293,19 +293,20 @@
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
+								aria-hidden="true"
 							>
 								<path
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									stroke-width="2"
 									d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-								/>
+								></path>
 								<path
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									stroke-width="2"
 									d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-								/>
+								></path>
 							</svg>
 						</div>
 						<p class="text-gray-600 dark:text-gray-300">Klicken um Aufnahme zu starten</p>
@@ -313,22 +314,23 @@
 
 					<button
 						on:click={startCamera}
+						aria-label="Kamera öffnen"
 						class="transform rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-4 font-semibold text-white shadow-lg transition hover:scale-105 hover:from-purple-700 hover:to-blue-700 focus:ring-4 focus:ring-purple-500/50 focus:outline-none"
 					>
 						<span class="flex items-center gap-2">
-							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 								<path
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									stroke-width="2"
 									d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-								/>
+								></path>
 								<path
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									stroke-width="2"
 									d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-								/>
+								></path>
 							</svg>
 							Kamera öffnen
 						</span>
@@ -340,6 +342,7 @@
 				<!-- Camera View -->
 				<div class="relative overflow-hidden rounded-xl bg-black">
 					<!-- Video element - always visible when camera is active -->
+					<!-- svelte-ignore a11y-media-has-caption -->
 					<video
 						bind:this={videoElement}
 						autoplay
@@ -350,7 +353,9 @@
 						class:mirror={facingMode === 'user'}
 						class:opacity-0={!isVideoReady}
 						style="min-height: 300px; max-height: 500px;"
-					/>
+						aria-label="Kamera-Vorschau"
+					>
+					</video>
 
 					<!-- Loading overlay - shown while video is loading -->
 					{#if !isVideoReady}
@@ -371,52 +376,55 @@
 						<div class="flex items-center justify-center gap-4">
 							<button
 								on:click={stopCamera}
+								aria-label="Kamera schließen"
 								class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
 								title="Close camera"
 							>
-								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										stroke-width="2"
 										d="M6 18L18 6M6 6l12 12"
-									/>
+									></path>
 								</svg>
 							</button>
 
 							<button
 								on:click={capturePhoto}
+								aria-label="Foto aufnehmen"
 								class="transform rounded-full bg-white p-5 text-gray-900 shadow-xl transition hover:scale-110 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
 								disabled={!isVideoReady}
 							>
-								<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										stroke-width="2"
 										d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-									/>
+									></path>
 									<path
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										stroke-width="2"
 										d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-									/>
+									></path>
 								</svg>
 							</button>
 
 							<button
 								on:click={switchCamera}
+								aria-label="Kamera wechseln"
 								class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
 								title="Switch camera"
 							>
-								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 									<path
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										stroke-width="2"
 										d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-									/>
+									></path>
 								</svg>
 							</button>
 						</div>
@@ -430,7 +438,7 @@
 					<div class="relative overflow-hidden rounded-xl">
 						<img
 							src={capturedImage}
-							alt="Captured"
+							alt="Aufgenommenes Foto"
 							class="h-auto max-h-[400px] w-full object-cover"
 						/>
 						{#if isProcessing}
@@ -449,12 +457,14 @@
 						<div class="flex gap-3">
 							<button
 								on:click={retakePhoto}
+								aria-label="Foto erneut aufnehmen"
 								class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-800 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
 							>
 								Retake Photo
 							</button>
 							<button
 								on:click={analyzePhoto}
+								aria-label="Foto analysieren"
 								class="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white shadow-lg transition hover:from-purple-700 hover:to-blue-700"
 							>
 								Analyze Photo
@@ -482,12 +492,14 @@
 						<div class="mt-4 flex gap-3">
 							<button
 								on:click={retakePhoto}
+								aria-label="Weiteres Foto aufnehmen"
 								class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-800 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
 							>
 								Take Another Photo
 							</button>
 							<button
 								on:click={reset}
+								aria-label="Zurücksetzen"
 								class="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white shadow-lg transition hover:from-purple-700 hover:to-blue-700"
 							>
 								Start Over
@@ -521,4 +533,3 @@
 		transition: opacity 0.3s ease-in-out;
 	}
 </style>
-
