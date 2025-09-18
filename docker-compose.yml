@@ -3,23 +3,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: kigaprio-backend
+      target: production
+    image: kigaprio-backend
     restart: unless-stopped
     volumes:
-      # Mount static files from frontend build
       - frontend-static:/app/static:ro
-      # Persistent storage for uploads etc.
-      - ./data/uploads:/app/uploads
     environment:
       - ENV=production
       - DEBUG=false
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=${SECRET_KEY}
-      - CORS_ORIGINS=${CORS_ORIGINS:-https://yourdomain.com}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.kigaprio-backend.rule=Host(`api.yourdomain.com`) || (Host(`yourdomain.com`) && PathPrefix(`/api`))"
+      - "traefik.http.routers.kigaprio-backend.rule=Host(`kiga.dhjd.de`)"
       - "traefik.http.routers.kigaprio-backend.entrypoints=websecure"
       - "traefik.http.routers.kigaprio-backend.tls=true"
       - "traefik.http.routers.kigaprio-backend.tls.certresolver=letsencrypt"
@@ -29,12 +23,15 @@ services:
       - "traefik.http.middlewares.kigaprio-ratelimit.ratelimit.burst=50"
       - "traefik.http.routers.kigaprio-backend.middlewares=kigaprio-ratelimit"
     depends_on:
-      - db
-      - redis
-      - frontend-builder
+      # - db
+      # - redis
+      frontend-builder:
+        condition: service_completed_successfully
     networks:
       - kigaprio-prod
       - proxy
+    ports:
+      - 8000:8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -48,51 +45,52 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: builder
-    container_name: kigaprio-frontend-builder
+    image: kigaprio-frontend-builder
+    restart: "no"
     volumes:
-      - frontend-static:/app/build
-    command: sh -c "cp -r /app/build/* /app/build/"
+      - frontend-static:/shared/build
+    command: sh -c "cp -r /app/build/* /shared/build/"
     networks:
       - kigaprio-prod
 
-  db:
-    image: postgres:16-alpine
-    container_name: kigaprio-db
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./backup:/backup  # For database backups
-    networks:
-      - kigaprio-prod
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: kigaprio-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
-    networks:
-      - kigaprio-prod
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: kigaprio-db
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=${DB_USER}
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD}
+  #     - POSTGRES_DB=${DB_NAME}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #     - ./backup:/backup  # For database backups
+  #   networks:
+  #     - kigaprio-prod
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: kigaprio-redis
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - kigaprio-prod
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
 
 volumes:
-  postgres-data:
-  redis-data:
+  # postgres-data:
+  # redis-data:
   frontend-static:
 
 networks:

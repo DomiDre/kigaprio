@@ -1,0 +1,10 @@
+[project]
+name = "webhook"
+version = "0.1.0"
+description = "A small webhook to pull and update to latest running version on server"
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=3.1.2",
+    "gunicorn>=23.0.0",
+    "python-dotenv>=1.1.1",
+]

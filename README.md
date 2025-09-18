@@ -23,32 +23,28 @@ git clone https://github.com/DomiDre/kigaprio
 cd kigaprio
 ```
 
-2. **Run with Docker (Recommended)**:
+2. **Install just & docker**
+All default scripts are collected in the `justfile`. Consider [installing it](https://github.com/casey/just) or look up commands from it.
+
+The environment is defined for usage in docker containers.
+
+3. **Development setup**:
+Build dev containers
 ```bash
-# Start development environment
-docker compose -f docker-compose.dev.yml up --build
+just dev-build
 ```
 
-3. **Or run locally with UV**:
+Run development setup
 ```bash
-# Install UV if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies
-uv sync --dev
-
-# Run the application
-uv run uvicorn kigaprio.main:app --reload --host 0.0.0.0 --port 8000
+just dev
 ```
 
 ### Production Setup
 
 **Run production environment**:
 ```bash
-docker compose up --build -d
-
-# With nginx reverse proxy
-docker compose up --build -d
+just build
+just prod
 ```
 
 ## API Endpoints
