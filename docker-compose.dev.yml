@@ -18,11 +18,9 @@ services:
     ports:
       - "8000:8000"
     command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
-    depends_on:
-      - db
-      - redis
-    networks:
-      - kigaprio-dev
+    # depends_on:
+    #   - db
+    #   - redis
 
   frontend:
     build:
@@ -39,32 +37,23 @@ services:
       - NODE_ENV=development
     ports:
       - "5173:5173"  # Vite dev server
-    networks:
-      - kigaprio-dev
 
-  db:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=kigaprio
-    volumes:
-      - postgres-data-dev:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - kigaprio-dev
+  # db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     - POSTGRES_USER=user
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=kigaprio
+  #   volumes:
+  #     - postgres-data-dev:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    networks:
-      - kigaprio-dev
+# volumes:
+#   postgres-data-dev:
 
-volumes:
-  postgres-data-dev:
-
-networks:
-  kigaprio-dev:
-    driver: bridge

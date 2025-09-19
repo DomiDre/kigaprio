@@ -1,19 +1,15 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import type { AnalysisResult } from '../../types/scanner.types';
 
-	export let result: AnalysisResult;
+	interface Props {
+		result: AnalysisResult;
+		onRetake?: () => void;
+		onReset?: () => void;
+	}
 
-	const dispatch = createEventDispatcher();
+	let { result, onRetake, onReset }: Props = $props();
+
 	const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-	function handleRetake() {
-		dispatch('retake');
-	}
-
-	function handleReset() {
-		dispatch('reset');
-	}
 
 	function formatTime(time: string): string {
 		// Format time string if needed
@@ -106,7 +102,7 @@
 
 	<div class="mt-6 flex gap-3">
 		<button
-			on:click={handleRetake}
+			onclick={onRetake}
 			aria-label="Take another photo"
 			class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-800 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
 		>
@@ -130,7 +126,7 @@
 		</button>
 
 		<button
-			on:click={handleReset}
+			onclick={onReset}
 			aria-label="Start over"
 			class="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white shadow-lg transition hover:from-purple-700 hover:to-blue-700"
 		>

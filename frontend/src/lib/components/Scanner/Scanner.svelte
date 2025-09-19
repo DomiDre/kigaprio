@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
 	import CameraView from './CameraView.svelte';
 	import CapturePreview from './CapturePreview.svelte';
 	import AnalysisResults from './AnalysisResults.svelte';
@@ -12,7 +11,7 @@
 	const detectionService = new DetectionService();
 
 	// State
-	let state: ScannerState = {
+	let scannerState: ScannerState = $state({
 		cameraActive: false,
 		capturedImage: null,
 		isProcessing: false,
@@ -21,58 +20,65 @@
 		paperDetected: false,
 		detectionConfidence: 0,
 		captureCountdown: 0
-	};
-
-	let facingMode: CameraFacingMode = 'environment';
-	let opencvReady = false;
-	let autoCapture = true;
-
-	onMount(async () => {
-		if (!cameraService.isSupported()) {
-			state.error = 'Camera API is not supported in your browser';
-			return;
-		}
-
-		opencvReady = await detectionService.initialize();
 	});
 
-	onDestroy(() => {
-		cameraService.stopCamera();
+	let facingMode: CameraFacingMode = $state('environment');
+	let opencvReady = $state(false);
+	let autoCapture = $state(true);
+	let extractedImage: string | null = $state(null);
+
+	$effect(() => {
+		// onMount equivalent
+		(async () => {
+			if (!cameraService.isSupported()) {
+				scannerState.error = 'Camera API is not supported in your browser';
+				return;
+			}
+
+			opencvReady = await detectionService.initialize();
+		})();
+
+		// Cleanup
+		return () => {
+			cameraService.stopCamera();
+		};
 	});
 
 	async function handleStartCamera() {
-		state.error = null;
-		state.cameraActive = true;
+		scannerState.error = null;
+		scannerState.cameraActive = true;
 
 		try {
 			await cameraService.startCamera(facingMode);
 		} catch (error) {
-			state.error = `Camera access error: ${error}`;
-			state.cameraActive = false;
+			scannerState.error = `Camera access error: ${error}`;
+			scannerState.cameraActive = false;
 		}
 	}
 
 	function handleStopCamera() {
 		cameraService.stopCamera();
-		state.cameraActive = false;
-		state.paperDetected = false;
-		state.detectionConfidence = 0;
+		scannerState.cameraActive = false;
+		scannerState.paperDetected = false;
+		scannerState.detectionConfidence = 0;
 	}
 
-	function handleCapture(event: CustomEvent<{ image: string }>) {
-		state.capturedImage = event.detail.image;
+	function handleCapture(detail: { image: string; extractedImage?: string }) {
+		scannerState.capturedImage = detail.image;
+		extractedImage = detail.extractedImage || null;
 		handleStopCamera();
 	}
 
 	function handleRetake() {
-		state.capturedImage = null;
-		state.analysisResult = null;
+		scannerState.capturedImage = null;
+		extractedImage = null;
+		scannerState.analysisResult = null;
 		handleStartCamera();
 	}
 
 	function handleReset() {
 		handleStopCamera();
-		state = {
+		scannerState = {
 			cameraActive: false,
 			capturedImage: null,
 			isProcessing: false,
@@ -82,16 +88,19 @@
 			detectionConfidence: 0,
 			captureCountdown: 0
 		};
+		extractedImage = null;
 	}
 
 	async function handleAnalyze() {
-		if (!state.capturedImage) return;
+		// Use extracted image if available, otherwise use full capture
+		const imageToAnalyze = extractedImage || scannerState.capturedImage;
+		if (!imageToAnalyze) return;
 
-		state.isProcessing = true;
-		state.error = null;
+		scannerState.isProcessing = true;
+		scannerState.error = null;
 
 		try {
-			const response = await fetch(state.capturedImage);
+			const response = await fetch(imageToAnalyze);
 			const blob = await response.blob();
 			const formData = new FormData();
 			formData.append('image', blob, 'capture.jpg');
@@ -105,12 +114,20 @@
 				throw new Error(`Server error: ${apiResponse.status}`);
 			}
 
-			state.analysisResult = await apiResponse.json();
+			scannerState.analysisResult = await apiResponse.json();
 		} catch (error) {
-			state.error = `Analysis error: ${error}`;
+			scannerState.error = `Analysis error: ${error}`;
 		} finally {
-			state.isProcessing = false;
+			scannerState.isProcessing = false;
 		}
+	}
+
+	function handleSwitchCamera() {
+		facingMode = facingMode === 'user' ? 'environment' : 'user';
+	}
+
+	function handleError(detail: { message: string }) {
+		scannerState.error = detail.message;
 	}
 </script>
 
@@ -121,56 +138,69 @@
 		<!-- Header -->
 		<div class="mb-8 text-center">
 			<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">📸 Priolisten Scanner</h1>
-			<p class="text-gray-600 dark:text-gray-300">Einmal schnell alle Blaetter fotografieren</p>
+			<p class="text-gray-600 dark:text-gray-300">Einmal schnell alle Blätter fotografieren</p>
 		</div>
 
 		<!-- Main Card -->
 		<div class="rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
-			{#if state.error}
+			{#if scannerState.error}
 				<div
 					class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20"
 				>
-					<p class="text-sm text-red-700 dark:text-red-400">{state.error}</p>
+					<p class="text-sm text-red-700 dark:text-red-400">{scannerState.error}</p>
 				</div>
 			{/if}
 
-			{#if !state.cameraActive && !state.capturedImage}
+			{#if !scannerState.cameraActive && !scannerState.capturedImage}
 				<!-- Start Screen -->
 				<div class="py-12 text-center">
 					<button
-						on:click={handleStartCamera}
+						onclick={handleStartCamera}
 						class="transform rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-4 font-semibold text-white shadow-lg transition hover:scale-105"
 					>
-						Kamera oeffnen
+						Kamera öffnen
 					</button>
+
+					<div class="mt-6 text-sm text-gray-600 dark:text-gray-400">
+						<p>📋 Positioniere das Papier im Kamerabereich</p>
+						<p>✨ Die App erkennt automatisch die Papierkanten</p>
+						<p>📸 Das Papier wird automatisch zugeschnitten</p>
+					</div>
 				</div>
-			{:else if state.cameraActive}
+			{:else if scannerState.cameraActive}
 				<CameraView
 					{cameraService}
 					{detectionService}
 					{facingMode}
 					{opencvReady}
-					{autoCapture}
-					on:capture={handleCapture}
-					on:close={handleStopCamera}
-					on:switchCamera={() => (facingMode = facingMode === 'user' ? 'environment' : 'user')}
-					bind:paperDetected={state.paperDetected}
-					bind:detectionConfidence={state.detectionConfidence}
-					bind:captureCountdown={state.captureCountdown}
+					bind:autoCapture
+					bind:paperDetected={scannerState.paperDetected}
+					bind:detectionConfidence={scannerState.detectionConfidence}
+					bind:captureCountdown={scannerState.captureCountdown}
+					onCapture={handleCapture}
+					onError={handleError}
+					onClose={handleStopCamera}
+					onSwitchCamera={handleSwitchCamera}
 				/>
-			{:else if state.capturedImage}
+			{:else if scannerState.capturedImage}
 				<CapturePreview
-					image={state.capturedImage}
-					isProcessing={state.isProcessing}
-					on:retake={handleRetake}
-					on:analyze={handleAnalyze}
-				/>
+					image={extractedImage || scannerState.capturedImage}
+					isProcessing={scannerState.isProcessing}
+					onRetake={handleRetake}
+					onAnalyze={handleAnalyze}
+				>
+					{#if extractedImage}
+						<div class="mt-2 text-sm text-green-600 dark:text-green-400">
+							✅ Papier wurde automatisch zugeschnitten
+						</div>
+					{/if}
+				</CapturePreview>
 
-				{#if state.analysisResult}
+				{#if scannerState.analysisResult}
 					<AnalysisResults
-						result={state.analysisResult}
-						on:retake={handleRetake}
-						on:reset={handleReset}
+						result={scannerState.analysisResult}
+						onRetake={handleRetake}
+						onReset={handleReset}
 					/>
 				{/if}
 			{/if}

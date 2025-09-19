@@ -1,43 +1,53 @@
 <script lang="ts">
-	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 	import DetectionOverlay from './DetectionOverlay.svelte';
 	import type { CameraService } from '../../services/camera.service';
 	import type { DetectionService } from '../../services/detection.service';
 	import type { CameraFacingMode, DetectionResult } from '../../types/scanner.types';
 
-	export let cameraService: CameraService;
-	export let detectionService: DetectionService;
-	export let facingMode: CameraFacingMode;
-	export let opencvReady: boolean;
-	export let autoCapture: boolean;
-	export let paperDetected: boolean = false;
-	export let detectionConfidence: number = 0;
-	export let captureCountdown: number = 0;
+	interface Props {
+		cameraService: CameraService;
+		detectionService: DetectionService;
+		facingMode: CameraFacingMode;
+		opencvReady: boolean;
+		autoCapture: boolean;
+		paperDetected?: boolean;
+		detectionConfidence?: number;
+		captureCountdown?: number;
+		onCapture?: (detail: { image: string; extractedImage?: string }) => void;
+		onError?: (detail: { message: string }) => void;
+		onClose?: () => void;
+		onSwitchCamera?: () => void;
+	}
 
-	const dispatch = createEventDispatcher();
+	let {
+		cameraService,
+		detectionService,
+		facingMode,
+		opencvReady,
+		autoCapture = $bindable(),
+		paperDetected = $bindable(false),
+		detectionConfidence = $bindable(0),
+		captureCountdown = $bindable(0),
+		onCapture,
+		onError,
+		onClose,
+		onSwitchCamera
+	}: Props = $props();
 
-	let videoElement: HTMLVideoElement;
-	let captureCanvas: HTMLCanvasElement;
-	let detectionCanvas: HTMLCanvasElement;
-	let stream: MediaStream | null = null;
-	let isVideoReady = false;
-	let animationFrame: number | null = null;
-	let stableDetectionStart: number | null = null;
-	let lastDetectionResult: DetectionResult | null = null;
+	let videoElement = $state<HTMLVideoElement>();
+	let captureCanvas = $state<HTMLCanvasElement>();
+	let detectionCanvas = $state<HTMLCanvasElement>();
+	let extractedCanvas = $state<HTMLCanvasElement>();
+	let stream = $state<MediaStream | null>(null);
+	let isVideoReady = $state(false);
+	let animationFrame = $state<number | null>(null);
+	let stableDetectionStart = $state<number | null>(null);
+	let lastDetectionResult = $state<DetectionResult | null>(null);
+	let extractedImageData = $state<string | null>(null);
 
-	const AUTO_CAPTURE_DELAY = 2000;
-	const MIN_CONFIDENCE_FOR_CAPTURE = 70;
-
-	onMount(async () => {
-		await startCamera();
-	});
-
-	onDestroy(() => {
-		stopDetection();
-		if (stream) {
-			cameraService.stopCamera();
-		}
-	});
+	const AUTO_CAPTURE_DELAY = 1000;
+	const MIN_CONFIDENCE_FOR_CAPTURE = 60;
+	const MIN_CONFIDENCE_FOR_STABLE = 40;
 
 	async function startCamera() {
 		try {
@@ -49,9 +59,9 @@
 				setTimeout(() => startDetection(), 500);
 			}
 		} catch (error) {
-			const e = error as Error; // Type assertion
+			const e = error as Error;
 			console.error('Failed to start camera:', e);
-			dispatch('error', { message: e.message });
+			onError?.({ message: e.message });
 		}
 	}
 
@@ -66,7 +76,7 @@
 
 			// Perform detection
 			console.debug('Performing detection');
-			const result = detectionService.detectPaper(videoElement, detectionCanvas);
+			const result = detectionService.detectPaper(videoElement!, detectionCanvas!);
 			console.debug(result);
 			lastDetectionResult = result;
 			paperDetected = result.detected;
@@ -98,19 +108,24 @@
 			return;
 		}
 
-		if (result.detected && result.confidence > MIN_CONFIDENCE_FOR_CAPTURE) {
+		// Use lower threshold for stable detection
+		if (
+			result.detected &&
+			result.confidence > MIN_CONFIDENCE_FOR_STABLE &&
+			result.stabilized !== false
+		) {
 			if (!stableDetectionStart) {
 				stableDetectionStart = Date.now();
 			} else {
 				const elapsed = Date.now() - stableDetectionStart;
 				const remaining = AUTO_CAPTURE_DELAY - elapsed;
 
-				if (remaining <= 0) {
+				if (remaining <= 0 && result.confidence > MIN_CONFIDENCE_FOR_CAPTURE) {
 					// Auto capture now
 					capturePhoto();
 					stableDetectionStart = null;
 					captureCountdown = 0;
-				} else {
+				} else if (remaining > 0) {
 					captureCountdown = Math.ceil(remaining / 1000);
 				}
 			}
@@ -121,28 +136,73 @@
 	}
 
 	function capturePhoto() {
-		if (!videoElement || !captureCanvas) return;
+		if (!videoElement || !captureCanvas || !extractedCanvas) return;
 
 		try {
+			// Capture the full image
 			const imageData = cameraService.capturePhoto(videoElement, captureCanvas, facingMode);
-			dispatch('capture', { image: imageData });
+
+			// Try to extract paper if detected
+			if (lastDetectionResult?.detected && lastDetectionResult.corners && opencvReady) {
+				const success = detectionService.extractPaper(
+					videoElement,
+					lastDetectionResult.corners,
+					extractedCanvas,
+					800 // Target width for extracted paper
+				);
+
+				if (success) {
+					// Get the extracted image as data URL
+					const extractedDataURL = extractedCanvas.toDataURL('image/png');
+					extractedImageData = extractedDataURL;
+					onCapture?.({
+						image: imageData,
+						extractedImage: extractedImageData
+					});
+					stopDetection();
+					return;
+				} else {
+					onError?.({ message: 'Paper extraction failed' });
+				}
+			} else {
+				onError?.({ message: `Somethings missing` });
+			}
+
+			// If no extraction or extraction failed, just send the full image
+			onCapture?.({
+				image: imageData
+			});
 		} catch (error) {
 			console.error('Failed to capture photo:', error);
-			dispatch('error', { message: 'Failed to capture photo' });
+			onError?.({ message: 'Failed to capture photo' });
 		}
 	}
 
 	function handleClose() {
 		stopDetection();
-		dispatch('close');
+		onClose?.();
 	}
 
 	function handleSwitchCamera() {
 		stopDetection();
-		dispatch('switchCamera');
+		onSwitchCamera?.();
 		// Restart with new facing mode
 		setTimeout(() => startCamera(), 100);
 	}
+
+	// Lifecycle
+	$effect(() => {
+		// onMount equivalent
+		startCamera();
+
+		// onDestroy equivalent (cleanup function)
+		return () => {
+			stopDetection();
+			if (stream) {
+				cameraService.stopCamera();
+			}
+		};
+	});
 </script>
 
 <div class="relative overflow-hidden rounded-xl bg-black">
@@ -171,13 +231,19 @@
 	{/if}
 
 	<!-- Controls overlay -->
-	<div class="absolute top-4 right-4">
+	<div class="absolute top-4 right-4 flex gap-2">
 		<label
 			class="flex cursor-pointer items-center gap-2 rounded-lg bg-black/50 p-2 text-white backdrop-blur-sm"
 		>
 			<input type="checkbox" bind:checked={autoCapture} class="rounded" />
 			<span class="text-sm">Auto-capture</span>
 		</label>
+
+		{#if paperDetected && lastDetectionResult?.stabilized}
+			<span class="rounded-lg bg-green-500/80 px-3 py-2 text-sm text-white backdrop-blur-sm">
+				Paper stable
+			</span>
+		{/if}
 	</div>
 
 	<!-- Loading overlay -->
@@ -196,7 +262,7 @@
 	<div class="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/70 to-transparent p-4">
 		<div class="flex items-center justify-center gap-4">
 			<button
-				on:click={handleClose}
+				onclick={handleClose}
 				aria-label="Close camera"
 				class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
 			>
@@ -211,10 +277,11 @@
 			</button>
 
 			<button
-				on:click={capturePhoto}
+				onclick={capturePhoto}
 				aria-label="Take photo"
 				class="transform rounded-full p-5 text-gray-900 shadow-xl transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
-				class:bg-green-500={paperDetected}
+				class:bg-green-500={paperDetected && lastDetectionResult?.stabilized}
+				class:bg-yellow-500={paperDetected && !lastDetectionResult?.stabilized}
 				class:bg-white={!paperDetected}
 				disabled={!isVideoReady}
 			>
@@ -235,7 +302,7 @@
 			</button>
 
 			<button
-				on:click={handleSwitchCamera}
+				onclick={handleSwitchCamera}
 				aria-label="Switch camera"
 				class="rounded-full bg-white/20 p-3 text-white backdrop-blur-sm transition hover:bg-white/30"
 			>
@@ -254,6 +321,7 @@
 	<!-- Hidden canvases -->
 	<canvas bind:this={captureCanvas} class="hidden"></canvas>
 	<canvas bind:this={detectionCanvas} class="hidden"></canvas>
+	<canvas bind:this={extractedCanvas} class="hidden"></canvas>
 </div>
 
 <style>
