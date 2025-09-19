@@ -45,9 +45,9 @@
 	let lastDetectionResult = $state<DetectionResult | null>(null);
 	let extractedImageData = $state<string | null>(null);
 
-	const AUTO_CAPTURE_DELAY = 2000;
-	const MIN_CONFIDENCE_FOR_CAPTURE = 70;
-	const MIN_CONFIDENCE_FOR_STABLE = 60;
+	const AUTO_CAPTURE_DELAY = 1000;
+	const MIN_CONFIDENCE_FOR_CAPTURE = 60;
+	const MIN_CONFIDENCE_FOR_STABLE = 40;
 
 	async function startCamera() {
 		try {
@@ -161,7 +161,11 @@
 					});
 					stopDetection();
 					return;
+				} else {
+					onError?.({ message: 'Paper extraction failed' });
 				}
+			} else {
+				onError?.({ message: `Somethings missing` });
 			}
 
 			// If no extraction or extraction failed, just send the full image
@@ -322,6 +326,7 @@
 	<!-- Hidden canvases -->
 	<canvas bind:this={captureCanvas} class="hidden"></canvas>
 	<canvas bind:this={detectionCanvas} class="hidden"></canvas>
+	<canvas bind:this={extractedCanvas} class="hidden"></canvas>
 </div>
 
 <style>

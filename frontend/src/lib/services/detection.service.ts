@@ -9,12 +9,12 @@ interface StabilizedCorners {
 export class DetectionService {
 	private cv: any = null;
 	private config: PaperDetectionConfig = {
-		minConfidence: 25,
+		minConfidence: 20,
 		minAreaRatio: 0.05,
 		maxAreaRatio: 0.95,
 		targetAspectRatio: 1.41,
-		autoCaptureDelay: 2000,
-		edgeThreshold: 20,
+		autoCaptureDelay: 1000,
+		edgeThreshold: 10,
 		minContourArea: 1000,
 		cannyLower: 50,
 		cannyUpper: 150
