@@ -8,10 +8,12 @@ const isLocalDev = process.env.NODE_ENV === 'development';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
-		https: isLocalDev ? {
-			key: fs.readFileSync('./local_dev.key'),
-			cert: fs.readFileSync('./local_dev.cert')
-		} : {},
+		https: isLocalDev
+			? {
+					key: fs.readFileSync('./local_dev.key'),
+					cert: fs.readFileSync('./local_dev.cert')
+				}
+			: {},
 		host: true
 	}
 });
