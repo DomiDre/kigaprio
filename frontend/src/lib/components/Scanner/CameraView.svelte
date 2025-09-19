@@ -178,11 +178,6 @@
 		}
 	}
 
-	function retakePhoto() {
-		extractedImageData = null;
-		startDetection();
-	}
-
 	function handleClose() {
 		stopDetection();
 		onClose?.();
