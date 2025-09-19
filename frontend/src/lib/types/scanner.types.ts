@@ -12,8 +12,9 @@ export interface AnalysisResult {
 
 export interface DetectionResult {
 	detected: boolean;
-	corners?: { x: number; y: number }[];
 	confidence: number;
+	corners?: { x: number; y: number }[];
+	stabilized?: boolean; // Added for stabilization status
 }
 
 export interface PaperDetectionConfig {
@@ -28,15 +29,15 @@ export interface PaperDetectionConfig {
 	cannyUpper: number;
 }
 
-export type CameraFacingMode = 'user' | 'environment';
-
 export interface ScannerState {
 	cameraActive: boolean;
 	capturedImage: string | null;
 	isProcessing: boolean;
-	analysisResult: AnalysisResult | null;
+	analysisResult: any | null;
 	error: string | null;
 	paperDetected: boolean;
 	detectionConfidence: number;
 	captureCountdown: number;
 }
+
+export type CameraFacingMode = 'user' | 'environment';

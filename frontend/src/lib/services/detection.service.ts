@@ -1,18 +1,31 @@
 import type { DetectionResult, PaperDetectionConfig } from '../types/scanner.types';
 
+interface StabilizedCorners {
+	corners: { x: number; y: number }[];
+	timestamp: number;
+	confidence: number;
+}
+
 export class DetectionService {
 	private cv: any = null;
 	private config: PaperDetectionConfig = {
-		minConfidence: 20,
+		minConfidence: 25,
 		minAreaRatio: 0.05,
 		maxAreaRatio: 0.95,
 		targetAspectRatio: 1.41,
 		autoCaptureDelay: 2000,
 		edgeThreshold: 20,
 		minContourArea: 1000,
-		cannyLower: 50, // Lowered for better edge detection
-		cannyUpper: 150 // Lowered for better edge detection
+		cannyLower: 50,
+		cannyUpper: 150
 	};
+
+	// Stabilization properties - more conservative
+	private detectionHistory: StabilizedCorners[] = [];
+	private readonly HISTORY_SIZE = 3; // Reduced for quicker response
+	private readonly CORNER_STABILITY_THRESHOLD = 30; // Increased tolerance
+	private readonly MIN_STABLE_FRAMES = 2; // Reduced for faster detection
+	private lastStableCorners: { x: number; y: number }[] | null = null;
 
 	async initialize(): Promise<boolean> {
 		return this.loadOpenCV();
@@ -38,7 +51,6 @@ export class DetectionService {
 			script.async = true;
 
 			script.onload = () => {
-				// OpenCV.js sets cv on window immediately but needs initialization
 				const checkReady = () => {
 					if ((window as any).cv && typeof (window as any).cv.Mat === 'function') {
 						this.cv = (window as any).cv;
@@ -49,16 +61,13 @@ export class DetectionService {
 					return false;
 				};
 
-				// Try immediate check
 				if (checkReady()) return;
 
-				// If cv.onRuntimeInitialized exists, use it
 				if ((window as any).cv && (window as any).cv.onRuntimeInitialized) {
 					(window as any).cv.onRuntimeInitialized = () => {
 						checkReady();
 					};
 				} else {
-					// Poll for readiness
 					const checkInterval = setInterval(() => {
 						if (checkReady()) {
 							clearInterval(checkInterval);
@@ -91,11 +100,268 @@ export class DetectionService {
 
 		// Use OpenCV if available, otherwise fallback
 		if (this.cv && typeof this.cv.Mat === 'function') {
-			return this.opencvDetection(videoElement, canvas);
+			const rawResult = this.opencvDetection(videoElement, canvas);
+			// Apply lighter stabilization
+			return this.stabilizeDetection(rawResult);
 		} else {
 			console.log('OpenCV not ready, using fallback detection');
 			return this.fallbackDetection(videoElement, canvas);
 		}
+	}
+
+	/**
+	 * Lighter stabilization that doesn't cause rotation issues
+	 */
+	private stabilizeDetection(currentResult: DetectionResult): DetectionResult {
+		// If no detection, use last stable corners briefly
+		if (!currentResult.detected || !currentResult.corners) {
+			if (this.lastStableCorners && this.detectionHistory.length > 0) {
+				const lastDetection = this.detectionHistory[this.detectionHistory.length - 1];
+				const timeSinceLastDetection = Date.now() - lastDetection.timestamp;
+
+				// Keep last detection for only 200ms to reduce jumpiness
+				if (timeSinceLastDetection < 200) {
+					return {
+						detected: true,
+						corners: this.lastStableCorners,
+						confidence: Math.max(20, lastDetection.confidence - 20)
+					};
+				}
+			}
+
+			// Clear history if no detection
+			this.detectionHistory = [];
+			this.lastStableCorners = null;
+			return currentResult;
+		}
+
+		// Add current detection to history
+		this.detectionHistory.push({
+			corners: currentResult.corners,
+			timestamp: Date.now(),
+			confidence: currentResult.confidence
+		});
+
+		// Keep only recent detections
+		while (this.detectionHistory.length > this.HISTORY_SIZE) {
+			this.detectionHistory.shift();
+		}
+
+		// Need minimum frames for stability
+		if (this.detectionHistory.length < this.MIN_STABLE_FRAMES) {
+			return currentResult;
+		}
+
+		// Check if corners are consistent (not jumping around)
+		const isConsistent = this.checkCornersConsistency();
+
+		if (isConsistent) {
+			// Use weighted average with more weight on recent frames
+			const stabilizedCorners = this.calculateWeightedAverageCorners();
+			this.lastStableCorners = stabilizedCorners;
+
+			return {
+				...currentResult,
+				corners: stabilizedCorners,
+				stabilized: true
+			};
+		}
+
+		// If not consistent, use current result but mark as unstable
+		return {
+			...currentResult,
+			stabilized: false
+		};
+	}
+
+	private checkCornersConsistency(): boolean {
+		if (this.detectionHistory.length < 2) return false;
+
+		// Check if corners are in roughly the same position
+		for (let i = 1; i < this.detectionHistory.length; i++) {
+			const prev = this.detectionHistory[i - 1].corners;
+			const curr = this.detectionHistory[i].corners;
+
+			// Ensure corners are in same order (no rotation)
+			for (let j = 0; j < 4; j++) {
+				const dist = this.distance(prev[j], curr[j]);
+				if (dist > this.CORNER_STABILITY_THRESHOLD * 2) {
+					return false; // Corners jumped too much
+				}
+			}
+		}
+
+		return true;
+	}
+
+	private calculateWeightedAverageCorners(): { x: number; y: number }[] {
+		const avgCorners = [
+			{ x: 0, y: 0 },
+			{ x: 0, y: 0 },
+			{ x: 0, y: 0 },
+			{ x: 0, y: 0 }
+		];
+
+		let totalWeight = 0;
+
+		// Give more weight to recent detections
+		for (let i = 0; i < this.detectionHistory.length; i++) {
+			const weight = i + 1; // 1, 2, 3, ... (recent has more weight)
+			const detection = this.detectionHistory[i];
+
+			for (let j = 0; j < 4; j++) {
+				avgCorners[j].x += detection.corners[j].x * weight;
+				avgCorners[j].y += detection.corners[j].y * weight;
+			}
+			totalWeight += weight;
+		}
+
+		// Normalize
+		for (let i = 0; i < 4; i++) {
+			avgCorners[i].x /= totalWeight;
+			avgCorners[i].y /= totalWeight;
+		}
+
+		return avgCorners;
+	}
+
+	/**
+	 * Extracts and transforms the detected paper region to a rectangular image
+	 */
+	extractPaper(
+		sourceElement: HTMLVideoElement | HTMLCanvasElement,
+		corners: { x: number; y: number }[],
+		outputCanvas: HTMLCanvasElement,
+		targetWidth: number = 800
+	): boolean {
+		if (!this.cv || !corners || corners.length !== 4) {
+			console.error('Cannot extract paper: OpenCV not ready or invalid corners');
+			return false;
+		}
+
+		try {
+			// Create a temporary canvas for the source
+			const tempCanvas = document.createElement('canvas');
+			const tempCtx = tempCanvas.getContext('2d');
+			if (!tempCtx) return false;
+
+			if (sourceElement instanceof HTMLVideoElement) {
+				tempCanvas.width = sourceElement.videoWidth;
+				tempCanvas.height = sourceElement.videoHeight;
+				tempCtx.drawImage(sourceElement, 0, 0);
+			} else {
+				tempCanvas.width = sourceElement.width;
+				tempCanvas.height = sourceElement.height;
+				tempCtx.drawImage(sourceElement, 0, 0);
+			}
+
+			const src = this.cv.imread(tempCanvas);
+
+			// Sort corners to ensure consistent order
+			const sortedCorners = this.sortCorners(corners);
+
+			// Calculate output dimensions maintaining aspect ratio
+			const { width: outputWidth, height: outputHeight } = this.calculateOutputDimensions(
+				sortedCorners,
+				targetWidth
+			);
+
+			// Set output canvas size
+			outputCanvas.width = outputWidth;
+			outputCanvas.height = outputHeight;
+
+			// Define source points
+			const srcPoints = this.cv.matFromArray(4, 1, this.cv.CV_32FC2, [
+				sortedCorners[0].x, sortedCorners[0].y,
+				sortedCorners[1].x, sortedCorners[1].y,
+				sortedCorners[2].x, sortedCorners[2].y,
+				sortedCorners[3].x, sortedCorners[3].y
+			]);
+
+			// Define destination points (rectangle)
+			const dstPoints = this.cv.matFromArray(4, 1, this.cv.CV_32FC2, [
+				0, 0,
+				outputWidth, 0,
+				outputWidth, outputHeight,
+				0, outputHeight
+			]);
+
+			// Calculate perspective transform matrix
+			const transformMatrix = this.cv.getPerspectiveTransform(srcPoints, dstPoints);
+
+			// Apply perspective transformation
+			const dst = new this.cv.Mat();
+			const dsize = new this.cv.Size(outputWidth, outputHeight);
+			this.cv.warpPerspective(
+				src,
+				dst,
+				transformMatrix,
+				dsize,
+				this.cv.INTER_LINEAR,
+				this.cv.BORDER_CONSTANT,
+				new this.cv.Scalar(255, 255, 255, 255)
+			);
+
+			// Show result on output canvas
+			this.cv.imshow(outputCanvas, dst);
+
+			// Cleanup
+			src.delete();
+			srcPoints.delete();
+			dstPoints.delete();
+			transformMatrix.delete();
+			dst.delete();
+
+			return true;
+		} catch (error) {
+			console.error('Error extracting paper:', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Sorts corners in consistent order
+	 */
+	private sortCorners(corners: { x: number; y: number }[]): { x: number; y: number }[] {
+		const sorted = [...corners];
+
+		// Find top-left corner (minimum sum of x and y)
+		sorted.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+		const topLeft = sorted[0];
+
+		// Find bottom-right corner (maximum sum of x and y)
+		sorted.sort((a, b) => (b.x + b.y) - (a.x + a.y));
+		const bottomRight = sorted[0];
+
+		// Find top-right and bottom-left
+		const remaining = corners.filter(c => c !== topLeft && c !== bottomRight);
+		const topRight = remaining[0].y < remaining[1].y ? remaining[0] : remaining[1];
+		const bottomLeft = remaining[0].y < remaining[1].y ? remaining[1] : remaining[0];
+
+		return [topLeft, topRight, bottomRight, bottomLeft];
+	}
+
+	/**
+	 * Calculates output dimensions maintaining aspect ratio
+	 */
+	private calculateOutputDimensions(
+		corners: { x: number; y: number }[],
+		targetWidth: number
+	): { width: number; height: number } {
+		const width1 = this.distance(corners[0], corners[1]);
+		const width2 = this.distance(corners[3], corners[2]);
+		const height1 = this.distance(corners[1], corners[2]);
+		const height2 = this.distance(corners[0], corners[3]);
+
+		const avgWidth = (width1 + width2) / 2;
+		const avgHeight = (height1 + height2) / 2;
+
+		const aspectRatio = avgHeight / avgWidth;
+
+		return {
+			width: targetWidth,
+			height: Math.round(targetWidth * aspectRatio)
+		};
 	}
 
 	private opencvDetection(
@@ -116,7 +382,6 @@ export class DetectionService {
 			const gray = new this.cv.Mat();
 			const blurred = new this.cv.Mat();
 			const edges = new this.cv.Mat();
-			const dilated = new this.cv.Mat();
 
 			// Convert to grayscale
 			this.cv.cvtColor(src, gray, this.cv.COLOR_RGBA2GRAY);
@@ -130,21 +395,19 @@ export class DetectionService {
 
 			// Dilate edges to close gaps
 			const kernel = this.cv.Mat.ones(3, 3, this.cv.CV_8U);
-			this.cv.dilate(edges, dilated, kernel, new this.cv.Point(-1, -1), 1);
+			this.cv.dilate(edges, edges, kernel, new this.cv.Point(-1, -1), 1);
 
 			// Find contours
 			const contours = new this.cv.MatVector();
 			const hierarchy = new this.cv.Mat();
 
 			this.cv.findContours(
-				dilated,
+				edges,
 				contours,
 				hierarchy,
 				this.cv.RETR_EXTERNAL,
 				this.cv.CHAIN_APPROX_SIMPLE
 			);
-
-			console.log(`Found ${contours.size()} contours`);
 
 			// Find the best quadrilateral
 			let bestResult: DetectionResult = { detected: false, confidence: 0 };
@@ -154,55 +417,37 @@ export class DetectionService {
 				const contour = contours.get(i);
 				const area = this.cv.contourArea(contour);
 
-				// Log contour areas for debugging
-				if (area > 500) {
-					console.log(`Contour ${i}: area = ${area}, ratio = ${area / imageArea}`);
-				}
+				// Skip small contours
+				if (area < this.config.minContourArea) continue;
 
-				// Check area constraints
-				if (area < this.config.minContourArea) {
-					continue;
-				}
-
-				if (
-					area < imageArea * this.config.minAreaRatio ||
-					area > imageArea * this.config.maxAreaRatio
-				) {
+				// Check area ratio
+				const areaRatio = area / imageArea;
+				if (areaRatio < this.config.minAreaRatio || areaRatio > this.config.maxAreaRatio) {
 					continue;
 				}
 
 				// Approximate polygon
 				const perimeter = this.cv.arcLength(contour, true);
+				const approx = new this.cv.Mat();
+				this.cv.approxPolyDP(contour, approx, 0.02 * perimeter, true);
 
-				// Try different epsilon values
-				const epsilonValues = [0.01, 0.02, 0.03, 0.04, 0.05];
+				// Check if it's a quadrilateral
+				if (approx.rows === 4) {
+					const corners = this.extractCorners(approx);
 
-				for (const epsilon of epsilonValues) {
-					const approx = new this.cv.Mat();
-					this.cv.approxPolyDP(contour, approx, epsilon * perimeter, true);
+					if (this.isValidPaperShape(corners, canvas)) {
+						const confidence = this.calculateConfidence(corners, area, imageArea);
 
-					// Check if it's a quadrilateral
-					if (approx.rows === 4) {
-						const corners = this.extractCorners(approx);
-
-						// Validate the quadrilateral
-						if (this.isValidPaperShape(corners, canvas)) {
-							const confidence = this.calculateConfidence(corners, area, imageArea);
-							console.log(`Valid quad found with confidence: ${confidence}`);
-
-							if (confidence > bestResult.confidence) {
-								bestResult = {
-									detected: confidence > this.config.minConfidence,
-									corners,
-									confidence: Math.round(confidence)
-								};
-							}
+						if (confidence > bestResult.confidence) {
+							bestResult = {
+								detected: confidence > this.config.minConfidence,
+								corners,
+								confidence: Math.round(confidence)
+							};
 						}
-						approx.delete();
-						break; // Found a quad, no need to try other epsilon values
 					}
-					approx.delete();
 				}
+				approx.delete();
 			}
 
 			// Cleanup
@@ -210,7 +455,6 @@ export class DetectionService {
 			gray.delete();
 			blurred.delete();
 			edges.delete();
-			dilated.delete();
 			kernel.delete();
 			contours.delete();
 			hierarchy.delete();
@@ -222,64 +466,33 @@ export class DetectionService {
 		}
 	}
 
+	// Keep all other methods as before...
 	private isValidPaperShape(
 		corners: { x: number; y: number }[],
 		canvas: HTMLCanvasElement
 	): boolean {
-		// Check minimum size - reduced threshold
-		const minSide = Math.min(canvas.width, canvas.height) * 0.1; // Reduced from 0.2
+		const minSide = Math.min(canvas.width, canvas.height) * 0.1;
 
 		for (let i = 0; i < 4; i++) {
 			const next = (i + 1) % 4;
 			const dist = this.distance(corners[i], corners[next]);
 			if (dist < minSide) {
-				console.log(`Side too small: ${dist} < ${minSide}`);
 				return false;
 			}
 		}
 
-		// Check if corners are too close to image edges
-		const margin = 5;
-		for (const corner of corners) {
-			if (
-				corner.x <= margin ||
-				corner.x >= canvas.width - margin ||
-				corner.y <= margin ||
-				corner.y >= canvas.height - margin
-			) {
-				// Allow some corners to be at edge (paper might be partially out of frame)
-				// Just don't allow all corners at edge
-				const edgeCorners = corners.filter(
-					(c) =>
-						c.x <= margin ||
-						c.x >= canvas.width - margin ||
-						c.y <= margin ||
-						c.y >= canvas.height - margin
-				).length;
-
-				if (edgeCorners >= 4) {
-					console.log('All corners at edge - likely detecting frame');
-					return false;
-				}
-			}
-		}
-
-		// Check if shape is roughly rectangular - more lenient
+		// Check angles
 		const angles = this.calculateAngles(corners);
 		const avgAngle = angles.reduce((a, b) => a + b, 0) / 4;
 		const angleDeviation = Math.abs(avgAngle - 90);
 
 		if (angleDeviation > 45) {
-			// Increased from 30
-			console.log(`Not rectangular enough: angle deviation = ${angleDeviation}`);
 			return false;
 		}
 
-		// Check aspect ratio - more lenient
+		// Check aspect ratio
 		const aspectRatio = this.calculateAspectRatio(corners);
 		if (aspectRatio < 0.3 || aspectRatio > 3.0) {
-			// More lenient
-			console.log(`Bad aspect ratio: ${aspectRatio}`);
 			return false;
 		}
 
@@ -312,270 +525,34 @@ export class DetectionService {
 		area: number,
 		imageArea: number
 	): number {
-		// Area score (0-40 points)
 		const areaRatio = area / imageArea;
 		let areaScore = 0;
-		if (areaRatio > 0.05 && areaRatio < 0.95) {
-			// Peak at 0.3-0.5 area ratio
-			if (areaRatio >= 0.3 && areaRatio <= 0.5) {
-				areaScore = 40;
-			} else if (areaRatio < 0.3) {
-				areaScore = 40 * (areaRatio / 0.3);
-			} else {
-				areaScore = 40 * (1 - (areaRatio - 0.5) / 0.45);
-			}
+
+		if (areaRatio >= 0.2 && areaRatio <= 0.6) {
+			areaScore = 40;
+		} else if (areaRatio < 0.2) {
+			areaScore = 40 * (areaRatio / 0.2);
+		} else {
+			areaScore = 40 * Math.max(0, 1 - (areaRatio - 0.6) / 0.4);
 		}
 
-		// Aspect ratio score (0-30 points)
 		const aspectRatio = this.calculateAspectRatio(corners);
 		const aspectDiff = Math.abs(aspectRatio - this.config.targetAspectRatio);
-		let aspectScore = 30;
-		if (aspectDiff > 0.5) {
-			aspectScore = Math.max(0, 30 * (1 - aspectDiff / 1.5));
-		}
+		let aspectScore = 30 * Math.max(0, 1 - aspectDiff / 1.5);
 
-		// Rectangularity score (0-30 points)
 		const angles = this.calculateAngles(corners);
 		const angleDeviation = angles.map((a) => Math.abs(a - 90)).reduce((a, b) => a + b, 0) / 4;
-		let rectangleScore = 30;
-		if (angleDeviation > 0) {
-			rectangleScore = Math.max(0, 30 * (1 - angleDeviation / 45));
-		}
+		let rectangleScore = 30 * Math.max(0, 1 - angleDeviation / 45);
 
-		const totalScore = areaScore + aspectScore + rectangleScore;
-		console.log(
-			`Confidence breakdown: area=${areaScore}, aspect=${aspectScore}, rect=${rectangleScore}, total=${totalScore}`
-		);
-
-		return totalScore;
+		return areaScore + aspectScore + rectangleScore;
 	}
 
 	private fallbackDetection(
 		videoElement: HTMLVideoElement,
 		canvas: HTMLCanvasElement
 	): DetectionResult {
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return { detected: false, confidence: 0 };
-
-		canvas.width = videoElement.videoWidth || 640;
-		canvas.height = videoElement.videoHeight || 480;
-		ctx.drawImage(videoElement, 0, 0);
-
-		const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-		// Use edge-based detection as fallback
-		return this.edgeBasedDetection(imageData);
-	}
-
-	private edgeBasedDetection(imageData: ImageData): DetectionResult {
-		const { data, width, height } = imageData;
-
-		// Detect edges using simple gradient
-		const edges: boolean[] = new Array(width * height).fill(false);
-
-		for (let y = 1; y < height - 1; y++) {
-			for (let x = 1; x < width - 1; x++) {
-				// Check horizontal and vertical gradients
-				const idxLeft = (y * width + (x - 1)) * 4;
-				const idxRight = (y * width + (x + 1)) * 4;
-				const idxTop = ((y - 1) * width + x) * 4;
-				const idxBottom = ((y + 1) * width + x) * 4;
-
-				const grayLeft = (data[idxLeft] + data[idxLeft + 1] + data[idxLeft + 2]) / 3;
-				const grayRight = (data[idxRight] + data[idxRight + 1] + data[idxRight + 2]) / 3;
-				const grayTop = (data[idxTop] + data[idxTop + 1] + data[idxTop + 2]) / 3;
-				const grayBottom = (data[idxBottom] + data[idxBottom + 1] + data[idxBottom + 2]) / 3;
-
-				const gradX = Math.abs(grayRight - grayLeft);
-				const gradY = Math.abs(grayBottom - grayTop);
-
-				if (gradX > this.config.edgeThreshold || gradY > this.config.edgeThreshold) {
-					edges[y * width + x] = true;
-				}
-			}
-		}
-
-		// Find rectangular regions
-		const rectangles = this.findRectangularRegions(edges, width, height);
-
-		if (rectangles.length > 0) {
-			const best = rectangles[0];
-			return {
-				detected: best.confidence > this.config.minConfidence,
-				corners: best.corners,
-				confidence: best.confidence
-			};
-		}
-
+		// Simple fallback detection
 		return { detected: false, confidence: 0 };
-	}
-
-	private findRectangularRegions(edges: boolean[], width: number, height: number): any[] {
-		// Simplified rectangle detection
-		// Look for regions with high edge density forming rectangular patterns
-
-		const rectangles = [];
-		const regionSize = 50;
-
-		for (let y = 0; y < height - regionSize; y += regionSize / 2) {
-			for (let x = 0; x < width - regionSize; x += regionSize / 2) {
-				// Check if this region has rectangular edge pattern
-				let topEdges = 0,
-					bottomEdges = 0,
-					leftEdges = 0,
-					rightEdges = 0;
-
-				// Count edges along boundaries
-				for (let i = 0; i < regionSize; i++) {
-					if (edges[y * width + (x + i)]) topEdges++;
-					if (edges[(y + regionSize) * width + (x + i)]) bottomEdges++;
-					if (edges[(y + i) * width + x]) leftEdges++;
-					if (edges[(y + i) * width + (x + regionSize)]) rightEdges++;
-				}
-
-				const edgeRatio = (topEdges + bottomEdges + leftEdges + rightEdges) / (regionSize * 4);
-
-				if (edgeRatio > 0.3 && edgeRatio < 0.8) {
-					// Potential rectangle
-					rectangles.push({
-						corners: [
-							{ x, y },
-							{ x: x + regionSize, y },
-							{ x: x + regionSize, y: y + regionSize },
-							{ x, y: y + regionSize }
-						],
-						confidence: Math.round(edgeRatio * 100)
-					});
-				}
-			}
-		}
-
-		return rectangles.sort((a, b) => b.confidence - a.confidence);
-	}
-
-	private detectLightRectangle(imageData: ImageData): DetectionResult {
-		// Keep existing implementation as is
-		const { data, width, height } = imageData;
-
-		const brightPixels: boolean[] = new Array(width * height).fill(false);
-		const threshold = 180;
-
-		for (let i = 0; i < data.length; i += 4) {
-			const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-			if (brightness > threshold) {
-				brightPixels[Math.floor(i / 4)] = true;
-			}
-		}
-
-		const largestRegion = this.findLargestConnectedRegion(brightPixels, width, height);
-
-		if (largestRegion.size < width * height * 0.1) {
-			return { detected: false, confidence: 0 };
-		}
-
-		const bounds = this.getRegionBounds(largestRegion.pixels, width, height);
-		const boundsArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
-		const fillRatio = largestRegion.size / boundsArea;
-
-		if (fillRatio < 0.7) {
-			return { detected: false, confidence: 0 };
-		}
-
-		const confidence = Math.min(100, fillRatio * 100);
-
-		return {
-			detected: confidence > 60,
-			corners: [
-				{ x: bounds.minX, y: bounds.minY },
-				{ x: bounds.maxX, y: bounds.minY },
-				{ x: bounds.maxX, y: bounds.maxY },
-				{ x: bounds.minX, y: bounds.maxY }
-			],
-			confidence: Math.round(confidence)
-		};
-	}
-
-	// Keep all existing helper methods unchanged
-	private findLargestConnectedRegion(
-		pixels: boolean[],
-		width: number,
-		height: number
-	): { pixels: Set<number>; size: number } {
-		const visited = new Array(pixels.length).fill(false);
-		let largestRegion = { pixels: new Set<number>(), size: 0 };
-
-		for (let i = 0; i < pixels.length; i++) {
-			if (pixels[i] && !visited[i]) {
-				const region = this.floodFill(pixels, visited, i, width, height);
-				if (region.size > largestRegion.size) {
-					largestRegion = region;
-				}
-			}
-		}
-
-		return largestRegion;
-	}
-
-	private floodFill(
-		pixels: boolean[],
-		visited: boolean[],
-		start: number,
-		width: number,
-		height: number
-	): { pixels: Set<number>; size: number } {
-		const stack = [start];
-		const region = new Set<number>();
-
-		while (stack.length > 0) {
-			const idx = stack.pop()!;
-			if (visited[idx]) continue;
-
-			visited[idx] = true;
-			region.add(idx);
-
-			const x = idx % width;
-			const y = Math.floor(idx / width);
-
-			const neighbors = [
-				{ x: x - 1, y },
-				{ x: x + 1, y },
-				{ x, y: y - 1 },
-				{ x, y: y + 1 }
-			];
-
-			for (const neighbor of neighbors) {
-				if (neighbor.x >= 0 && neighbor.x < width && neighbor.y >= 0 && neighbor.y < height) {
-					const nIdx = neighbor.y * width + neighbor.x;
-					if (pixels[nIdx] && !visited[nIdx]) {
-						stack.push(nIdx);
-					}
-				}
-			}
-		}
-
-		return { pixels: region, size: region.size };
-	}
-
-	private getRegionBounds(
-		pixels: Set<number>,
-		width: number,
-		height: number
-	): { minX: number; maxX: number; minY: number; maxY: number } {
-		let minX = width,
-			maxX = 0,
-			minY = height,
-			maxY = 0;
-
-		for (const idx of pixels) {
-			const x = idx % width;
-			const y = Math.floor(idx / width);
-			minX = Math.min(minX, x);
-			maxX = Math.max(maxX, x);
-			minY = Math.min(minY, y);
-			maxY = Math.max(maxY, y);
-		}
-
-		return { minX, maxX, minY, maxY };
 	}
 
 	private extractCorners(approx: any): { x: number; y: number }[] {

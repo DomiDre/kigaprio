@@ -1,19 +1,16 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import LoadingSpinner from '../shared/LoadingSpinner.svelte';
 
-	export let image: string;
-	export let isProcessing: boolean = false;
-
-	const dispatch = createEventDispatcher();
-
-	function handleRetake() {
-		dispatch('retake');
+	interface Props {
+		image: string;
+		isProcessing: boolean;
+		onRetake?: () => void;
+		onAnalyze?: () => void;
+		children?: Snippet;
 	}
 
-	function handleAnalyze() {
-		dispatch('analyze');
-	}
+	let { image, isProcessing, onRetake, onAnalyze, children }: Props = $props();
 </script>
 
 <div class="space-y-4">
@@ -23,6 +20,10 @@
 			alt="Captured schedule"
 			class="h-auto max-h-[400px] w-full bg-gray-100 object-contain dark:bg-gray-900"
 		/>
+
+		{#if children}
+			{@render children()}
+		{/if}
 
 		{#if isProcessing}
 			<div class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -38,39 +39,25 @@
 	{#if !isProcessing}
 		<div class="flex gap-3">
 			<button
-				on:click={handleRetake}
+				onclick={onRetake}
 				aria-label="Retake photo"
-				class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-800 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+				disabled={isProcessing}
+				class="flex-1 rounded-lg bg-gray-200 px-4 py-2 font-medium text-gray-800 transition hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 			>
-				<span class="flex items-center justify-center gap-2">
-					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-						></path>
-					</svg>
-					Retake Photo
-				</span>
+				📷 Neues Foto
 			</button>
 
 			<button
-				on:click={handleAnalyze}
+				onclick={onAnalyze}
 				aria-label="Analyze photo"
-				class="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white shadow-lg transition hover:from-purple-700 hover:to-blue-700"
+				disabled={isProcessing}
+				class="flex-1 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
 			>
-				<span class="flex items-center justify-center gap-2">
-					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-						></path>
-					</svg>
-					Extract Schedule
-				</span>
+				{#if isProcessing}
+					<span class="inline-block animate-spin">⏳</span> Analysiere...
+				{:else}
+					🔍 Analysieren
+				{/if}
 			</button>
 		</div>
 	{/if}
