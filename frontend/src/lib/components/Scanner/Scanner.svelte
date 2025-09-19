@@ -189,13 +189,11 @@
 					onRetake={handleRetake}
 					onAnalyze={handleAnalyze}
 				>
-					{#snippet children()}
-						{#if extractedImage}
-							<div class="mt-2 text-sm text-green-600 dark:text-green-400">
-								✅ Papier wurde automatisch zugeschnitten
-							</div>
-						{/if}
-					{/snippet}
+					{#if extractedImage}
+						<div class="mt-2 text-sm text-green-600 dark:text-green-400">
+							✅ Papier wurde automatisch zugeschnitten
+						</div>
+					{/if}
 				</CapturePreview>
 
 				{#if scannerState.analysisResult}
@@ -209,4 +207,3 @@
 		</div>
 	</div>
 </div>
-

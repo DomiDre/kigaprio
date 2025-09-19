@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
 	import DetectionOverlay from './DetectionOverlay.svelte';
 	import type { CameraService } from '../../services/camera.service';
 	import type { DetectionService } from '../../services/detection.service';
@@ -383,4 +382,3 @@
 		transition: opacity 0.3s ease-in-out;
 	}
 </style>
-

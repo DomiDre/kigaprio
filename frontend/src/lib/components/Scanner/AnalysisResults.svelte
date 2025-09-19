@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import type { AnalysisResult } from '../../types/scanner.types';
 
 	interface Props {

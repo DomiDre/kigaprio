@@ -105,7 +105,7 @@ export class DetectionService {
 			return this.stabilizeDetection(rawResult);
 		} else {
 			console.log('OpenCV not ready, using fallback detection');
-			return this.fallbackDetection(videoElement, canvas);
+			return this.fallbackDetection();
 		}
 	}
 
@@ -272,18 +272,26 @@ export class DetectionService {
 
 			// Define source points
 			const srcPoints = this.cv.matFromArray(4, 1, this.cv.CV_32FC2, [
-				sortedCorners[0].x, sortedCorners[0].y,
-				sortedCorners[1].x, sortedCorners[1].y,
-				sortedCorners[2].x, sortedCorners[2].y,
-				sortedCorners[3].x, sortedCorners[3].y
+				sortedCorners[0].x,
+				sortedCorners[0].y,
+				sortedCorners[1].x,
+				sortedCorners[1].y,
+				sortedCorners[2].x,
+				sortedCorners[2].y,
+				sortedCorners[3].x,
+				sortedCorners[3].y
 			]);
 
 			// Define destination points (rectangle)
 			const dstPoints = this.cv.matFromArray(4, 1, this.cv.CV_32FC2, [
-				0, 0,
-				outputWidth, 0,
-				outputWidth, outputHeight,
-				0, outputHeight
+				0,
+				0,
+				outputWidth,
+				0,
+				outputWidth,
+				outputHeight,
+				0,
+				outputHeight
 			]);
 
 			// Calculate perspective transform matrix
@@ -326,15 +334,15 @@ export class DetectionService {
 		const sorted = [...corners];
 
 		// Find top-left corner (minimum sum of x and y)
-		sorted.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+		sorted.sort((a, b) => a.x + a.y - (b.x + b.y));
 		const topLeft = sorted[0];
 
 		// Find bottom-right corner (maximum sum of x and y)
-		sorted.sort((a, b) => (b.x + b.y) - (a.x + a.y));
+		sorted.sort((a, b) => b.x + b.y - (a.x + a.y));
 		const bottomRight = sorted[0];
 
 		// Find top-right and bottom-left
-		const remaining = corners.filter(c => c !== topLeft && c !== bottomRight);
+		const remaining = corners.filter((c) => c !== topLeft && c !== bottomRight);
 		const topRight = remaining[0].y < remaining[1].y ? remaining[0] : remaining[1];
 		const bottomLeft = remaining[0].y < remaining[1].y ? remaining[1] : remaining[0];
 
@@ -538,19 +546,16 @@ export class DetectionService {
 
 		const aspectRatio = this.calculateAspectRatio(corners);
 		const aspectDiff = Math.abs(aspectRatio - this.config.targetAspectRatio);
-		let aspectScore = 30 * Math.max(0, 1 - aspectDiff / 1.5);
+		const aspectScore = 30 * Math.max(0, 1 - aspectDiff / 1.5);
 
 		const angles = this.calculateAngles(corners);
 		const angleDeviation = angles.map((a) => Math.abs(a - 90)).reduce((a, b) => a + b, 0) / 4;
-		let rectangleScore = 30 * Math.max(0, 1 - angleDeviation / 45);
+		const rectangleScore = 30 * Math.max(0, 1 - angleDeviation / 45);
 
 		return areaScore + aspectScore + rectangleScore;
 	}
 
-	private fallbackDetection(
-		videoElement: HTMLVideoElement,
-		canvas: HTMLCanvasElement
-	): DetectionResult {
+	private fallbackDetection(): DetectionResult {
 		// Simple fallback detection
 		return { detected: false, confidence: 0 };
 	}
