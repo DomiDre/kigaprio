@@ -156,9 +156,13 @@
 					// Get the extracted image as data URL
 					const extractedDataURL = extractedCanvas.toDataURL('image/png');
 					extractedImageData = extractedDataURL;
-					showExtracted = true;
+					showExtracted = false;
+					onCapture?.({
+						image: imageData,
+						extractedImage: extractedImageData
+					});
 					stopDetection();
-					return; // Don't send the capture event yet, wait for user confirmation
+					return;
 				}
 			}
 
