@@ -1,37 +1,28 @@
-<!-- src/routes/scanner/+page.svelte -->
 <script lang="ts">
-	import Scanner from '$lib/components/Scanner/Scanner.svelte';
-	import { browser } from '$app/environment';
-	import { checkBrowserCompatibility } from '$lib/utils/scanner.utils';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { currentUser, isAuthenticated } from '$lib/stores/auth';
 
-	let compatible = true;
-	let issues: string[] = [];
+	let user: typeof $currentUser = null;
+	let auth: boolean = false;
 
-	if (browser) {
-		const compatibility = checkBrowserCompatibility();
-		compatible = compatibility.compatible;
-		issues = compatibility.issues;
-	}
+	$: user = $currentUser;
+	$: auth = $isAuthenticated;
+
+	onMount(() => {
+		// Redirect unauthenticated users to /login
+		if (!auth) {
+			goto('/login');
+		}
+	});
 </script>
 
-<svelte:head>
-	<title>Priolisten Scanner</title>
-	<meta name="description" content="Scan and extract schedule information" />
-</svelte:head>
-
-{#if compatible}
-	<Scanner />
-{:else}
-	<div class="flex min-h-screen items-center justify-center p-4">
-		<div class="text-center">
-			<h1 class="mb-4 text-2xl font-bold">Browser Compatibility Issue</h1>
-			<p class="mb-4">Your browser doesn't support all required features:</p>
-			<ul class="list-inside list-disc">
-				{#each issues as issue (issue)}
-					<li>{issue}</li>
-				{/each}
-			</ul>
-			<p class="mt-4">Please use a modern browser like Chrome, Firefox, or Safari.</p>
+{#if auth && user}
+	<div class="flex min-h-screen flex-col items-center justify-center bg-gray-50">
+		<div class="mt-20 w-full max-w-md rounded bg-white p-8 shadow">
+			<h1 class="mb-4 text-3xl font-bold text-gray-900">Welcome</h1>
+			<p class="text-gray-700">Hello, {user.email}!</p>
+			<!-- content for logged-in users -->
 		</div>
 	</div>
 {/if}
