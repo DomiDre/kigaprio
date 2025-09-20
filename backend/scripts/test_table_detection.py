@@ -372,17 +372,17 @@ class TableExtractor:
             return
 
         # Create figure with appropriate size
-        fig, axes = plt.subplots(rows, cols, figsize=(cols * 2, rows * 1.5))
+        # fig, axes = plt.subplots(rows, cols, figsize=(cols * 2, rows * 1.5))
 
-        # Handle single row or column
-        if rows == 1 and cols == 1:
-            axes = [[axes]]
-        elif rows == 1:
-            axes = [axes]
-        elif cols == 1:
-            axes = [[ax] for ax in axes]
+        # # Handle single row or column
+        # if rows == 1 and cols == 1:
+        #     axes = [[axes]]
+        # elif rows == 1:
+        #     axes = [axes]
+        # elif cols == 1:
+        #     axes = [[ax] for ax in axes]
 
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        # days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
         # for i, row in enumerate(cells):
         #     for j, cell in enumerate(row):
