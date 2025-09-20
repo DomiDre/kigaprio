@@ -1,5 +1,5 @@
 import { writable, derived } from 'svelte/store';
-import type { ScannerState, AnalysisResult } from '../types/scanner.types';
+import type { ScannerState, AnalysisResult } from '../types/scanner';
 
 function createScannerStore() {
 	const initialState: ScannerState = {

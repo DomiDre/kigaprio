@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AnalysisResult } from '../../types/scanner.types';
+	import type { AnalysisResult } from '../../types/scanner';
 
 	interface Props {
 		result: AnalysisResult;

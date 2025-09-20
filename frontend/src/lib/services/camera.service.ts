@@ -1,4 +1,4 @@
-import type { CameraFacingMode } from '../types/scanner.types';
+import type { CameraFacingMode } from '../types/scanner';
 
 export class CameraService {
 	private stream: MediaStream | null = null;

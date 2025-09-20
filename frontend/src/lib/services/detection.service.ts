@@ -1,4 +1,4 @@
-import type { DetectionResult, PaperDetectionConfig } from '../types/scanner.types';
+import type { DetectionResult, PaperDetectionConfig } from '../types/scanner';
 
 interface StabilizedCorners {
 	corners: { x: number; y: number }[];

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { DetectionResult } from '../../types/scanner.types';
+	import type { DetectionResult } from '../../types/scanner';
 
 	export let videoElement: HTMLVideoElement;
 	export let detectionResult: DetectionResult | null;
