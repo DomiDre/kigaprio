@@ -21,3 +21,4 @@ export async function loginAdmin(email: string, password: string): Promise<User 
 	await pb.collection('_superusers').authWithPassword(email, password);
 	return pb.authStore.record as User | null;
 }
+

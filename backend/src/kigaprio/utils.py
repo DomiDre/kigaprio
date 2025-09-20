@@ -1,8 +1,13 @@
+import os
 from pathlib import Path
 
-from fastapi import HTTPException, UploadFile
+import httpx
+from fastapi import HTTPException, Request, UploadFile, status
 
 from kigaprio.config import settings
+
+POCKETBASE_URL = os.getenv("PUBLIC_POCKETBASE_URL")
+assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
 
 
 async def validate_file(files: list[UploadFile]) -> list[UploadFile]:
@@ -30,3 +35,27 @@ async def validate_file(files: list[UploadFile]) -> list[UploadFile]:
             )
 
     return files
+
+
+async def validate_token(request: Request):
+    token = request.headers.get("Authorization")
+    if not token or not token.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
+
+    token_value = token[len("Bearer ") :]
+
+    async with httpx.AsyncClient() as client:
+        # Verify session using PocketBase API
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/users/records",
+            headers={"Authorization": f"Bearer {token_value}"},
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
+        print(response.text)
+    return token_value

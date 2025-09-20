@@ -14,6 +14,7 @@ services:
       - DEBUG=true
       - CORS_ORIGINS=http://localhost:5173,http://localhost:8000
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - PUBLIC_POCKETBASE_URL=http://pocketbase:8090
     ports:
       - "8000:8000"
     command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
@@ -34,6 +35,7 @@ services:
       - PUBLIC_API_URL=http://localhost:8000
       - PUBLIC_POCKETBASE_URL=http://localhost:8090
       - NODE_ENV=development
+      - USE_DEV_HTTPS=false
     ports:
       - "5173:5173"  # Vite dev server
     depends_on:

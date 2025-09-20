@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
-	import { loginUser, loginAdmin } from '$lib/services/auth';
+	import { loginAdmin } from '$lib/services/auth';
 
 	let email = '';
 	let password = '';
@@ -11,8 +11,8 @@
 	async function handleLogin() {
 		error = '';
 		try {
-			await loginUser(email, password);
-			goto('/dashboard');
+			await loginAdmin(email, password);
+			goto('/admin/dashboard');
 		} catch (err) {
 			error = (err as Error).message;
 		}
@@ -22,10 +22,6 @@
 		pb.authStore.clear();
 		goto('/');
 	}
-
-	function goToRegister() {
-		goto('/register');
-	}
 </script>
 
 <div
@@ -34,8 +30,7 @@
 	<div class="container mx-auto max-w-4xl px-4 py-8">
 		<!-- Header -->
 		<div class="mb-8 text-center">
-			<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Login Prioliste</h1>
-			<p class="text-gray-600 dark:text-gray-300">Kindergarten Prioliste eingeben</p>
+			<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Admin Login</h1>
 		</div>
 		<!-- Main Card -->
 		<div class="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
@@ -77,13 +72,6 @@
                                text-white shadow-lg transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						Anmelden
-					</button>
-					<button
-						type="button"
-						class="w-full rounded-xl bg-gray-600 py-3 font-semibold text-white shadow-lg hover:bg-gray-700"
-						on:click={goToRegister}
-					>
-						Registrieren
 					</button>
 					{#if error}
 						<p
