@@ -207,3 +207,5 @@ __marimo__/
 
 *.cert
 *.key
+backend/images
+backend/scripts/output
