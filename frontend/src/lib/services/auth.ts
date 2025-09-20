@@ -1,7 +1,11 @@
 import { pb } from '$lib/services/pocketbase';
 import type { User } from '$lib/types/pocketbase';
 
-export async function registerUser(email: string, password: string, userData: Partial<User> = {}): Promise<User> {
+export async function registerUser(
+	email: string,
+	password: string,
+	userData: Partial<User> = {}
+): Promise<User> {
 	const record = await pb.collection('users').create({
 		email,
 		password,
@@ -21,4 +25,3 @@ export async function loginAdmin(email: string, password: string): Promise<User 
 	await pb.collection('_superusers').authWithPassword(email, password);
 	return pb.authStore.record as User | null;
 }
-

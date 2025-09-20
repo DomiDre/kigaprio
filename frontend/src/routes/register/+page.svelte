@@ -5,14 +5,22 @@
 	import { currentUser } from '$lib/stores/auth';
 	import { registerUser } from '$lib/services/auth';
 
-	let email = '';
-	let password = '';
-	let passwordConfirm = '';
-	let fullName = '';
-	let error = '';
-	let loading = false;
+	let email = $state('');
+	let password = $state('');
+	let passwordConfirm = $state('');
+	let fullName = $state('');
+	let error = $state('');
+	let loading = $state(false);
 
-	async function handleRegister() {
+	$effect(() => {
+		if ($currentUser) {
+			goto('/dashboard');
+		}
+	});
+
+	async function handleRegister(event: Event) {
+		event.preventDefault();
+
 		error = '';
 		loading = true;
 
@@ -44,26 +52,6 @@
 	function goToLogin() {
 		goto('/login');
 	}
-
-	async function handleGoogleRegister() {
-		error = '';
-		loading = true;
-		try {
-			await pb.collection('users').authWithOAuth2({ provider: 'google' });
-			if (pb.authStore.isValid) {
-				goto('/dashboard');
-			}
-		} catch (err) {
-			error = 'Google registration failed. ' + (err as Error).message;
-		} finally {
-			loading = false;
-		}
-	}
-
-	// Redirect if already logged in
-	$: if ($currentUser) {
-		goto('/dashboard');
-	}
 </script>
 
 <div
@@ -77,7 +65,7 @@
 		</div>
 		<!-- Main Card -->
 		<div class="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
-			<form class="space-y-6" on:submit|preventDefault={handleRegister}>
+			<form class="space-y-6" onsubmit={handleRegister}>
 				<div>
 					<label for="fullName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
 						Name
@@ -164,7 +152,7 @@
 					Haben Sie bereits einen Account?
 					<button
 						type="button"
-						on:click={goToLogin}
+						onclick={goToLogin}
 						class="ml-1 font-semibold text-blue-600 underline hover:text-blue-500"
 					>
 						Hier klicken zum einloggen.

@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
-	import { loginUser, loginAdmin } from '$lib/services/auth';
+	import { loginUser } from '$lib/services/auth';
 
 	let email = '';
 	let password = '';
