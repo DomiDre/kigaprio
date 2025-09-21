@@ -19,40 +19,16 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 
 
-# Alternative Development with Alpine (if you need smaller image)
-FROM node:20-alpine AS development-alpine
-
-WORKDIR /app
-
-# Install build dependencies and libc6-compat for better compatibility
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    libc6-compat \
-    && ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
-
-# Copy package files
-COPY package*.json ./
-
-# Force reinstall with proper platform
-RUN npm cache clean --force && \
-    npm install --platform=linuxmusl --arch=x64 && \
-    # Manually ensure rollup musl package is installed
-    npm install @rollup/rollup-linux-x64-musl@latest
-
-# Copy source code
-COPY . .
-
-# Expose port for Vite dev server
-EXPOSE 5173
-
-# Run development server
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
-
-
 # Build stage
 FROM node:20 AS builder
+
+# Accept build arguments
+ARG PUBLIC_API_URL
+ARG PUBLIC_POCKETBASE_URL
+
+# Set environment variables for the build
+ENV PUBLIC_API_URL=$PUBLIC_API_URL
+ENV PUBLIC_POCKETBASE_URL=$PUBLIC_POCKETBASE_URL
 
 WORKDIR /app
 
