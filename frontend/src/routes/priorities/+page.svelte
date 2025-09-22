@@ -305,11 +305,6 @@
 
 			weeks[weekIndex].status = 'completed';
 
-			// Unlock next week if exists
-			if (weekIndex < weeks.length - 1) {
-				weeks[weekIndex + 1].status = 'pending';
-			}
-
 			saveSuccess = 'Woche erfolgreich gespeichert!';
 			setTimeout(() => (saveSuccess = ''), 3000);
 			closeEditModal();
@@ -317,31 +312,6 @@
 			saveError = 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
 			setTimeout(() => (saveError = ''), 3000);
 			console.error('Save error:', error);
-		}
-	}
-
-	async function submitMonth() {
-		const allWeeksComplete = weeks.every((w) => w.status === 'completed');
-		if (!allWeeksComplete) {
-			saveError = 'Bitte vervollständigen Sie alle Wochen vor dem Einreichen';
-			setTimeout(() => (saveError = ''), 3000);
-			return;
-		}
-
-		try {
-			// Mark month as submitted in PocketBase
-			await pb.collection('monthlySubmissions').create({
-				userId: $currentUser?.id,
-				month: selectedMonth,
-				submittedAt: new Date().toISOString(),
-				weeks: weeks
-			});
-
-			saveSuccess = 'Monat erfolgreich eingereicht!';
-			setTimeout(() => (saveSuccess = ''), 3000);
-		} catch (error) {
-			saveError = 'Fehler beim Einreichen. Bitte versuchen Sie es erneut.';
-			setTimeout(() => (saveError = ''), 3000);
 		}
 	}
 </script>
@@ -412,13 +382,33 @@
 				<div class="mb-6 flex gap-2 overflow-x-auto pb-2">
 					{#each weeks as week, index}
 						<button
-							class="min-w-[80px] flex-none rounded-lg px-4 py-2 shadow transition
-							{activeWeekIndex === index
+							class="flex min-w-[80px] flex-none flex-col items-center rounded-lg px-4 py-2 shadow transition
+      {activeWeekIndex === index
 								? 'bg-purple-600 text-white'
-								: 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}"
+								: week.status === 'completed'
+									? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+									: 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}"
 							onclick={() => (activeWeekIndex = index)}
 						>
-							Woche {week.weekNumber}
+							<span>Woche {week.weekNumber}</span>
+							<span class="mt-1 text-xs">
+								{#if week.status === 'completed'}
+									<span
+										class="inline-block rounded-full bg-green-500 px-2 py-0.5 font-bold text-white"
+										>✓</span
+									>
+								{:else if week.status === 'pending'}
+									<span
+										class="inline-block rounded-full bg-yellow-400 px-2 py-0.5 font-bold text-white"
+										>!</span
+									>
+								{:else}
+									<span
+										class="inline-block rounded-full bg-gray-400 px-2 py-0.5 font-bold text-white"
+										>●</span
+									>
+								{/if}
+							</span>
 						</button>
 					{/each}
 				</div>
@@ -560,16 +550,6 @@
 				</div>
 			{/if}
 		{/if}
-
-		<!-- Action Buttons -->
-		<div class="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-			<button
-				class="w-full transform rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-4 font-semibold text-white shadow-xl transition hover:scale-105 sm:w-auto"
-				onclick={submitMonth}
-			>
-				Gesamten Monat einreichen
-			</button>
-		</div>
 
 		<!-- Notifications -->
 		{#if saveError}
