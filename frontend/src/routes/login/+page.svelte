@@ -12,7 +12,7 @@
 		error = '';
 		try {
 			await loginUser(email, password);
-			goto('/dashboard');
+			goto('/');
 		} catch (err) {
 			error = (err as Error).message;
 		}
@@ -20,6 +20,10 @@
 
 	function handleLogout() {
 		pb.authStore.clear();
+		goto('/');
+	}
+
+	function handleDashboard() {
 		goto('/');
 	}
 
@@ -42,6 +46,12 @@
 			{#if $currentUser}
 				<div class="rounded-lg bg-gray-100 p-6 text-center shadow dark:bg-gray-700">
 					<p class="mb-4 text-gray-800 dark:text-gray-100">Willkommen, {$currentUser.email}!</p>
+					<button
+						class="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-semibold text-white shadow-lg transition hover:scale-105"
+						on:click={handleDashboard}
+					>
+						Dashboard
+					</button>
 					<button
 						class="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-semibold text-white shadow-lg transition hover:scale-105"
 						on:click={handleLogout}
