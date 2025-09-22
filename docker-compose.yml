@@ -19,10 +19,6 @@ services:
       - "traefik.http.routers.kigaprio-backend.tls=true"
       - "traefik.http.routers.kigaprio-backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
-      # Rate limiting
-      - "traefik.http.middlewares.kigaprio-ratelimit.ratelimit.average=100"
-      - "traefik.http.middlewares.kigaprio-ratelimit.ratelimit.burst=50"
-      - "traefik.http.routers.kigaprio-backend.middlewares=kigaprio-ratelimit"
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -83,33 +79,14 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.kigaprio-backend.rule=Host(`pb.kiga.dhjd.de`)"
-      - "traefik.http.routers.kigaprio-backend.entrypoints=websecure"
-      - "traefik.http.routers.kigaprio-backend.tls=true"
-      - "traefik.http.routers.kigaprio-backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8090"
-      # Rate limiting
-      - "traefik.http.middlewares.kigaprio-ratelimit.ratelimit.average=100"
-      - "traefik.http.middlewares.kigaprio-ratelimit.ratelimit.burst=50"
-      - "traefik.http.routers.kigaprio-backend.middlewares=kigaprio-ratelimit"
+      - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
+      - "traefik.http.routers.pocketbase.entrypoints=websecure"
+      - "traefik.http.routers.pocketbase.tls=true"
+      - "traefik.http.routers.pocketbase.tls.certresolver=letsencrypt"
+      - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
     secrets:
       - pb_admin_email
       - pb_admin_password
-
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: kigaprio-redis
-  #   restart: unless-stopped
-  #   command: redis-server --appendonly yes
-  #   volumes:
-  #     - redis-data:/data
-  #   networks:
-  #     - kigaprio-prod
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
 
 volumes:
   frontend-static:
