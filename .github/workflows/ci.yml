@@ -46,31 +46,6 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
     
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: kigaprio_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-    
     steps:
     - uses: actions/checkout@v4
     
@@ -91,8 +66,9 @@ jobs:
       run: uv run pytest
       working-directory: ./backend
       env:
-        DATABASE_URL: postgresql://user:password@localhost:5432/kigaprio_test
-        REDIS_URL: redis://localhost:6379
+        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
+        PUBLIC_API_URL: http://backend:8000
+
   frontend-security:
     name: Frontend Security Audit
     runs-on: ubuntu-latest
@@ -114,6 +90,7 @@ jobs:
     - name: Run npm audit
       run: npm audit --audit-level=high
       working-directory: ./frontend
+
   frontend-checks:
     name: Frontend Lint & Format
     runs-on: ubuntu-latest
@@ -135,7 +112,7 @@ jobs:
     - name: Run ESLint
       run: npm run lint
       working-directory: ./frontend
-    
+
     - name: Run Prettier check
       run: npm run format:check
       working-directory: ./frontend
@@ -143,10 +120,16 @@ jobs:
     - name: Run Svelte check
       run: npm run check
       working-directory: ./frontend
+      env:
+        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
+        PUBLIC_API_URL: http://backend:8000
     
     - name: Run type checking
       run: npm run check:types
       working-directory: ./frontend
+      env:
+        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
+        PUBLIC_API_URL: http://backend:8000
 
   frontend-tests:
     name: Frontend Tests
@@ -169,6 +152,9 @@ jobs:
     - name: Run tests
       run: npm run test
       working-directory: ./frontend
+      env:
+        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
+        PUBLIC_API_URL: http://backend:8000
 
   frontend-build:
     name: Frontend Build
@@ -187,7 +173,10 @@ jobs:
     - name: Install dependencies
       run: npm ci
       working-directory: ./frontend
-    
+
     - name: Build
       run: npm run build
       working-directory: ./frontend
+      env:
+        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
+        PUBLIC_API_URL: http://backend:8000
