@@ -38,7 +38,7 @@
 		}
 
 		try {
-			await registerUser(email, password, { name: fullName });
+			await registerUser(email, password, fullName);
 			// Auto-login after registration
 			await pb.collection('users').authWithPassword(email, password);
 			goto('/dashboard');
