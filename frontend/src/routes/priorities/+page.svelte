@@ -33,49 +33,71 @@
 	function getWeeksForMonth(year: number, month: number): WeekData[] {
 		const weeks: WeekData[] = [];
 		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0); // Last day of the month
 
-		// Find first Monday of the month or the Monday of the week containing the 1st
+		// Find the Monday of the week containing the 1st of the month
 		let currentDate = new Date(firstDay);
 		const dayOfWeek = currentDate.getDay();
-		if (dayOfWeek !== 1) {
-			// If not Monday
-			const daysToMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-			currentDate.setDate(currentDate.getDate() + daysToMonday);
-		}
+		const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to go back to Monday
+		currentDate.setDate(currentDate.getDate() - daysToSubtract);
 
 		let weekNumber = 1;
 
-		// Generate 4 weeks
-		while (weekNumber <= 4) {
+		// Generate weeks until we've covered all workdays in the month
+		while (true) {
 			const startDate = new Date(currentDate);
 			const endDate = new Date(currentDate);
 			endDate.setDate(endDate.getDate() + 4); // Friday
 
-			// Format dates as DD.MM.YYYY
-			const formatDate = (date: Date) => {
-				const day = date.getDate().toString().padStart(2, '0');
-				const monthStr = (date.getMonth() + 1).toString().padStart(2, '0');
-				const year = date.getFullYear();
-				return `${day}.${monthStr}.${year}`;
-			};
+			// Check if this week contains any days from our target month
+			const weekDays: Date[] = [];
+			for (let i = 0; i < 5; i++) {
+				const day = new Date(startDate);
+				day.setDate(day.getDate() + i);
+				weekDays.push(day);
+			}
 
-			weeks.push({
-				weekNumber,
-				startDate: formatDate(startDate),
-				endDate: formatDate(endDate),
-				priorities: {
-					monday: null,
-					tuesday: null,
-					wednesday: null,
-					thursday: null,
-					friday: null
-				},
-				status: weekNumber === 1 ? 'pending' : 'locked'
-			});
+			// Only include weeks that have at least one workday in the target month
+			const hasRelevantDay = weekDays.some(
+				(day) => day.getMonth() === month && day.getFullYear() === year
+			);
+
+			if (!hasRelevantDay && weekNumber > 1) {
+				// We've gone past the month
+				break;
+			}
+
+			if (hasRelevantDay) {
+				// Format dates as DD.MM.YYYY
+				const formatDate = (date: Date) => {
+					const day = date.getDate().toString().padStart(2, '0');
+					const monthStr = (date.getMonth() + 1).toString().padStart(2, '0');
+					const year = date.getFullYear();
+					return `${day}.${monthStr}.${year}`;
+				};
+
+				weeks.push({
+					weekNumber,
+					startDate: formatDate(startDate),
+					endDate: formatDate(endDate),
+					priorities: {
+						monday: null,
+						tuesday: null,
+						wednesday: null,
+						thursday: null,
+						friday: null
+					},
+					status: 'pending'
+				});
+
+				weekNumber++;
+			}
 
 			// Move to next week
 			currentDate.setDate(currentDate.getDate() + 7);
-			weekNumber++;
+
+			// Safety check: don't generate more than 6 weeks (should never happen)
+			if (weekNumber > 6) break;
 		}
 
 		return weeks;
@@ -140,12 +162,13 @@
 
 	// Get day dates for display
 	function getDayDates(weekData: WeekData): string[] {
-		const [day, _month] = weekData.startDate.split('.');
-		const startDay = parseInt(day);
+		const [day, month, year] = weekData.startDate.split('.');
+		const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 
 		return Array.from({ length: 5 }, (_, i) => {
-			const dayNum = startDay + i;
-			return `${dayNum}.`;
+			const currentDate = new Date(startDate);
+			currentDate.setDate(currentDate.getDate() + i);
+			return `${currentDate.getDate()}.`;
 		});
 	}
 
@@ -164,7 +187,7 @@
 
 	// Derived state
 	let completedWeeks = $derived(weeks.filter((w) => w.status === 'completed').length);
-	let progressPercentage = $derived((completedWeeks / weeks.length) * 100);
+	let progressPercentage = $derived(weeks.length > 0 ? (completedWeeks / weeks.length) * 100 : 0);
 
 	// Update weeks when month changes
 	$effect(() => {
@@ -207,11 +230,6 @@
 						status: 'completed',
 						id: record.id
 					};
-
-					// Unlock next week if this one is completed
-					if (weekIndex < weeks.length - 1 && weeks[weekIndex + 1].status === 'locked') {
-						weeks[weekIndex + 1].status = 'pending';
-					}
 				}
 			});
 		} catch (error) {
@@ -220,8 +238,6 @@
 	}
 
 	function selectPriority(weekIndex: number, day: keyof DayPriorities, priority: Priority) {
-		if (!priority || weeks[weekIndex].status === 'locked') return;
-
 		// Check if this priority is already used this week
 		const currentWeek = weeks[weekIndex];
 		const dayEntries = Object.entries(currentWeek.priorities) as [keyof DayPriorities, Priority][];
@@ -238,7 +254,6 @@
 	}
 
 	function openEditModal(week: WeekData, index: number) {
-		if (week.status === 'locked') return;
 		editingWeek = { ...week };
 		activeWeekIndex = index;
 		showEditModal = true;
@@ -457,7 +472,6 @@
 											{weeks[activeWeekIndex].priorities[dayKey as keyof DayPriorities] === priority
 												? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white'
 												: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
-											disabled={weeks[activeWeekIndex].status === 'locked'}
 											onclick={() =>
 												selectPriority(
 													activeWeekIndex,
@@ -535,14 +549,12 @@
 									</div>
 								{/each}
 							</div>
-							{#if week.status === 'pending'}
-								<button
-									class="mt-3 w-full rounded-lg bg-purple-600 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
-									onclick={() => openEditModal(week, index)}
-								>
-									Bearbeiten
-								</button>
-							{/if}
+							<button
+								class="mt-3 w-full rounded-lg bg-purple-600 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+								onclick={() => openEditModal(week, index)}
+							>
+								Bearbeiten
+							</button>
 						</div>
 					{/each}
 				</div>
@@ -561,12 +573,16 @@
 
 		<!-- Notifications -->
 		{#if saveError}
-			<div class="fixed right-4 bottom-4 rounded-lg bg-red-500 px-4 py-3 text-white shadow-lg">
+			<div
+				class="fixed right-4 bottom-4 z-[60] rounded-lg bg-red-500 px-4 py-3 text-white shadow-lg"
+			>
 				{saveError}
 			</div>
 		{/if}
 		{#if saveSuccess}
-			<div class="fixed right-4 bottom-4 rounded-lg bg-green-500 px-4 py-3 text-white shadow-lg">
+			<div
+				class="fixed right-4 bottom-4 z-[60] rounded-lg bg-green-500 px-4 py-3 text-white shadow-lg"
+			>
 				{saveSuccess}
 			</div>
 		{/if}
