@@ -3,6 +3,7 @@
 	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
 	import type { Priority, DayPriorities, WeekData } from '$lib/types/priorities.ts';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	// Priority configuration with proper typing
 	const priorityColors: Record<1 | 2 | 3 | 4 | 5, string> = {
@@ -32,11 +33,10 @@
 	// Helper function to get week dates for a given month
 	function getWeeksForMonth(year: number, month: number): WeekData[] {
 		const weeks: WeekData[] = [];
-		const firstDay = new Date(year, month, 1);
-		const lastDay = new Date(year, month + 1, 0); // Last day of the month
+		const firstDay = new SvelteDate(year, month, 1);
 
 		// Find the Monday of the week containing the 1st of the month
-		let currentDate = new Date(firstDay);
+		let currentDate = new SvelteDate(firstDay);
 		const dayOfWeek = currentDate.getDay();
 		const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to go back to Monday
 		currentDate.setDate(currentDate.getDate() - daysToSubtract);
@@ -45,14 +45,14 @@
 
 		// Generate weeks until we've covered all workdays in the month
 		while (true) {
-			const startDate = new Date(currentDate);
-			const endDate = new Date(currentDate);
+			const startDate = new SvelteDate(currentDate);
+			const endDate = new SvelteDate(currentDate);
 			endDate.setDate(endDate.getDate() + 4); // Friday
 
 			// Check if this week contains any days from our target month
 			const weekDays: Date[] = [];
 			for (let i = 0; i < 5; i++) {
-				const day = new Date(startDate);
+				const day = new SvelteDate(startDate);
 				day.setDate(day.getDate() + i);
 				weekDays.push(day);
 			}
@@ -166,7 +166,7 @@
 		const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 
 		return Array.from({ length: 5 }, (_, i) => {
-			const currentDate = new Date(startDate);
+			const currentDate = new SvelteDate(startDate);
 			currentDate.setDate(currentDate.getDate() + i);
 			return `${currentDate.getDate()}.`;
 		});
@@ -334,7 +334,7 @@
 					bind:value={selectedMonth}
 					class="ml-2 border-0 bg-transparent font-semibold text-purple-600 focus:outline-none dark:text-purple-400"
 				>
-					{#each monthOptions as month}
+					{#each monthOptions as month (month)}
 						<option value={month}>{month}</option>
 					{/each}
 				</select>
@@ -345,7 +345,7 @@
 		<div class="mb-6 rounded-xl bg-white p-4 shadow-lg dark:bg-gray-800">
 			<div class="flex flex-wrap items-center justify-center gap-4 text-sm">
 				<span class="font-semibold text-gray-700 dark:text-gray-300">Priorität:</span>
-				{#each Object.entries(priorityLabels) as [priority, label]}
+				{#each Object.entries(priorityLabels) as [priority, label] (label)}
 					<div class="flex items-center gap-2">
 						<span
 							class="flex h-8 w-8 items-center justify-center rounded-full {priorityColors[
@@ -380,7 +380,7 @@
 			<!-- Mobile Week Tabs -->
 			{#if isMobile}
 				<div class="mb-6 flex gap-2 overflow-x-auto pb-2">
-					{#each weeks as week, index}
+					{#each weeks as week, index (index)}
 						<button
 							class="flex min-w-[80px] flex-none flex-col items-center rounded-lg px-4 py-2 shadow transition
       {activeWeekIndex === index
@@ -441,7 +441,7 @@
 					</div>
 
 					<div class="space-y-4">
-						{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex}
+						{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex (dayKey)}
 							{@const dayDates = getDayDates(weeks[activeWeekIndex])}
 							{@const monthName = weeks[activeWeekIndex].startDate.split('.')[1]}
 							<div
@@ -456,7 +456,7 @@
 									</span>
 								</div>
 								<div class="flex justify-center gap-2">
-									{#each [1, 2, 3, 4, 5] as priority}
+									{#each [1, 2, 3, 4, 5] as priority (priority)}
 										<button
 											class="h-12 w-12 transform rounded-full font-bold shadow transition
 											{weeks[activeWeekIndex].priorities[dayKey as keyof DayPriorities] === priority
@@ -491,7 +491,7 @@
 			{:else}
 				<!-- Desktop Grid View -->
 				<div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-					{#each weeks as week, index}
+					{#each weeks as week, index (index)}
 						<div
 							class="rounded-xl bg-white p-4 shadow-xl transition hover:translate-y-[-2px] dark:bg-gray-800
 						{week.status === 'pending' ? 'border-2 border-purple-400' : ''}"
@@ -517,7 +517,7 @@
 								{week.startDate} - {week.endDate}
 							</div>
 							<div class="space-y-2">
-								{#each Object.entries(dayNames) as [dayKey, dayName]}
+								{#each Object.entries(dayNames) as [dayKey, dayName] (dayKey)}
 									{@const priority = week.priorities[dayKey as keyof DayPriorities]}
 									<div
 										class="flex items-center justify-between rounded p-2
@@ -600,7 +600,7 @@
 				</div>
 
 				<div class="space-y-4">
-					{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex}
+					{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex (dayKey)}
 						{@const dayDates = getDayDates(editingWeek)}
 						{@const monthName = editingWeek.startDate.split('.')[1]}
 						<div
@@ -612,7 +612,7 @@
 								</span>
 							</div>
 							<div class="flex justify-center gap-3">
-								{#each [1, 2, 3, 4, 5] as priority}
+								{#each [1, 2, 3, 4, 5] as priority (priority)}
 									<button
 										class="h-14 w-14 transform rounded-full font-bold shadow transition
 											{editingWeek.priorities[dayKey as keyof DayPriorities] === priority
