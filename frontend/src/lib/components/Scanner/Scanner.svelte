@@ -4,7 +4,7 @@
 	import AnalysisResults from './AnalysisResults.svelte';
 	import { CameraService } from '../../services/camera.service';
 	import { DetectionService } from '../../services/detection.service';
-	import type { ScannerState, CameraFacingMode } from '../../types/scanner.types';
+	import type { ScannerState, CameraFacingMode } from '../../types/scanner';
 
 	// Services
 	const cameraService = new CameraService();

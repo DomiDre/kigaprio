@@ -1,4 +1,4 @@
-import type { AnalysisResult } from '../types/scanner.types';
+import type { AnalysisResult } from '../types/scanner';
 
 export class ApiService {
 	private baseUrl: string;

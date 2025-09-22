@@ -162,3 +162,10 @@ copy-static-to-backend:
 dev-with-static:
     docker compose -f docker-compose.dev-with-static.yml up
 
+# Initialize secrets needed for running containers
+init-secrets:
+    ./scripts/init-secrets.sh
+
+# Initialize pocketbase directories for storage
+pocketbase-init: init-secrets
+    ./pocketbase/init.sh

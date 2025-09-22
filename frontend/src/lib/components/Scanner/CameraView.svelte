@@ -2,7 +2,7 @@
 	import DetectionOverlay from './DetectionOverlay.svelte';
 	import type { CameraService } from '../../services/camera.service';
 	import type { DetectionService } from '../../services/detection.service';
-	import type { CameraFacingMode, DetectionResult } from '../../types/scanner.types';
+	import type { CameraFacingMode, DetectionResult } from '../../types/scanner';
 
 	interface Props {
 		cameraService: CameraService;

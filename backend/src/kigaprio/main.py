@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from kigaprio.api.routes import analyze, health, upload
+from kigaprio.api.routes import analyze, health, priolist, upload
 from kigaprio.config import settings
 
 # Create FastAPI app
@@ -19,6 +19,8 @@ app = FastAPI(
 )
 ENV = os.getenv("ENV", "production")
 SERVE_STATIC = os.getenv("SERVE_STATIC", "false").lower() == "true"
+POCKETBASE_URL = os.getenv("PUBLIC_POCKETBASE_URL")
+assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
 
 # CORS configuration
 if ENV == "development":
@@ -27,9 +29,7 @@ if ENV == "development":
         CORSMiddleware,
         allow_origins=[
             "http://localhost:5173",  # Vite dev server
-            "http://localhost:8000",  # Backend
             "http://127.0.0.1:5173",
-            "http://127.0.0.1:8000",
         ],
         allow_credentials=True,
         allow_methods=["*"],
@@ -52,6 +52,7 @@ else:
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(upload.router, prefix="/api/v1", tags=["Upload"])
 app.include_router(analyze.router, prefix="/api/v1", tags=["Analyze"])
+app.include_router(priolist.router, prefix="/api/v1", tags=["Prioliste"])
 
 # Serve static files (compiled Svelte frontend)
 static_path = Path("/app/static")
@@ -77,7 +78,7 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
 
         # Catch-all route for SvelteKit client-side routing
         @app.get("/{full_path:path}")
-        async def serve_spa(request: Request, full_path: str):
+        async def serve_spa(full_path: str):
             # Skip API routes
             if full_path.startswith("api/"):
                 return {"error": "Not found"}, 404
