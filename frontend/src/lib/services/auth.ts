@@ -1,24 +1,20 @@
 import { pb } from '$lib/services/pocketbase';
 import type { User } from '$lib/types/pocketbase';
 
-export async function registerUser(
-	email: string,
-	password: string,
-	name: string
-): Promise<User> {
+export async function registerUser(email: string, password: string, name: string): Promise<User> {
 	const record = await pb.collection('users').create({
 		email,
 		password,
 		passwordConfirm: password,
 		role: 'user',
-		name,
+		name
 	});
 	const user: User = {
 		id: record.id,
 		name: record.name,
 		email: record.email,
 		role: record.role
-	}
+	};
 	return user;
 }
 
