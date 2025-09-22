@@ -490,7 +490,7 @@
 				</div>
 			{:else}
 				<!-- Desktop Grid View -->
-				<div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+				<div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-{weeks.length}">
 					{#each weeks as week, index (index)}
 						<div
 							class="rounded-xl bg-white p-4 shadow-xl transition hover:translate-y-[-2px] dark:bg-gray-800
