@@ -11,7 +11,7 @@ services:
     environment:
       - ENV=production
       - DEBUG=false
-      - PUBLIC_POCKETBASE_URL=http://pocketbase:8090
+      - POCKETBASE_URL=http://pocketbase:8090
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kigaprio-backend.rule=Host(`kiga.dhjd.de`)"
@@ -44,14 +44,9 @@ services:
       target: builder
     image: kigaprio-frontend-builder
     restart: "no"
-    environment:
-      - PUBLIC_API_URL=https://kiga.dhjd.de
-      - PUBLIC_POCKETBASE_URL=https://pb.kiga.dhjd.de
     volumes:
       - frontend-static:/shared/build
     command: sh -c "cp -r /app/build/* /shared/build/"
-    networks:
-      - kigaprio-prod
 
   pocketbase:
     build:
@@ -76,14 +71,14 @@ services:
       retries: 5
     networks:
       - kigaprio-prod
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
-      - "traefik.http.routers.pocketbase.entrypoints=websecure"
-      - "traefik.http.routers.pocketbase.tls=true"
-      - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
-      - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
+    #   - proxy
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
+    #   - "traefik.http.routers.pocketbase.entrypoints=websecure"
+    #   - "traefik.http.routers.pocketbase.tls=true"
+    #   - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
+    #   - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
     secrets:
       - pb_admin_email
       - pb_admin_password
@@ -99,6 +94,5 @@ secrets:
 
 networks:
   kigaprio-prod:
-    driver: bridge
   proxy:
     external: true

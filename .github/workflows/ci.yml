@@ -66,8 +66,7 @@ jobs:
       run: uv run pytest
       working-directory: ./backend
       env:
-        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
-        PUBLIC_API_URL: http://backend:8000
+        POCKETBASE_URL: http://pocketbase:8090
 
   frontend-security:
     name: Frontend Security Audit
@@ -120,16 +119,10 @@ jobs:
     - name: Run Svelte check
       run: npm run check
       working-directory: ./frontend
-      env:
-        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
-        PUBLIC_API_URL: http://backend:8000
     
     - name: Run type checking
       run: npm run check:types
       working-directory: ./frontend
-      env:
-        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
-        PUBLIC_API_URL: http://backend:8000
 
   frontend-tests:
     name: Frontend Tests
@@ -152,9 +145,6 @@ jobs:
     - name: Run tests
       run: npm run test
       working-directory: ./frontend
-      env:
-        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
-        PUBLIC_API_URL: http://backend:8000
 
   frontend-build:
     name: Frontend Build
@@ -177,6 +167,3 @@ jobs:
     - name: Build
       run: npm run build
       working-directory: ./frontend
-      env:
-        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
-        PUBLIC_API_URL: http://backend:8000
