@@ -5,11 +5,11 @@
 	import type { Priority, DayPriorities, WeekData } from '$lib/types/priorities';
 
 	// Import components
-	import Header from '$lib/components/Header.svelte';
 	import Legend from '$lib/components/Legend.svelte';
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
 	import WeekTabs from '$lib/components/WeekTabs.svelte';
 	import Notifications from '$lib/components/Notifications.svelte';
+	import Header from './Header.svelte';
 	import MobileWeekView from './MobileWeekView.svelte';
 	import DesktopGridView from './DesktopGridView.svelte';
 	import EditModal from './EditModal.svelte';
