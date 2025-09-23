@@ -71,14 +71,14 @@ services:
       retries: 5
     networks:
       - kigaprio-prod
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
-      - "traefik.http.routers.pocketbase.entrypoints=websecure"
-      - "traefik.http.routers.pocketbase.tls=true"
-      - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
-      - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
+    #   - proxy
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
+    #   - "traefik.http.routers.pocketbase.entrypoints=websecure"
+    #   - "traefik.http.routers.pocketbase.tls=true"
+    #   - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
+    #   - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
     secrets:
       - pb_admin_email
       - pb_admin_password
@@ -94,6 +94,5 @@ secrets:
 
 networks:
   kigaprio-prod:
-    driver: bridge
   proxy:
     external: true
