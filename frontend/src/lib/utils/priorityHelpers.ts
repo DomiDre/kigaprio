@@ -2,7 +2,7 @@ import type { DayPriorities } from '$lib/types/priorities';
 
 export function validateWeekPriorities(priorities: DayPriorities): {
 	isValid: boolean;
-	message: string
+	message: string;
 } {
 	const allDaysSet = Object.values(priorities).every((p) => p !== null);
 	if (!allDaysSet) {

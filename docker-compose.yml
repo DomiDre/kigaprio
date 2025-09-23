@@ -17,7 +17,7 @@ services:
       - "traefik.http.routers.kigaprio-backend.rule=Host(`kiga.dhjd.de`)"
       - "traefik.http.routers.kigaprio-backend.entrypoints=websecure"
       - "traefik.http.routers.kigaprio-backend.tls=true"
-      - "traefik.http.routers.kigaprio-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.kigaprio-backend.tls.certresolver=myresolver"
       - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
     depends_on:
       pocketbase:
@@ -82,7 +82,7 @@ services:
       - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
       - "traefik.http.routers.pocketbase.entrypoints=websecure"
       - "traefik.http.routers.pocketbase.tls=true"
-      - "traefik.http.routers.pocketbase.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
       - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
     secrets:
       - pb_admin_email
