@@ -30,6 +30,7 @@
 	let isMobile = $state(false);
 	let showEditModal = $state(false);
 	let editingWeek = $state<WeekData | null>(null);
+	let editingWeekIndex = $state<number>(0); // Track which week is being edited
 	let saveError = $state('');
 	let saveSuccess = $state('');
 	let weeks = $state<WeekData[]>([]);
@@ -96,7 +97,7 @@
 
 	function openEditModal(week: WeekData, index: number) {
 		editingWeek = { ...week };
-		activeWeekIndex = index;
+		editingWeekIndex = index; // Store which week we're editing
 		showEditModal = true;
 	}
 
@@ -132,7 +133,12 @@
 				weeks[weekIndex].id = record.id;
 			}
 
+			// Update the status to completed
 			weeks[weekIndex].status = 'completed';
+
+			// Force reactivity update by reassigning the array
+			weeks = [...weeks];
+
 			saveSuccess = 'Woche erfolgreich gespeichert!';
 			setTimeout(() => (saveSuccess = ''), 3000);
 			closeEditModal();
@@ -141,6 +147,16 @@
 			setTimeout(() => (saveError = ''), 3000);
 			console.error('Save error:', error);
 		}
+	}
+
+	async function saveEditingWeek() {
+		if (!editingWeek) return;
+
+		// Update the week in the weeks array with the edited data
+		weeks[editingWeekIndex] = { ...editingWeek };
+
+		// Save the week
+		await saveWeek(editingWeekIndex);
 	}
 </script>
 
@@ -172,6 +188,14 @@
 	</div>
 
 	{#if showEditModal && editingWeek}
-		<EditModal {editingWeek} {activeWeekIndex} {closeEditModal} {saveWeek} {weeks} {getDayDates} />
+		<EditModal
+			{editingWeek}
+			activeWeekIndex={editingWeekIndex}
+			{closeEditModal}
+			saveWeek={saveEditingWeek}
+			{weeks}
+			{getDayDates}
+		/>
 	{/if}
 </div>
+
