@@ -11,7 +11,7 @@ services:
     environment:
       - ENV=production
       - DEBUG=false
-      - PUBLIC_POCKETBASE_URL=http://pocketbase:8090
+      - POCKETBASE_URL=http://pocketbase:8090
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kigaprio-backend.rule=Host(`kiga.dhjd.de`)"
@@ -44,14 +44,9 @@ services:
       target: builder
     image: kigaprio-frontend-builder
     restart: "no"
-    environment:
-      - PUBLIC_API_URL=https://kiga.dhjd.de
-      - PUBLIC_POCKETBASE_URL=https://pb.kiga.dhjd.de
     volumes:
       - frontend-static:/shared/build
     command: sh -c "cp -r /app/build/* /shared/build/"
-    networks:
-      - kigaprio-prod
 
   pocketbase:
     build:

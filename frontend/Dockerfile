@@ -22,14 +22,6 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 # Build stage
 FROM node:20 AS builder
 
-# Accept build arguments
-ARG PUBLIC_API_URL
-ARG PUBLIC_POCKETBASE_URL
-
-# Set environment variables for the build
-ENV PUBLIC_API_URL=$PUBLIC_API_URL
-ENV PUBLIC_POCKETBASE_URL=$PUBLIC_POCKETBASE_URL
-
 WORKDIR /app
 
 # Copy package files

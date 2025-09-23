@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from kigaprio.api.routes import analyze, health, priolist, upload
+from kigaprio.api.routes import analyze, database, health, priolist, upload
 from kigaprio.config import settings
 
 # Create FastAPI app
@@ -19,7 +19,7 @@ app = FastAPI(
 )
 ENV = os.getenv("ENV", "production")
 SERVE_STATIC = os.getenv("SERVE_STATIC", "false").lower() == "true"
-POCKETBASE_URL = os.getenv("PUBLIC_POCKETBASE_URL")
+POCKETBASE_URL = os.getenv("POCKETBASE_URL")
 assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
 
 # CORS configuration
@@ -53,6 +53,7 @@ app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(upload.router, prefix="/api/v1", tags=["Upload"])
 app.include_router(analyze.router, prefix="/api/v1", tags=["Analyze"])
 app.include_router(priolist.router, prefix="/api/v1", tags=["Prioliste"])
+app.include_router(database.router, prefix="/api/v1", tags=["Pocketbase"])
 
 # Serve static files (compiled Svelte frontend)
 static_path = Path("/app/static")

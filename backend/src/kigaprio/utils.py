@@ -6,7 +6,7 @@ from fastapi import HTTPException, Request, UploadFile, status
 
 from kigaprio.config import settings
 
-POCKETBASE_URL = os.getenv("PUBLIC_POCKETBASE_URL")
+POCKETBASE_URL = os.getenv("POCKETBASE_URL")
 assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
 
 
