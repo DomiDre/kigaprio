@@ -14,7 +14,7 @@
 
 	$effect(() => {
 		if ($currentUser) {
-			goto('/dashboard');
+			goto('/');
 		}
 	});
 
@@ -41,7 +41,7 @@
 			await registerUser(email, password, fullName);
 			// Auto-login after registration
 			await pb.collection('users').authWithPassword(email, password);
-			goto('/dashboard');
+			goto('/');
 		} catch (err) {
 			error = (err as Error).message;
 		} finally {
