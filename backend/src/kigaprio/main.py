@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from kigaprio.api.routes import analyze, database, health, priolist, upload
+from kigaprio.api.routes import admin, analyze, database, health, priolist, upload
 from kigaprio.config import settings
 
 # Create FastAPI app
@@ -54,6 +54,7 @@ app.include_router(upload.router, prefix="/api/v1", tags=["Upload"])
 app.include_router(analyze.router, prefix="/api/v1", tags=["Analyze"])
 app.include_router(priolist.router, prefix="/api/v1", tags=["Prioliste"])
 app.include_router(database.router, prefix="/api/v1", tags=["Pocketbase"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 # Serve static files (compiled Svelte frontend)
 static_path = Path("/app/static")

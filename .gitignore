@@ -211,3 +211,4 @@ backend/images
 backend/scripts/output
 .secrets
 pocketbase/pb_data
+redis

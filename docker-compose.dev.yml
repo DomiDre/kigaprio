@@ -18,8 +18,16 @@ services:
     ports:
       - "8000:8000"
     command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
-    # depends_on:
-    #   - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -37,7 +45,8 @@ services:
     ports:
       - "5173:5173"  # Vite dev server
     depends_on:
-      - pocketbase
+      backend:
+        condition: service_healthy
 
   pocketbase:
     build:
@@ -66,9 +75,24 @@ services:
       - pb_admin_email
       - pb_admin_password
 
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 secrets:
   pb_admin_email:
     file: ./.secrets/pb_admin_email
   pb_admin_password:
     file: ./.secrets/pb_admin_password
+  
 
