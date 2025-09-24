@@ -12,6 +12,8 @@ mkdir -p "$SECRETS_DIR"
 declare -a secrets=(
 	"pb_admin_email:PROMPT"
 	"pb_admin_password:RANDOM"
+	"pb_service_email:PROMPT"
+	"pb_service_password:RANDOM"
 )
 
 generate_random() {

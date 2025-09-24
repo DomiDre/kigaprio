@@ -84,9 +84,6 @@ async def admin_login(
     """Authenticate a PocketBase admin and return a token"""
     try:
         async with httpx.AsyncClient() as client:
-            print(
-                f" Sending to {POCKETBASE_URL}/api/collections/_superusers/auth-with-password"
-            )
             response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/_superusers/auth-with-password",
                 json={"identity": request.identity, "password": request.password},
@@ -123,6 +120,7 @@ async def get_magic_word_info(
 
     try:
         magic_word = await get_magic_word_from_cache_or_db(redis_client)
+        print(magic_word)
         if not magic_word:
             magic_word = DEFAULT_MAGIC_WORD
 

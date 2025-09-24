@@ -21,6 +21,7 @@ POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 
+
 class MagicWordRequest(BaseModel):
     magic_word: str = Field(..., min_length=1)
 

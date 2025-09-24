@@ -2,9 +2,13 @@ import os
 
 import httpx
 import redis
+from fastapi import HTTPException
 
 POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
 DEFAULT_MAGIC_WORD = os.getenv("DEFAULT_MAGIC_WORD", "initialsetup2025")
+
+SERVICE_ACCOUNT_EMAIL = os.getenv("PB_SERVICE_EMAIL")
+SERVICE_ACCOUNT_PASSWORD = os.getenv("PB_SERVICE_PASSWORD")
 
 
 async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | None:
@@ -18,9 +22,25 @@ async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | No
     try:
         async with httpx.AsyncClient() as client:
             # Use PocketBase's public API to get system settings
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": SERVICE_ACCOUNT_EMAIL,
+                    "password": SERVICE_ACCOUNT_PASSWORD,
+                },
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=401, detail="Invalid service credentials"
+                )
+
+            data = response.json()
+            service_token = data.get("token")
             response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/system_settings/records",
                 params={"filter": 'key="registration_magic_word"'},
+                headers={"Authorization": f"Bearer {service_token}"},
             )
 
             if response.status_code == 200:

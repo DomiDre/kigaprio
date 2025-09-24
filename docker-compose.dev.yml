@@ -9,6 +9,7 @@ services:
       - ./backend/src:/app/src
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/uv.lock:/app/uv.lock:ro
+      - ./scripts/load-secrets.sh:/usr/local/bin/load-secrets.sh:ro
     environment:
       - ENV=development
       - DEBUG=true
@@ -17,6 +18,7 @@ services:
       - POCKETBASE_URL=http://pocketbase:8090
     ports:
       - "8000:8000"
+    entrypoint: /usr/local/bin/load-secrets.sh
     command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -28,6 +30,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    secrets:
+      - pb_service_email
+      - pb_service_password
 
   frontend:
     build:
@@ -94,5 +99,9 @@ secrets:
     file: ./.secrets/pb_admin_email
   pb_admin_password:
     file: ./.secrets/pb_admin_password
+  pb_service_email:
+    file: ./.secrets/pb_service_email
+  pb_service_password:
+    file: ./.secrets/pb_service_password
   
 
