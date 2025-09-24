@@ -1,6 +1,4 @@
-import json
 import os
-from datetime import datetime
 
 import httpx
 import redis
@@ -89,26 +87,9 @@ async def create_or_update_magic_word(
                 if success:
                     # Clear cache
                     await redis_client.delete("magic_word:current")
-                    # Log the change
-                    await log_magic_word_change(redis_client, new_word, admin_email)
 
                 return success
     except Exception as e:
         print(f"Error updating magic word in database: {e}")
 
     return False
-
-
-async def log_magic_word_change(
-    redis_client: redis.Redis, new_word: str, admin_email: str
-):
-    """Log magic word changes for audit trail"""
-    log_entry = {
-        "timestamp": datetime.now().isoformat(),
-        "action": "magic_word_changed",
-        "new_word_length": len(new_word),
-        "changed_by": admin_email,
-    }
-    # Keep logs for 30 days
-    log_key = f"audit:magic_word:{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    await redis_client.setex(log_key, 2592000, json.dumps(log_entry))

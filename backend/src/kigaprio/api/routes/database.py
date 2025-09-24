@@ -55,36 +55,6 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "127.0.0.1"
 
 
-def log_registration_attempt(
-    redis_client: redis.Redis, success: bool, email: str | None = None
-):
-    """Log registration attempts for monitoring"""
-    date_key = f"stats:registrations:{datetime.now().strftime('%Y%m%d')}"
-
-    if success:
-        redis_client.hincrby(date_key, "successful", 1)
-        # Log successful registration emails (hashed for privacy)
-        if email:
-            import hashlib
-
-            email_hash = hashlib.sha256(email.lower().encode()).hexdigest()[:8]
-            redis_client.sadd(
-                f"stats:registered_users:{datetime.now().strftime('%Y%m%d')}",
-                email_hash,
-            )
-    else:
-        redis_client.hincrby(date_key, "failed", 1)
-        # Track failed attempts per email domain
-        if email and "@" in email:
-            domain = email.split("@")[1]
-            redis_client.hincrby(
-                f"stats:failed_domains:{datetime.now().strftime('%Y%m%d')}", domain, 1
-            )
-
-    # Expire after 90 days
-    redis_client.expire(date_key, 7776000)
-
-
 @router.post("/verify-magic-word")
 async def verify_magic_word(
     request: MagicWordRequest,
@@ -114,12 +84,6 @@ async def verify_magic_word(
 
     # Check magic word (case-insensitive comparison)
     if request.magic_word.strip().lower() != magic_word.lower():
-        # Log failed attempt
-        redis_client.hincrby(
-            f"stats:magic_word_failures:{datetime.now().strftime('%Y%m%d')}",
-            client_ip,
-            1,
-        )
         raise HTTPException(status_code=403, detail="Ungültiges Zauberwort")
 
     # Reset rate limit on success
@@ -132,11 +96,6 @@ async def verify_magic_word(
     token_key = f"reg_token:{token}"
     token_data = {"created_at": datetime.now().isoformat(), "ip": client_ip}
     redis_client.setex(token_key, 600, json.dumps(token_data))
-
-    # Log successful verification
-    redis_client.hincrby(
-        f"stats:magic_word_success:{datetime.now().strftime('%Y%m%d')}", "count", 1
-    )
 
     return MagicWordResponse(
         success=True, token=token, message="Zauberwort erfolgreich verifiziert"
@@ -154,7 +113,6 @@ async def register_user(
     token_data = redis_client.get(token_key)
 
     if not token_data:
-        log_registration_attempt(redis_client, False)
         raise HTTPException(
             status_code=403, detail="Ungültiger oder abgelaufener Registrierungstoken"
         )
@@ -165,7 +123,6 @@ async def register_user(
     # Check for duplicate registration attempts
     email_key = f"reg_email:{request.email.lower()}"
     if redis_client.exists(email_key):
-        log_registration_attempt(redis_client, False, request.email)
         raise HTTPException(
             status_code=429,
             detail="Eine Registrierung für diese E-Mail-Adresse läuft bereits",
@@ -189,7 +146,6 @@ async def register_user(
             )
 
             if response.status_code != 200:
-                log_registration_attempt(redis_client, False, request.email)
                 error_data = response.json()
 
                 # Handle PocketBase validation errors
@@ -211,25 +167,9 @@ async def register_user(
                     detail=error_data.get("message", "Registrierung fehlgeschlagen"),
                 )
 
-            # Log successful registration
-            log_registration_attempt(redis_client, True, request.email)
-
             # Store registration metadata
             user_data = response.json()
-            redis_client.setex(
-                f"user:registered:{user_data['id']}",
-                86400,  # 24 hours
-                json.dumps(
-                    {
-                        "email": request.email,
-                        "name": request.name,
-                        "registered_at": datetime.now().isoformat(),
-                    }
-                ),
-            )
-
             return user_data
-
     finally:
         # Remove email lock
         redis_client.delete(email_key)
@@ -260,6 +200,10 @@ async def proxy_get(path: str, request: Request):
 
 @router.post("/pb/{path:path}")
 async def proxy_post(path: str, request: Request):
+    # Block direct access to registration endpoint
+    if path == "api/collections/users/records":
+        # Optionally log the attempt, then:
+        raise HTTPException(status_code=403, detail="Direct registration is disabled")
     return await proxy_to_pocketbase(path, request)
 
 
