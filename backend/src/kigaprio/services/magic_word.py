@@ -86,7 +86,7 @@ async def create_or_update_magic_word(
 
                 if success:
                     # Clear cache
-                    await redis_client.delete("magic_word:current")
+                    redis_client.delete("magic_word:current")
 
                 return success
     except Exception as e:
