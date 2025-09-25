@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
 	import type { Priority, DayPriorities, WeekData } from '$lib/types/priorities';
 
@@ -164,24 +163,27 @@
 	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 >
 	<div class="container mx-auto max-w-6xl px-4 py-8">
-		<Header {monthOptions} bind:selectedMonth />
-		<Legend />
+		{#if $currentUser}
+			<Header {monthOptions} bind:selectedMonth />
+			<Legend />
+			{#if weeks.length > 0}
+				<ProgressBar {completedWeeks} totalWeeks={weeks.length} {progressPercentage} />
 
-		{#if weeks.length > 0}
-			<ProgressBar {completedWeeks} totalWeeks={weeks.length} {progressPercentage} />
-
-			{#if isMobile}
-				<WeekTabs {weeks} bind:activeWeekIndex />
-				<MobileWeekView
-					week={weeks[activeWeekIndex]}
-					weekIndex={activeWeekIndex}
-					{selectPriority}
-					{saveWeek}
-					{getDayDates}
-				/>
-			{:else}
-				<DesktopGridView {weeks} {openEditModal} />
+				{#if isMobile}
+					<WeekTabs {weeks} bind:activeWeekIndex />
+					<MobileWeekView
+						week={weeks[activeWeekIndex]}
+						weekIndex={activeWeekIndex}
+						{selectPriority}
+						{saveWeek}
+						{getDayDates}
+					/>
+				{:else}
+					<DesktopGridView {weeks} {openEditModal} />
+				{/if}
 			{/if}
+		{:else}
+			<div class="mb-8 text-center text-gray-600 dark:text-gray-300">Lade...</div>
 		{/if}
 
 		<Notifications {saveError} {saveSuccess} />

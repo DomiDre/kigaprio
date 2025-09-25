@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { pb } from '$lib/services/pocketbase';
+	import { apiService } from '$lib/services/api';
 	import { currentUser } from '$lib/stores/auth';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
@@ -10,9 +10,14 @@
 			goto('/login');
 		}
 	});
-	function handleLogout() {
-		pb.authStore.clear();
-		goto('/');
+	async function handleLogout() {
+		try {
+			await apiService.logout();
+		} catch (err) {
+			console.error('Logout error:', err);
+		} finally {
+			goto('/');
+		}
 	}
 </script>
 
