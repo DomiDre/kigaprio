@@ -1,11 +1,13 @@
 import type { AnalysisResult } from '../types/scanner';
 
 export class ApiService {
-	private baseUrl: string;
+	public baseUrl: string;
 	private timeout: number;
 
 	constructor(baseUrl: string = '/api', timeout: number = 30000) {
-		this.baseUrl = baseUrl;
+		this.baseUrl = import.meta.env.DEV
+			? 'http://localhost:8000/api/v1' // Dev mode - full URL to FastAPI
+			: '/api/v1'; // Prod mode - relative path
 		this.timeout = timeout;
 	}
 

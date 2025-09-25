@@ -13,6 +13,7 @@ from kigaprio.services.magic_word import (
     get_magic_word_from_cache_or_db,
 )
 from kigaprio.services.redis_service import get_redis
+from kigaprio.utils import get_client_ip
 
 router = APIRouter()
 
@@ -33,26 +34,10 @@ class MagicWordResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=1)
     passwordConfirm: str
     name: str = Field(..., min_length=1)
     registration_token: str
-
-
-def get_client_ip(request: Request) -> str:
-    """Extract client IP from request"""
-    # Check for X-Forwarded-For header (when behind proxy)
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-
-    # Check for X-Real-IP header
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip
-
-    # Fall back to direct connection
-    return request.client.host if request.client else "127.0.0.1"
 
 
 @router.post("/verify-magic-word")
@@ -61,8 +46,14 @@ async def verify_magic_word(
     req: Request,
     redis_client: redis.Redis = Depends(get_redis),
 ) -> MagicWordResponse:
-    """Verify the magic word and return a temporary registration token"""
+    """Verify the magic word and return a temporary registration token.
+    This endpoint is triggered before a registration and therefore anybody
+    should be able to call it.
 
+    However to avoid spam, rate limits are implemented.
+    """
+
+    # determine if there are too many requests by client_ip
     client_ip = get_client_ip(req)
     rate_limit_key = f"rate_limit:magic_word:{client_ip}"
     attempts = redis_client.get(rate_limit_key)
@@ -106,7 +97,12 @@ async def verify_magic_word(
 async def register_user(
     request: RegisterRequest, redis_client: redis.Redis = Depends(get_redis)
 ):
-    """Register a new user with magic word token verification"""
+    """Register a new user with magic word token verification.
+
+    As only people who have passed magic word check may register. This
+    endpoint can still be called by anyone, but the token check must
+    be passed at the beginning.
+    """
 
     # Verify registration token
     token_key = f"reg_token:{request.registration_token}"

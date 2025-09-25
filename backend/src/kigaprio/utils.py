@@ -59,3 +59,19 @@ async def validate_token(request: Request):
             )
         print(response.text)
     return token_value
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP from request"""
+    # Check for X-Forwarded-For header (when behind proxy)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+
+    # Check for X-Real-IP header
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+
+    # Fall back to direct connection
+    return request.client.host if request.client else "127.0.0.1"
