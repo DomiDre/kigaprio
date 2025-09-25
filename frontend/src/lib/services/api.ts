@@ -45,8 +45,14 @@ export class ApiService {
 				'Authorization': `Bearer ${token}`
 			};
 		}
-
 		const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+
+		// Check for refreshed token in response header
+		const newToken = response.headers.get('X-New-Token');
+		if (newToken && newToken !== token) {
+			console.debug('Token refreshed, updating local storage');
+			authStore.updateToken(newToken);
+		}
 
 		// Handle 401 Unauthorized - session expired
 		if (response.status === 401) {
@@ -130,6 +136,47 @@ export class ApiService {
 	}) {
 		return this.request('/register', {
 			method: 'POST',
+			body: JSON.stringify(data)
+		});
+	}
+
+	async getPriorities(month?: string) {
+		const params = new URLSearchParams();
+		if (month) {
+			params.append('month', month);
+		}
+		const queryString = params.toString();
+		const endpoint = queryString ? `/priorities/?${queryString}` : '/priorities';
+
+		return this.request(endpoint, {
+			method: 'GET'
+		});
+	}
+
+	async createPriority(data: {
+		userId: string;
+		month: string;
+		weekNumber: number;
+		priorities: any;
+		startDate: string;
+		endDate: string;
+	}) {
+		return this.request('/priorities', {
+			method: 'POST',
+			body: JSON.stringify(data)
+		});
+	}
+
+	async updatePriority(id: string, data: {
+		userId: string;
+		month: string;
+		weekNumber: number;
+		priorities: any;
+		startDate: string;
+		endDate: string;
+	}) {
+		return this.request(`/priorities/${id}`, {
+			method: 'PATCH',
 			body: JSON.stringify(data)
 		});
 	}

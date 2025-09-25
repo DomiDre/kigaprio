@@ -85,7 +85,17 @@ function createAuthStore() {
 				return localStorage.getItem(TOKEN_KEY);
 			}
 			return null;
-		}
+		},
+
+		updateToken: (newToken: string) => {
+			if (browser) {
+				localStorage.setItem(TOKEN_KEY, newToken);
+			}
+			update(state => ({
+				...state,
+				token: newToken
+			}));
+		},
 	};
 }
 

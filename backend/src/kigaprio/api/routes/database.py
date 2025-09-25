@@ -257,6 +257,19 @@ async def login_user(
             redis_client.delete(rate_limit_key)
             redis_client.delete(identity_rate_limit_key)
 
+            # store logged in sessions in redis
+            session_key = f"session:{auth_data['token']}"
+            user_info = {
+                "id": auth_data["record"]["id"],
+                "email": auth_data["record"]["email"],
+                "name": auth_data["record"]["name"],
+            }
+            redis_client.setex(
+                session_key,
+                14 * 24 * 3600,  # 14 days, same as token lifetime
+                json.dumps(user_info),
+            )
+
             return LoginResponse(
                 token=auth_data["token"],
                 record=auth_data["record"],
@@ -276,6 +289,7 @@ async def login_user(
 @router.post("/refresh")
 async def refresh_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    redis_client: redis.Redis = Depends(get_redis),
 ):
     """Refresh an authentication token.
 
@@ -302,6 +316,25 @@ async def refresh_token(
             # Parse successful response
             auth_data = response.json()
 
+            # Update session in Redis with new token
+            old_session_key = f"session:{token}"
+            new_session_key = f"session:{auth_data['token']}"
+
+            # Copy session data to new key if it exists
+            session_data = redis_client.get(old_session_key)
+            user_info = {
+                "id": auth_data["record"]["id"],
+                "email": auth_data["record"]["email"],
+                "name": auth_data["record"]["name"],
+            }
+            if session_data:
+                redis_client.delete(old_session_key)
+
+            redis_client.setex(
+                new_session_key,
+                14 * 24 * 3600,  # 14 days
+                json.dumps(user_info),
+            )
             return {
                 "token": auth_data["token"],
                 "record": auth_data["record"],
@@ -315,3 +348,30 @@ async def refresh_token(
             status_code=500,
             detail="Ein unerwarteter Fehler ist aufgetreten",
         ) from e
+
+
+@router.post("/logout")
+async def logout_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    redis_client: redis.Redis = Depends(get_redis),
+):
+    """Logout a user by invalidating their session.
+
+    Note: This only removes the session from Redis cache.
+    The PocketBase token will still be valid until it expires.
+    For complete logout, the client should also delete the token.
+    """
+    token = credentials.credentials
+    session_key = f"session:{token}"
+
+    # Check if session exists
+    if not redis_client.exists(session_key):
+        raise HTTPException(
+            status_code=404,
+            detail="Sitzung nicht gefunden oder bereits abgelaufen",
+        )
+
+    # Delete session from Redis
+    redis_client.delete(session_key)
+
+    return {"success": True, "message": "Erfolgreich abgemeldet"}

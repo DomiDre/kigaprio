@@ -21,6 +21,7 @@
 		getDayDates
 	} from '$lib/utils/dateHelpers';
 	import { validateWeekPriorities } from '$lib/utils/priorityHelpers';
+	import { apiService } from '$lib/services/api';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -60,10 +61,7 @@
 		if (!$currentUser) return;
 
 		try {
-			const records = await pb.collection('priorities').getFullList({
-				filter: `userId = "${$currentUser.id}" && month = "${selectedMonth}"`,
-				sort: 'weekNumber'
-			});
+			const records = await apiService.getPriorities(selectedMonth);
 
 			records.forEach((record: any) => {
 				const weekIndex = weeks.findIndex((w) => w.weekNumber === record.weekNumber);
@@ -78,6 +76,8 @@
 			});
 		} catch (error) {
 			console.error('Error loading priorities:', error);
+			saveError = 'Fehler beim Laden der Prioritäten';
+			setTimeout(() => (saveError = ''), 3000);
 		}
 	}
 
@@ -125,24 +125,25 @@
 				endDate: week.endDate
 			};
 
+			let record;
 			if (week.id) {
-				await pb.collection('priorities').update(week.id, data);
+				record = await apiService.updatePriority(week.id, data);
 			} else {
-				const record = await pb.collection('priorities').create(data);
+				record = await apiService.createPriority(data);
 				weeks[weekIndex].id = record.id;
 			}
 
 			// Update the status to completed
 			weeks[weekIndex].status = 'completed';
 
-			// Force reactivity update by reassigning the array
+			// Force reactivity update
 			weeks = [...weeks];
 
 			saveSuccess = 'Woche erfolgreich gespeichert!';
 			setTimeout(() => (saveSuccess = ''), 3000);
 			closeEditModal();
-		} catch (error) {
-			saveError = 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
+		} catch (error: any) {
+			saveError = error.message || 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
 			setTimeout(() => (saveError = ''), 3000);
 			console.error('Save error:', error);
 		}

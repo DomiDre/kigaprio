@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from kigaprio.api.routes import admin, analyze, database, health, priolist, upload
 from kigaprio.config import settings
+from kigaprio.middleware.auth_middleware import TokenRefreshMiddleware
 
 # Create FastAPI app
 app = FastAPI(
@@ -47,12 +48,14 @@ else:
             allow_headers=["*"],
         )
 
+# add middlewares
+app.add_middleware(TokenRefreshMiddleware)
 
 # API routes
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(upload.router, prefix="/api/v1", tags=["Upload"])
 app.include_router(analyze.router, prefix="/api/v1", tags=["Analyze"])
-app.include_router(priolist.router, prefix="/api/v1", tags=["Prioliste"])
+app.include_router(priolist.router, prefix="/api/v1/priorities", tags=["Prioliste"])
 app.include_router(database.router, prefix="/api/v1", tags=["Pocketbase"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
