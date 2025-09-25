@@ -5,7 +5,7 @@ from datetime import datetime
 
 import httpx
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from kigaprio.services.magic_word import (
@@ -19,7 +19,6 @@ router = APIRouter()
 # Configuration
 POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-
 
 
 class MagicWordRequest(BaseModel):
@@ -174,50 +173,3 @@ async def register_user(
     finally:
         # Remove email lock
         redis_client.delete(email_key)
-
-
-# ==================== Proxy Endpoints ====================
-async def proxy_to_pocketbase(path: str, request: Request) -> Response:
-    """Shared proxy logic for PocketBase"""
-    async with httpx.AsyncClient() as client:
-        response = await client.request(
-            method=request.method,
-            url=f"{POCKETBASE_URL}/{path}",
-            headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
-            content=await request.body(),
-            params=request.query_params,
-        )
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-        )
-
-
-@router.get("/pb/{path:path}")
-async def proxy_get(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
-
-
-@router.post("/pb/{path:path}")
-async def proxy_post(path: str, request: Request):
-    # Block direct access to registration endpoint
-    if path == "api/collections/users/records":
-        # Optionally log the attempt, then:
-        raise HTTPException(status_code=403, detail="Direct registration is disabled")
-    return await proxy_to_pocketbase(path, request)
-
-
-@router.put("/pb/{path:path}")
-async def proxy_put(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
-
-
-@router.delete("/pb/{path:path}")
-async def proxy_delete(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
-
-
-@router.patch("/pb/{path:path}")
-async def proxy_patch(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
