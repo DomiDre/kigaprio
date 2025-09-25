@@ -1,10 +1,8 @@
 <!-- src/routes/register/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
-	import type { User } from '$lib/types/pocketbase';
 
 	let email = $state('');
 	let password = $state('');
@@ -89,16 +87,6 @@
 				const errorData = await response.json();
 				throw new Error(errorData.detail || 'Registration failed');
 			}
-
-			const record = await response.json();
-
-			const user: User = {
-				id: record.id,
-				name: record.name,
-				email: record.email,
-				role: record.role
-			};
-
 			goto('/');
 		} catch (err) {
 			error = (err as Error).message;

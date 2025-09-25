@@ -1,26 +1,41 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { pb } from '$lib/services/pocketbase';
-	import { currentUser } from '$lib/stores/auth';
-	import { loginUser } from '$lib/services/auth';
+	import { currentUser, isAuthenticated } from '$lib/stores/auth';
+	import { apiService } from '$lib/services/api';
+	import { onMount } from 'svelte';
 
 	let email = '';
 	let password = '';
 	let error = '';
+	let isLoading = false;
+
+	onMount(() => {
+		if ($isAuthenticated) {
+			goto('/');
+		}
+	});
 
 	async function handleLogin() {
 		error = '';
+		isLoading = true;
 		try {
-			await loginUser(email, password);
+			await apiService.login(email, password);
 			goto('/');
 		} catch (err) {
 			error = (err as Error).message;
+		} finally {
+			isLoading = false;
 		}
 	}
 
-	function handleLogout() {
-		pb.authStore.clear();
-		goto('/');
+	async function handleLogout() {
+		try {
+			await apiService.logout();
+		} catch (err) {
+			console.error('Logout error:', err);
+		} finally {
+			goto('/');
+		}
 	}
 
 	function handleDashboard() {

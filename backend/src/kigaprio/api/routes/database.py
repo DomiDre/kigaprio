@@ -6,6 +6,7 @@ from datetime import datetime
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
 from kigaprio.services.magic_word import (
@@ -16,6 +17,7 @@ from kigaprio.services.redis_service import get_redis
 from kigaprio.utils import get_client_ip
 
 router = APIRouter()
+security = HTTPBearer()
 
 # Configuration
 POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
@@ -38,6 +40,17 @@ class RegisterRequest(BaseModel):
     passwordConfirm: str
     name: str = Field(..., min_length=1)
     registration_token: str
+
+
+class LoginRequest(BaseModel):
+    identity: str = Field(..., min_length=1, description="Email or username")
+    password: str = Field(..., min_length=1)
+
+
+class LoginResponse(BaseModel):
+    token: str
+    record: dict
+    message: str | None = None
 
 
 @router.post("/verify-magic-word")
@@ -169,3 +182,136 @@ async def register_user(
     finally:
         # Remove email lock
         redis_client.delete(email_key)
+
+
+@router.post("/login")
+async def login_user(
+    request: LoginRequest,
+    req: Request,
+    redis_client: redis.Redis = Depends(get_redis),
+) -> LoginResponse:
+    """Authenticate a user and return auth token from PocketBase.
+
+    This endpoint proxies the authentication to PocketBase's auth-with-password endpoint.
+    Rate limiting is implemented to prevent brute force attacks.
+    """
+
+    # Rate limiting by IP
+    client_ip = get_client_ip(req)
+    rate_limit_key = f"rate_limit:login:{client_ip}"
+    attempts = redis_client.get(rate_limit_key)
+
+    if attempts and int(str(attempts)) >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Zu viele Login-Versuche. Bitte versuchen Sie es in 1 Minute erneut.",
+        )
+
+    # Rate limiting by identity (email/username)
+    identity_rate_limit_key = f"rate_limit:login:identity:{request.identity.lower()}"
+    identity_attempts = redis_client.get(identity_rate_limit_key)
+
+    if identity_attempts and int(str(identity_attempts)) >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Zu viele Login-Versuche für diesen Benutzer. Bitte versuchen Sie es in 1 Minute erneut.",
+        )
+
+    # Increment rate limit counters
+    redis_client.incr(rate_limit_key)
+    redis_client.expire(rate_limit_key, 60)  # 1 min expiry
+
+    redis_client.incr(identity_rate_limit_key)
+    redis_client.expire(identity_rate_limit_key, 60)  # 1 min expiry
+
+    try:
+        # Proxy authentication to PocketBase
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": request.identity,
+                    "password": request.password,
+                },
+            )
+
+            if response.status_code != 200:
+                error_data = response.json()
+
+                # Don't reveal whether email exists or not (security best practice)
+                if response.status_code == 400:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Ungültige Anmeldedaten",
+                    )
+
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=error_data.get("message", "Anmeldung fehlgeschlagen"),
+                )
+
+            # Parse successful response
+            auth_data = response.json()
+
+            # Reset rate limits on successful login
+            redis_client.delete(rate_limit_key)
+            redis_client.delete(identity_rate_limit_key)
+
+            return LoginResponse(
+                token=auth_data["token"],
+                record=auth_data["record"],
+                message="Erfolgreich angemeldet",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Ein unerwarteter Fehler ist aufgetreten",
+        ) from e
+
+
+@router.post("/refresh")
+async def refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Refresh an authentication token.
+
+    This endpoint proxies to PocketBase's auth-refresh endpoint.
+    """
+
+    token = credentials.credentials
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-refresh",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            if response.status_code != 200:
+                error_data = response.json()
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=error_data.get(
+                        "message", "Token-Aktualisierung fehlgeschlagen"
+                    ),
+                )
+
+            # Parse successful response
+            auth_data = response.json()
+
+            return {
+                "token": auth_data["token"],
+                "record": auth_data["record"],
+                "message": "Token erfolgreich aktualisiert",
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Ein unerwarteter Fehler ist aufgetreten",
+        ) from e

@@ -1,124 +1,16 @@
-import type { AnalysisResult } from '../types/scanner';
+import { authStore } from '$lib/stores/auth';
+import { goto } from '$app/navigation';
+import { browser } from '$app/environment';
 
 export class ApiService {
 	public baseUrl: string;
-	private timeout: number;
 
-	constructor(baseUrl: string = '/api', timeout: number = 30000) {
+	constructor() {
 		this.baseUrl = import.meta.env.DEV
 			? 'http://localhost:8000/api/v1' // Dev mode - full URL to FastAPI
 			: '/api/v1'; // Prod mode - relative path
-		this.timeout = timeout;
 	}
 
-	async analyzeSchedule(imageBlob: Blob): Promise<AnalysisResult> {
-		const formData = new FormData();
-		formData.append('image', imageBlob, 'capture.jpg');
-
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-		try {
-			const response = await fetch(`${this.baseUrl}/analyze-schedule`, {
-				method: 'POST',
-				body: formData,
-				signal: controller.signal
-			});
-
-			clearTimeout(timeoutId);
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(`Server error (${response.status}): ${errorText}`);
-			}
-
-			const result = await response.json();
-			return this.validateAnalysisResult(result);
-		} catch (error) {
-			clearTimeout(timeoutId);
-			const e = error as Error; // Type assertion
-			if (e.name === 'AbortError') {
-				throw new Error('Request timeout - analysis took too long');
-			}
-
-			throw e;
-		}
-	}
-
-	private validateAnalysisResult(result: any): AnalysisResult {
-		// Validate the result structure
-		if (!result || typeof result !== 'object') {
-			throw new Error('Invalid response format');
-		}
-
-		// Ensure required fields exist
-		const validated: AnalysisResult = {
-			success: Boolean(result.success),
-			analysis: result.analysis || undefined,
-			error: result.error || undefined
-		};
-
-		// Validate analysis structure if present
-		if (validated.analysis) {
-			validated.analysis = {
-				labels: Array.isArray(result.analysis.labels) ? result.analysis.labels : undefined,
-				confidence:
-					typeof result.analysis.confidence === 'number' ? result.analysis.confidence : undefined,
-				description:
-					typeof result.analysis.description === 'string' ? result.analysis.description : undefined,
-				name: typeof result.analysis.name === 'string' ? result.analysis.name : undefined,
-				schedule: this.validateSchedule(result.analysis.schedule)
-			};
-		}
-
-		return validated;
-	}
-
-	private validateSchedule(schedule: any): Record<string, string> | undefined {
-		if (!schedule || typeof schedule !== 'object') {
-			return undefined;
-		}
-
-		const validated: Record<string, string> = {};
-		const validDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-		for (const day of validDays) {
-			if (schedule[day] && typeof schedule[day] === 'string') {
-				validated[day] = schedule[day];
-			}
-		}
-
-		return Object.keys(validated).length > 0 ? validated : undefined;
-	}
-
-	async uploadScheduleData(
-		analysisResult: AnalysisResult
-	): Promise<{ success: boolean; message?: string }> {
-		try {
-			const response = await fetch(`${this.baseUrl}/save-schedule`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(analysisResult.analysis)
-			});
-
-			if (!response.ok) {
-				throw new Error(`Failed to save schedule: ${response.status}`);
-			}
-
-			return await response.json();
-		} catch (error) {
-			console.error('Failed to upload schedule:', error);
-			throw error;
-		}
-	}
-
-	// Helper method to convert base64 to blob
-	async base64ToBlob(base64: string): Promise<Blob> {
-		const response = await fetch(base64);
-		return await response.blob();
-	}
 
 	// Method to check API health
 	async healthCheck(): Promise<boolean> {
@@ -132,6 +24,114 @@ export class ApiService {
 		} catch {
 			return false;
 		}
+	}
+
+
+	private async request(endpoint: string, options: RequestInit = {}) {
+		const token = authStore.getToken();
+
+		const config: RequestInit = {
+			...options,
+			headers: {
+				'Content-Type': 'application/json',
+				...options.headers,
+			}
+		};
+
+		// Add auth token if available
+		if (token) {
+			config.headers = {
+				...config.headers,
+				'Authorization': `Bearer ${token}`
+			};
+		}
+
+		const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+
+		// Handle 401 Unauthorized - session expired
+		if (response.status === 401) {
+			authStore.clearAuth();
+			if (browser) {
+				goto('/login');
+			}
+			throw new Error('Sitzung abgelaufen. Bitte melden Sie sich erneut an.');
+		}
+
+		// Handle rate limiting
+		if (response.status === 429) {
+			const data = await response.json();
+			throw new Error(data.detail || 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.');
+		}
+
+		if (!response.ok) {
+			const data = await response.json();
+			throw new Error(data.detail || 'Ein Fehler ist aufgetreten');
+		}
+
+		return response.json();
+	}
+
+	async login(identity: string, password: string) {
+		const response = await this.request('/login', {
+			method: 'POST',
+			body: JSON.stringify({ identity, password })
+		});
+
+		// Store auth data
+		authStore.setAuth(response.token, response.record);
+
+		return response;
+	}
+
+	async logout() {
+		const token = authStore.getToken();
+		if (token) {
+			try {
+				await this.request('/logout', {
+					method: 'POST',
+					body: JSON.stringify({ token })
+				});
+			} catch (error) {
+				console.error('Logout error:', error);
+			}
+		}
+
+		authStore.clearAuth();
+	}
+
+	async refreshToken() {
+		const token = authStore.getToken();
+		if (!token) {
+			throw new Error('Kein Token verfügbar');
+		}
+
+		const response = await this.request('/refresh', {
+			method: 'POST',
+			body: JSON.stringify({ token })
+		});
+
+		authStore.setAuth(response.token, response.record);
+		return response;
+	}
+
+	async verifyMagicWord(magicWord: string) {
+		return this.request('/verify-magic-word', {
+			method: 'POST',
+			body: JSON.stringify({ magic_word: magicWord })
+		});
+	}
+
+	async register(data: {
+		email: string;
+		password: string;
+		passwordConfirm: string;
+		name: string;
+		registration_token: string;
+	}) {
+		return this.request('/register', {
+			method: 'POST',
+			body: JSON.stringify(data)
+		});
 	}
 }
 
