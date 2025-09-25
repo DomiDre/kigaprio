@@ -90,16 +90,12 @@ export class ApiService {
 	}
 
 	async logout() {
-		const token = authStore.getToken();
-		if (token) {
-			try {
-				await this.request('/logout', {
-					method: 'POST',
-					body: JSON.stringify({ token })
-				});
-			} catch (error) {
-				console.error('Logout error:', error);
-			}
+		try {
+			await this.request('/logout', {
+				method: 'POST'
+			});
+		} catch (error) {
+			console.error('Logout error:', error);
 		}
 
 		authStore.clearAuth();
