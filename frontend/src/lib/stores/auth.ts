@@ -37,7 +37,7 @@ function createAuthStore() {
 				initialState.user = JSON.parse(storedUser);
 				initialState.token = storedToken;
 				initialState.isAuthenticated = true;
-			} catch (e) {
+			} catch {
 				console.error('Failed to parse stored user data');
 				localStorage.removeItem(TOKEN_KEY);
 				localStorage.removeItem(USER_KEY);
@@ -77,7 +77,7 @@ function createAuthStore() {
 		},
 
 		setLoading: (loading: boolean) => {
-			update(state => ({ ...state, isLoading: loading }));
+			update((state) => ({ ...state, isLoading: loading }));
 		},
 
 		getToken: (): string | null => {
@@ -91,16 +91,15 @@ function createAuthStore() {
 			if (browser) {
 				localStorage.setItem(TOKEN_KEY, newToken);
 			}
-			update(state => ({
+			update((state) => ({
 				...state,
 				token: newToken
 			}));
-		},
+		}
 	};
 }
 
 export const authStore = createAuthStore();
-export const currentUser = derived(authStore, $auth => $auth.user);
-export const isAuthenticated = derived(authStore, $auth => $auth.isAuthenticated);
-export const authToken = derived(authStore, $auth => $auth.token);
-
+export const currentUser = derived(authStore, ($auth) => $auth.user);
+export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticated);
+export const authToken = derived(authStore, ($auth) => $auth.token);

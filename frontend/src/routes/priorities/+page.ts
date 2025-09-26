@@ -14,4 +14,3 @@ export const load: PageLoad = async () => {
 
 	return;
 };
-

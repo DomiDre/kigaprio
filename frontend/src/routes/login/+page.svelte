@@ -7,7 +7,6 @@
 	let email = '';
 	let password = '';
 	let error = '';
-	let isLoading = false;
 
 	onMount(() => {
 		if ($isAuthenticated) {
@@ -17,14 +16,11 @@
 
 	async function handleLogin() {
 		error = '';
-		isLoading = true;
 		try {
 			await apiService.login(email, password);
 			goto('/');
 		} catch (err) {
 			error = (err as Error).message;
-		} finally {
-			isLoading = false;
 		}
 	}
 

@@ -11,7 +11,6 @@ export class ApiService {
 			: '/api/v1'; // Prod mode - relative path
 	}
 
-
 	// Method to check API health
 	async healthCheck(): Promise<boolean> {
 		try {
@@ -26,7 +25,6 @@ export class ApiService {
 		}
 	}
 
-
 	private async request(endpoint: string, options: RequestInit = {}) {
 		const token = authStore.getToken();
 
@@ -34,7 +32,7 @@ export class ApiService {
 			...options,
 			headers: {
 				'Content-Type': 'application/json',
-				...options.headers,
+				...options.headers
 			}
 		};
 
@@ -42,7 +40,7 @@ export class ApiService {
 		if (token) {
 			config.headers = {
 				...config.headers,
-				'Authorization': `Bearer ${token}`
+				Authorization: `Bearer ${token}`
 			};
 		}
 		const response = await fetch(`${this.baseUrl}${endpoint}`, config);
@@ -163,14 +161,17 @@ export class ApiService {
 		});
 	}
 
-	async updatePriority(id: string, data: {
-		userId: string;
-		month: string;
-		weekNumber: number;
-		priorities: any;
-		startDate: string;
-		endDate: string;
-	}) {
+	async updatePriority(
+		id: string,
+		data: {
+			userId: string;
+			month: string;
+			weekNumber: number;
+			priorities: any;
+			startDate: string;
+			endDate: string;
+		}
+	) {
 		return this.request(`/priorities/${id}`, {
 			method: 'PATCH',
 			body: JSON.stringify(data)

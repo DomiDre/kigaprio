@@ -29,16 +29,12 @@
 		// Listen for network errors / 401s globally
 		const originalFetch = window.fetch;
 		window.fetch = async (...args) => {
-			try {
-				const response = await originalFetch(...args);
-				if (response.status === 401) {
-					authStore.clearAuth();
-					goto('/login');
-				}
-				return response;
-			} catch (error) {
-				throw error;
+			const response = await originalFetch(...args);
+			if (response.status === 401) {
+				authStore.clearAuth();
+				goto('/login');
 			}
+			return response;
 		};
 
 		return () => {
