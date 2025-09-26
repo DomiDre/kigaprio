@@ -16,7 +16,11 @@ async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | No
     # Try cache first
     cached_word = redis_client.get("magic_word:current")
     if cached_word:
-        return str(cached_word)
+        return (
+            cached_word.decode("utf-8")
+            if isinstance(cached_word, bytes)
+            else str(cached_word)
+        )
 
     # Fetch from database
     try:
@@ -105,8 +109,10 @@ async def create_or_update_magic_word(
                     success = create_response.status_code == 200
 
                 if success:
-                    # Clear cache
+                    # Delete the old cache entry first
                     redis_client.delete("magic_word:current")
+                    # Immediately set the new value in cache
+                    redis_client.setex("magic_word:current", 300, new_word)
 
                 return success
     except Exception as e:
