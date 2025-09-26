@@ -5,9 +5,11 @@ services:
       dockerfile: Dockerfile
       target: production
     image: kigaprio-backend
+    entrypoint: /usr/local/bin/load-secrets.sh
     restart: unless-stopped
     volumes:
       - frontend-static:/app/static:ro
+      - ./scripts/load-secrets.sh:/usr/local/bin/load-secrets.sh:ro
     environment:
       - ENV=production
       - DEBUG=false
