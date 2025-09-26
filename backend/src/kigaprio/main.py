@@ -10,7 +10,6 @@ from fastapi.staticfiles import StaticFiles
 from kigaprio.api.routes import admin, analyze, database, health, priolist, upload
 from kigaprio.config import settings
 from kigaprio.middleware.auth_middleware import TokenRefreshMiddleware
-from kigaprio.middleware.log_requests import LogRequestsMiddleware
 
 
 class HealthCheckFilter(logging.Filter):
@@ -20,6 +19,7 @@ class HealthCheckFilter(logging.Filter):
 
 
 logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
+logging.getLogger("gunicorn.access").addFilter(HealthCheckFilter())
 
 # Create FastAPI app
 app = FastAPI(
@@ -60,7 +60,6 @@ else:
         )
 
 # add middlewares
-app.add_middleware(LogRequestsMiddleware)
 app.add_middleware(TokenRefreshMiddleware)
 
 # API routes
