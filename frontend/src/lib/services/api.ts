@@ -142,7 +142,7 @@ export class ApiService {
 			params.append('month', month);
 		}
 		const queryString = params.toString();
-		const endpoint = queryString ? `/priorities/?${queryString}` : '/priorities';
+		const endpoint = queryString ? `/priorities?${queryString}` : '/priorities';
 
 		return this.request(endpoint, {
 			method: 'GET'

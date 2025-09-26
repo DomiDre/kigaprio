@@ -50,7 +50,7 @@ class PriorityResponse(BaseModel):
     updated: str
 
 
-@router.get("/", response_model=list[PriorityResponse])
+@router.get("", response_model=list[PriorityResponse])
 async def get_user_priorities(
     month: str | None = Query(None, description="Filter by month (YYYY-MM)"),
     auth_data: dict = Depends(verify_token),
@@ -141,7 +141,7 @@ async def get_priority(
         ) from e
 
 
-@router.post("/", response_model=PriorityResponse)
+@router.post("", response_model=PriorityResponse)
 async def create_priority(
     priority: PriorityRecord,
     auth_data: dict = Depends(verify_token),
