@@ -114,10 +114,15 @@
 			setTimeout(() => (saveError = ''), 3000);
 			return;
 		}
+		if (!$currentUser) {
+			saveError = "No user id is set currently";
+			setTimeout(() => (saveError = ''), 3000);
+			return;
+		}
 
 		try {
 			const data = {
-				userId: $currentUser?.id,
+				userId: $currentUser.id,
 				month: selectedMonth,
 				weekNumber: week.weekNumber,
 				priorities: week.priorities,
