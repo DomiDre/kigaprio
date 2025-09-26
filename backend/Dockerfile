@@ -111,12 +111,5 @@ ENTRYPOINT ["/usr/local/bin/load-secrets.sh"]
 # Run with gunicorn for production
 CMD ["gunicorn", \
      "kigaprio.main:app", \
-     "--workers", "4", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "60", \
-     "--keep-alive", "5", \
-     "--max-requests", "1000", \
-     "--max-requests-jitter", "50", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+     "--config", \
+     "/app/gunicorn_config.py"]
