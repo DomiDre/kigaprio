@@ -115,7 +115,7 @@
 			return;
 		}
 		if (!$currentUser) {
-			saveError = "No user id is set currently";
+			saveError = 'No user id is set currently';
 			setTimeout(() => (saveError = ''), 3000);
 			return;
 		}
