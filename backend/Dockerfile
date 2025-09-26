@@ -112,4 +112,4 @@ ENTRYPOINT ["/usr/local/bin/load-secrets.sh"]
 CMD ["gunicorn", \
      "kigaprio.main:app", \
      "--config", \
-     "/app/gunicorn_config.py"]
+     "/app/src/kigaprio/gunicorn_config.py"]
