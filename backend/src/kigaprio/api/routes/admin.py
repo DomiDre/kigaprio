@@ -9,7 +9,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from kigaprio.services.magic_word import (
-    DEFAULT_MAGIC_WORD,
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
 )
@@ -120,9 +119,10 @@ async def get_magic_word_info(
 
     try:
         magic_word = await get_magic_word_from_cache_or_db(redis_client)
-        print(magic_word)
         if not magic_word:
-            magic_word = DEFAULT_MAGIC_WORD
+            raise HTTPException(
+                status_code=500, detail="No magic word initialized on database"
+            )
 
         async with httpx.AsyncClient() as client:
             response = await client.get(

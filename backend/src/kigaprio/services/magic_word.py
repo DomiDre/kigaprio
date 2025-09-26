@@ -5,7 +5,6 @@ import redis
 from fastapi import HTTPException
 
 POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
-DEFAULT_MAGIC_WORD = os.getenv("DEFAULT_MAGIC_WORD", "initialsetup2025")
 
 SERVICE_ACCOUNT_EMAIL = os.getenv("PB_SERVICE_EMAIL")
 SERVICE_ACCOUNT_PASSWORD = os.getenv("PB_SERVICE_PASSWORD")

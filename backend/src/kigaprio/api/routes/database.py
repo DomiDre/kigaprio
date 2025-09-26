@@ -10,7 +10,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
 from kigaprio.services.magic_word import (
-    DEFAULT_MAGIC_WORD,
     get_magic_word_from_cache_or_db,
 )
 from kigaprio.services.redis_service import get_redis
@@ -80,7 +79,7 @@ async def verify_magic_word(
     # Get magic word from cache/database
     magic_word = await get_magic_word_from_cache_or_db(redis_client)
     if not magic_word:
-        magic_word = DEFAULT_MAGIC_WORD
+        raise HTTPException(status_code=500, detail="No magic word is initialized")
 
     # Increment rate limit counter
     redis_client.incr(rate_limit_key)
