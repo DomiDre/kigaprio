@@ -102,8 +102,10 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-COPY --chown=root:root ../scripts/load-secrets.sh /usr/local/bin/load-secrets.sh
+USER root
+COPY --chown=root:root ./load-secrets.sh /usr/local/bin/load-secrets.sh
 RUN chmod +x /usr/local/bin/load-secrets.sh
+USER appuser
 
 ENTRYPOINT ["/usr/local/bin/load-secrets.sh"]
 # Run with gunicorn for production
