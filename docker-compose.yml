@@ -11,6 +11,7 @@ services:
     environment:
       - ENV=production
       - DEBUG=false
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - POCKETBASE_URL=http://pocketbase:8090
     labels:
       - "traefik.enable=true"
@@ -21,6 +22,8 @@ services:
       - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
     depends_on:
       pocketbase:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       frontend-builder:
         condition: service_completed_successfully
@@ -35,6 +38,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    secrets:
+      - pb_service_email
+      - pb_service_password
 
   # Build frontend and copy static files
   frontend-builder:
@@ -71,17 +77,33 @@ services:
       retries: 5
     networks:
       - kigaprio-prod
-    #   - proxy
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
-    #   - "traefik.http.routers.pocketbase.entrypoints=websecure"
-    #   - "traefik.http.routers.pocketbase.tls=true"
-    #   - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
-    #   - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pocketbase.rule=Host(`pb.kiga.dhjd.de`)"
+      - "traefik.http.routers.pocketbase.entrypoints=websecure"
+      - "traefik.http.routers.pocketbase.tls=true"
+      - "traefik.http.routers.pocketbase.tls.certresolver=myresolver"
+      - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
     secrets:
       - pb_admin_email
       - pb_admin_password
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kigaprio-prod
 
 volumes:
   frontend-static:
@@ -91,6 +113,11 @@ secrets:
     file: ./.secrets/pb_admin_email
   pb_admin_password:
     file: ./.secrets/pb_admin_password
+  pb_service_email:
+    file: ./.secrets/pb_service_email
+  pb_service_password:
+    file: ./.secrets/pb_service_password
+  
 
 networks:
   kigaprio-prod:
