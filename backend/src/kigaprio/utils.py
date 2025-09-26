@@ -1,13 +1,19 @@
+import json
 import os
 from pathlib import Path
 
 import httpx
-from fastapi import HTTPException, Request, UploadFile, status
+import redis
+from fastapi import Depends, HTTPException, Request, UploadFile
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.config import settings
+from kigaprio.services.redis_service import get_redis
 
 POCKETBASE_URL = os.getenv("POCKETBASE_URL")
 assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
+
+security = HTTPBearer()
 
 
 async def validate_file(files: list[UploadFile]) -> list[UploadFile]:
@@ -37,25 +43,77 @@ async def validate_file(files: list[UploadFile]) -> list[UploadFile]:
     return files
 
 
-async def validate_token(request: Request):
-    token = request.headers.get("Authorization")
-    if not token or not token.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
-        )
+async def verify_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    redis_client: redis.Redis = Depends(get_redis),
+):
+    """Verify the authentication token - first check Redis, then PocketBase if needed."""
+    token = credentials.credentials
+    session_key = f"session:{token}"
+    cached_user = redis_client.get(session_key)
 
-    token_value = token[len("Bearer ") :]
+    if cached_user:
+        # Token found in cache - it's valid
+        return {"token": token, "user": json.loads(str(cached_user))}
 
+    # Token not in cache - verify with PocketBase
     async with httpx.AsyncClient() as client:
-        # Verify session using PocketBase API
-        response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/users/records",
-            headers={"Authorization": f"Bearer {token_value}"},
+        # IMPORTANT: This will refresh the token and return a NEW one
+        response = await client.post(  # Note: POST, not GET
+            f"{POCKETBASE_URL}/api/collections/users/auth-refresh",
+            headers={"Authorization": f"Bearer {token}"},
         )
+
         if response.status_code != 200:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
+                status_code=401,
+                detail="Ungültiger oder abgelaufener Token",
             )
-        print(response.text)
-    return token_value
+
+        auth_data = response.json()
+        new_token = auth_data["token"]
+        user_data = auth_data["record"]
+
+        # Delete old session and create new one with refreshed token
+        redis_client.delete(session_key)  # Remove old token
+
+        new_session_key = f"session:{new_token}"
+        user_info = {
+            "id": user_data["id"],
+            "email": user_data["email"],
+            "name": user_data["name"],
+        }
+        redis_client.setex(
+            new_session_key,
+            14 * 24 * 3600,  # 14 days
+            json.dumps(user_info),
+        )
+
+        if new_token != token:
+            request.state.new_token = new_token
+
+        # Return BOTH tokens so we can inform the client
+        return {
+            "token": token,  # Original token (for this request)
+            "new_token": new_token
+            if new_token != token
+            else None,  # New token if changed
+            "user": user_data,
+        }
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP from request"""
+    # Check for X-Forwarded-For header (when behind proxy)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+
+    # Check for X-Real-IP header
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+
+    # Fall back to direct connection
+    return request.client.host if request.client else "127.0.0.1"

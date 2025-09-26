@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
-	import { loginAdmin } from '$lib/services/auth';
 
 	let email = '';
 	let password = '';
@@ -11,7 +9,7 @@
 	async function handleLogin() {
 		error = '';
 		try {
-			await loginAdmin(email, password);
+			// await loginAdmin(email, password);
 			goto('/admin/dashboard');
 		} catch (err) {
 			error = (err as Error).message;
@@ -19,7 +17,6 @@
 	}
 
 	function handleLogout() {
-		pb.authStore.clear();
 		goto('/');
 	}
 </script>

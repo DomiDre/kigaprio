@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { pb } from '$lib/services/pocketbase';
 	import { currentUser } from '$lib/stores/auth';
 	import type { Priority, DayPriorities, WeekData } from '$lib/types/priorities';
 
@@ -22,6 +21,7 @@
 		getDayDates
 	} from '$lib/utils/dateHelpers';
 	import { validateWeekPriorities } from '$lib/utils/priorityHelpers';
+	import { apiService } from '$lib/services/api';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -61,10 +61,7 @@
 		if (!$currentUser) return;
 
 		try {
-			const records = await pb.collection('priorities').getFullList({
-				filter: `userId = "${$currentUser.id}" && month = "${selectedMonth}"`,
-				sort: 'weekNumber'
-			});
+			const records = await apiService.getPriorities(selectedMonth);
 
 			records.forEach((record: any) => {
 				const weekIndex = weeks.findIndex((w) => w.weekNumber === record.weekNumber);
@@ -79,6 +76,8 @@
 			});
 		} catch (error) {
 			console.error('Error loading priorities:', error);
+			saveError = 'Fehler beim Laden der Prioritäten';
+			setTimeout(() => (saveError = ''), 3000);
 		}
 	}
 
@@ -115,10 +114,15 @@
 			setTimeout(() => (saveError = ''), 3000);
 			return;
 		}
+		if (!$currentUser) {
+			saveError = 'No user id is set currently';
+			setTimeout(() => (saveError = ''), 3000);
+			return;
+		}
 
 		try {
 			const data = {
-				userId: $currentUser?.id,
+				userId: $currentUser.id,
 				month: selectedMonth,
 				weekNumber: week.weekNumber,
 				priorities: week.priorities,
@@ -126,24 +130,25 @@
 				endDate: week.endDate
 			};
 
+			let record;
 			if (week.id) {
-				await pb.collection('priorities').update(week.id, data);
+				record = await apiService.updatePriority(week.id, data);
 			} else {
-				const record = await pb.collection('priorities').create(data);
+				record = await apiService.createPriority(data);
 				weeks[weekIndex].id = record.id;
 			}
 
 			// Update the status to completed
 			weeks[weekIndex].status = 'completed';
 
-			// Force reactivity update by reassigning the array
+			// Force reactivity update
 			weeks = [...weeks];
 
 			saveSuccess = 'Woche erfolgreich gespeichert!';
 			setTimeout(() => (saveSuccess = ''), 3000);
 			closeEditModal();
-		} catch (error) {
-			saveError = 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
+		} catch (error: any) {
+			saveError = error.message || 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
 			setTimeout(() => (saveError = ''), 3000);
 			console.error('Save error:', error);
 		}
@@ -164,24 +169,27 @@
 	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 >
 	<div class="container mx-auto max-w-6xl px-4 py-8">
-		<Header {monthOptions} bind:selectedMonth />
-		<Legend />
+		{#if $currentUser}
+			<Header {monthOptions} bind:selectedMonth />
+			<Legend />
+			{#if weeks.length > 0}
+				<ProgressBar {completedWeeks} totalWeeks={weeks.length} {progressPercentage} />
 
-		{#if weeks.length > 0}
-			<ProgressBar {completedWeeks} totalWeeks={weeks.length} {progressPercentage} />
-
-			{#if isMobile}
-				<WeekTabs {weeks} bind:activeWeekIndex />
-				<MobileWeekView
-					week={weeks[activeWeekIndex]}
-					weekIndex={activeWeekIndex}
-					{selectPriority}
-					{saveWeek}
-					{getDayDates}
-				/>
-			{:else}
-				<DesktopGridView {weeks} {openEditModal} />
+				{#if isMobile}
+					<WeekTabs {weeks} bind:activeWeekIndex />
+					<MobileWeekView
+						week={weeks[activeWeekIndex]}
+						weekIndex={activeWeekIndex}
+						{selectPriority}
+						{saveWeek}
+						{getDayDates}
+					/>
+				{:else}
+					<DesktopGridView {weeks} {openEditModal} />
+				{/if}
 			{/if}
+		{:else}
+			<div class="mb-8 text-center text-gray-600 dark:text-gray-300">Lade...</div>
 		{/if}
 
 		<Notifications {saveError} {saveSuccess} />

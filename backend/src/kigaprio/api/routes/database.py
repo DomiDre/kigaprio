@@ -1,50 +1,376 @@
+import json
 import os
+import secrets
+from datetime import datetime
 
 import httpx
-from fastapi import APIRouter, Request, Response
+import redis
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel, EmailStr, Field
+
+from kigaprio.services.magic_word import (
+    get_magic_word_from_cache_or_db,
+)
+from kigaprio.services.redis_service import get_redis
+from kigaprio.utils import get_client_ip
 
 router = APIRouter()
-POCKETBASE_URL = os.getenv("POCKETBASE_URL")
-assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
+security = HTTPBearer()
+
+# Configuration
+POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 
-async def proxy_to_pocketbase(path: str, request: Request) -> Response:
-    """Shared proxy logic"""
-    async with httpx.AsyncClient() as client:
-        response = await client.request(
-            method=request.method,
-            url=f"{POCKETBASE_URL}/{path}",
-            headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
-            content=await request.body(),
-            params=request.query_params,
+class MagicWordRequest(BaseModel):
+    magic_word: str = Field(..., min_length=1)
+
+
+class MagicWordResponse(BaseModel):
+    success: bool
+    token: str | None = None
+    message: str | None = None
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1)
+    passwordConfirm: str
+    name: str = Field(..., min_length=1)
+    registration_token: str
+
+
+class LoginRequest(BaseModel):
+    identity: str = Field(..., min_length=1, description="Email or username")
+    password: str = Field(..., min_length=1)
+
+
+class LoginResponse(BaseModel):
+    token: str
+    record: dict
+    message: str | None = None
+
+
+@router.post("/verify-magic-word")
+async def verify_magic_word(
+    request: MagicWordRequest,
+    req: Request,
+    redis_client: redis.Redis = Depends(get_redis),
+) -> MagicWordResponse:
+    """Verify the magic word and return a temporary registration token.
+    This endpoint is triggered before a registration and therefore anybody
+    should be able to call it.
+
+    However to avoid spam, rate limits are implemented.
+    """
+
+    # determine if there are too many requests by client_ip
+    client_ip = get_client_ip(req)
+    rate_limit_key = f"rate_limit:magic_word:{client_ip}"
+    attempts = redis_client.get(rate_limit_key)
+
+    if attempts and int(str(attempts)) >= 10:
+        raise HTTPException(
+            status_code=429,
+            detail="Zu viele Versuche. Bitte versuchen Sie es später erneut.",
         )
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            headers=dict(response.headers),
+
+    # Get magic word from cache/database
+    magic_word = await get_magic_word_from_cache_or_db(redis_client)
+    if not magic_word:
+        raise HTTPException(status_code=500, detail="No magic word is initialized")
+
+    # Increment rate limit counter
+    redis_client.incr(rate_limit_key)
+    redis_client.expire(rate_limit_key, 3600)
+
+    # Check magic word (case-insensitive comparison)
+    if request.magic_word.strip().lower() != magic_word.lower():
+        raise HTTPException(status_code=403, detail="Ungültiges Zauberwort")
+
+    # Reset rate limit on success
+    redis_client.delete(rate_limit_key)
+
+    # Generate temporary token
+    token = secrets.token_urlsafe(32)
+
+    # Store token in Redis with 10 minute expiration
+    token_key = f"reg_token:{token}"
+    token_data = {"created_at": datetime.now().isoformat(), "ip": client_ip}
+    redis_client.setex(token_key, 600, json.dumps(token_data))
+
+    return MagicWordResponse(
+        success=True, token=token, message="Zauberwort erfolgreich verifiziert"
+    )
+
+
+@router.post("/register")
+async def register_user(
+    request: RegisterRequest, redis_client: redis.Redis = Depends(get_redis)
+):
+    """Register a new user with magic word token verification.
+
+    As only people who have passed magic word check may register. This
+    endpoint can still be called by anyone, but the token check must
+    be passed at the beginning.
+    """
+
+    # Verify registration token
+    token_key = f"reg_token:{request.registration_token}"
+    token_data = redis_client.get(token_key)
+
+    if not token_data:
+        raise HTTPException(
+            status_code=403, detail="Ungültiger oder abgelaufener Registrierungstoken"
         )
 
+    # Delete token (one-time use)
+    redis_client.delete(token_key)
 
-@router.get("/pb/{path:path}")
-async def proxy_get(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
+    # Check for duplicate registration attempts
+    email_key = f"reg_email:{request.email.lower()}"
+    if redis_client.exists(email_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Eine Registrierung für diese E-Mail-Adresse läuft bereits",
+        )
+
+    # Set temporary lock on email (5 minutes)
+    redis_client.setex(email_key, 300, "registering")
+
+    try:
+        # Proxy registration to PocketBase
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/records",
+                json={
+                    "email": request.email.lower(),
+                    "password": request.password,
+                    "passwordConfirm": request.passwordConfirm,
+                    "name": request.name,
+                    "role": "user",
+                },
+            )
+
+            if response.status_code != 200:
+                error_data = response.json()
+
+                # Handle PocketBase validation errors
+                if "data" in error_data:
+                    errors = []
+                    for field, msgs in error_data["data"].items():
+                        if field == "email":
+                            errors.append(
+                                "Email-Adresse ist bereits registriert oder ungültig"
+                            )
+                        elif field == "password":
+                            errors.append("Passwort entspricht nicht den Anforderungen")
+                        else:
+                            errors.append(f"{field}: {msgs['message']}")
+                    raise HTTPException(status_code=400, detail=". ".join(errors))
+
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=error_data.get("message", "Registrierung fehlgeschlagen"),
+                )
+
+            # Store registration metadata
+            user_data = response.json()
+            return user_data
+    finally:
+        # Remove email lock
+        redis_client.delete(email_key)
 
 
-@router.post("/pb/{path:path}")
-async def proxy_post(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
+@router.post("/login")
+async def login_user(
+    request: LoginRequest,
+    req: Request,
+    redis_client: redis.Redis = Depends(get_redis),
+) -> LoginResponse:
+    """Authenticate a user and return auth token from PocketBase.
+
+    This endpoint proxies the authentication to PocketBase's auth-with-password endpoint.
+    Rate limiting is implemented to prevent brute force attacks.
+    """
+
+    # Rate limiting by IP
+    client_ip = get_client_ip(req)
+    rate_limit_key = f"rate_limit:login:{client_ip}"
+    attempts = redis_client.get(rate_limit_key)
+
+    if attempts and int(str(attempts)) >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Zu viele Login-Versuche. Bitte versuchen Sie es in 1 Minute erneut.",
+        )
+
+    # Rate limiting by identity (email/username)
+    identity_rate_limit_key = f"rate_limit:login:identity:{request.identity.lower()}"
+    identity_attempts = redis_client.get(identity_rate_limit_key)
+
+    if identity_attempts and int(str(identity_attempts)) >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Zu viele Login-Versuche für diesen Benutzer. Bitte versuchen Sie es in 1 Minute erneut.",
+        )
+
+    # Increment rate limit counters
+    redis_client.incr(rate_limit_key)
+    redis_client.expire(rate_limit_key, 60)  # 1 min expiry
+
+    redis_client.incr(identity_rate_limit_key)
+    redis_client.expire(identity_rate_limit_key, 60)  # 1 min expiry
+
+    try:
+        # Proxy authentication to PocketBase
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": request.identity.lower(),
+                    "password": request.password,
+                },
+            )
+
+            if response.status_code != 200:
+                error_data = response.json()
+
+                # Don't reveal whether email exists or not (security best practice)
+                if response.status_code == 400:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Ungültige Anmeldedaten",
+                    )
+
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=error_data.get("message", "Anmeldung fehlgeschlagen"),
+                )
+
+            # Parse successful response
+            auth_data = response.json()
+
+            # Reset rate limits on successful login
+            redis_client.delete(rate_limit_key)
+            redis_client.delete(identity_rate_limit_key)
+
+            # store logged in sessions in redis
+            session_key = f"session:{auth_data['token']}"
+            user_info = {
+                "id": auth_data["record"]["id"],
+                "email": auth_data["record"]["email"],
+                "name": auth_data["record"]["name"],
+            }
+            redis_client.setex(
+                session_key,
+                14 * 24 * 3600,  # 14 days, same as token lifetime
+                json.dumps(user_info),
+            )
+
+            return LoginResponse(
+                token=auth_data["token"],
+                record=auth_data["record"],
+                message="Erfolgreich angemeldet",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Ein unerwarteter Fehler ist aufgetreten",
+        ) from e
 
 
-@router.put("/pb/{path:path}")
-async def proxy_put(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
+@router.post("/refresh")
+async def refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    redis_client: redis.Redis = Depends(get_redis),
+):
+    """Refresh an authentication token.
+
+    This endpoint proxies to PocketBase's auth-refresh endpoint.
+    """
+
+    token = credentials.credentials
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-refresh",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            if response.status_code != 200:
+                error_data = response.json()
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=error_data.get(
+                        "message", "Token-Aktualisierung fehlgeschlagen"
+                    ),
+                )
+
+            # Parse successful response
+            auth_data = response.json()
+
+            # Update session in Redis with new token
+            old_session_key = f"session:{token}"
+            new_session_key = f"session:{auth_data['token']}"
+
+            # Copy session data to new key if it exists
+            session_data = redis_client.get(old_session_key)
+            user_info = {
+                "id": auth_data["record"]["id"],
+                "email": auth_data["record"]["email"],
+                "name": auth_data["record"]["name"],
+            }
+            if session_data:
+                redis_client.delete(old_session_key)
+
+            redis_client.setex(
+                new_session_key,
+                14 * 24 * 3600,  # 14 days
+                json.dumps(user_info),
+            )
+            return {
+                "token": auth_data["token"],
+                "record": auth_data["record"],
+                "message": "Token erfolgreich aktualisiert",
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Ein unerwarteter Fehler ist aufgetreten",
+        ) from e
 
 
-@router.delete("/pb/{path:path}")
-async def proxy_delete(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
+@router.post("/logout")
+async def logout_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    redis_client: redis.Redis = Depends(get_redis),
+):
+    """Logout a user by invalidating their session.
 
+    Note: This only removes the session from Redis cache.
+    The PocketBase token will still be valid until it expires.
+    For complete logout, the client should also delete the token.
+    """
+    token = credentials.credentials
+    session_key = f"session:{token}"
 
-@router.patch("/pb/{path:path}")
-async def proxy_patch(path: str, request: Request):
-    return await proxy_to_pocketbase(path, request)
+    # Check if session exists
+    if not redis_client.exists(session_key):
+        raise HTTPException(
+            status_code=404,
+            detail="Sitzung nicht gefunden oder bereits abgelaufen",
+        )
+
+    # Delete session from Redis
+    redis_client.delete(session_key)
+
+    return {"success": True, "message": "Erfolgreich abgemeldet"}

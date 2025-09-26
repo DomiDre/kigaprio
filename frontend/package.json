@@ -48,8 +48,5 @@
 	},
 	"overrides": {
 		"cookie": "^0.7.0"
-	},
-	"dependencies": {
-		"pocketbase": "^0.26.2"
 	}
 }
