@@ -146,7 +146,7 @@ async def register_user(
             response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/records",
                 json={
-                    "email": request.email,
+                    "email": request.email.lower(),
                     "password": request.password,
                     "passwordConfirm": request.passwordConfirm,
                     "name": request.name,
@@ -230,7 +230,7 @@ async def login_user(
             response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
                 json={
-                    "identity": request.identity,
+                    "identity": request.identity.lower(),
                     "password": request.password,
                 },
             )
