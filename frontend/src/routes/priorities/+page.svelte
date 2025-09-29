@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { currentUser } from '$lib/stores/auth';
+	import { currentUser, isAuthenticated } from '$lib/stores/auth';
 	import type { Priority, DayPriorities, WeekData } from '$lib/types/priorities';
 
 	// Import components
@@ -22,6 +22,7 @@
 	} from '$lib/utils/dateHelpers';
 	import { validateWeekPriorities } from '$lib/utils/priorityHelpers';
 	import { apiService } from '$lib/services/api';
+	import Loading from '$lib/components/Loading.svelte';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -165,11 +166,11 @@
 	}
 </script>
 
-<div
-	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
->
-	<div class="container mx-auto max-w-6xl px-4 py-8">
-		{#if $currentUser}
+{#if $currentUser && $isAuthenticated}
+	<div
+		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
+	>
+		<div class="container mx-auto max-w-6xl px-4 py-8">
 			<Header {monthOptions} bind:selectedMonth />
 			<Legend />
 			{#if weeks.length > 0}
@@ -188,21 +189,21 @@
 					<DesktopGridView {weeks} {openEditModal} />
 				{/if}
 			{/if}
-		{:else}
-			<div class="mb-8 text-center text-gray-600 dark:text-gray-300">Lade...</div>
+			<Notifications {saveError} {saveSuccess} />
+		</div>
+
+		{#if showEditModal && editingWeek}
+			<EditModal
+				{editingWeek}
+				activeWeekIndex={editingWeekIndex}
+				{closeEditModal}
+				saveWeek={saveEditingWeek}
+				{weeks}
+				{getDayDates}
+			/>
 		{/if}
-
-		<Notifications {saveError} {saveSuccess} />
 	</div>
-
-	{#if showEditModal && editingWeek}
-		<EditModal
-			{editingWeek}
-			activeWeekIndex={editingWeekIndex}
-			{closeEditModal}
-			saveWeek={saveEditingWeek}
-			{weeks}
-			{getDayDates}
-		/>
-	{/if}
-</div>
+{:else}
+	<!-- This will show if the user is not logged in but tries to access anyway. Will be redirected automatically via handler from +layout.svelte -->
+	<Loading message="Lade..." />
+{/if}

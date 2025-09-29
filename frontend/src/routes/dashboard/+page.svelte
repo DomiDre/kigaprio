@@ -3,6 +3,7 @@
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 	import { goto } from '$app/navigation';
+	import Loading from '$lib/components/Loading.svelte';
 
 	async function handleLogout() {
 		try {
@@ -90,5 +91,6 @@
 		</div>
 	</div>
 {:else}
-	Loading...
+	<!-- This will show if the user is not logged in but tries to access anyway. Will be redirected automatically via handler from +layout.svelte -->
+	<Loading message="Lade..." />
 {/if}
