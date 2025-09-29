@@ -12,30 +12,38 @@
 	onMount(() => {
 		if (!browser) return;
 
-		// Listen for storage events (logout from another tab)
+		let navigatingToLogin = false;
+
 		const handleStorageChange = (e: StorageEvent) => {
-			if (e.key === 'auth_token' && !e.newValue) {
-				// Token was removed - user logged out in another tab
-				authStore.clearAuth();
-				goto('/login');
-			} else if (e.key === 'auth_token' && e.newValue && !authStore.getToken()) {
-				// Token was added - user logged in another tab
-				window.location.reload();
+			if (e.key === 'auth_token') {
+				if (!e.newValue) {
+					authStore.clearAuth();
+					if (!navigatingToLogin) {
+						navigatingToLogin = true;
+						goto('/login', { replaceState: true });
+					}
+				} else if (e.newValue && !authStore.getToken()) {
+					setTimeout(() => {
+						window.location.reload();
+					}, 100);
+				}
 			}
 		};
 
-		window.addEventListener('storage', handleStorageChange);
-
-		// Listen for network errors / 401s globally
 		const originalFetch = window.fetch;
 		window.fetch = async (...args) => {
 			const response = await originalFetch(...args);
 			if (response.status === 401) {
 				authStore.clearAuth();
-				goto('/login');
+				if (!navigatingToLogin) {
+					navigatingToLogin = true;
+					goto('/login', { replaceState: true });
+				}
 			}
 			return response;
 		};
+
+		window.addEventListener('storage', handleStorageChange);
 
 		return () => {
 			window.removeEventListener('storage', handleStorageChange);
