@@ -13,7 +13,7 @@ export type WeekData = {
 	startDate: string;
 	endDate: string;
 	priorities: DayPriorities;
-	status: 'completed' | 'pending';
+	status: 'completed' | 'pending' | 'empty';
 	userId?: string;
 	id?: string;
 };

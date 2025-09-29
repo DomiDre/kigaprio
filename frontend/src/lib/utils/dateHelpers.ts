@@ -110,3 +110,30 @@ export function getDayDates(weekData: WeekData): string[] {
 		return `${currentDate.getDate()}.`;
 	});
 }
+
+export function isWeekComplete(week: WeekData): boolean {
+	const totalDaysInWeek = Object.keys(week.priorities).length;
+	const validPriorities = Object.values(week.priorities).filter(
+		(p) => p !== null && p !== undefined
+	);
+
+	return (
+		totalDaysInWeek > 0 &&
+		validPriorities.length === totalDaysInWeek &&
+		new Set(validPriorities).size === totalDaysInWeek
+	);
+}
+
+export function getWeekStatus(week: WeekData): 'completed' | 'pending' | 'empty' {
+	const validCount = Object.values(week.priorities).filter(
+		(p) => p !== null && p !== undefined
+	).length;
+
+	if (isWeekComplete(week)) {
+		return 'completed';
+	} else if (validCount > 0) {
+		return 'pending';
+	} else {
+		return 'empty';
+	}
+}
