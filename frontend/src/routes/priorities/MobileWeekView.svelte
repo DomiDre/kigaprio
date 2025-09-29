@@ -218,7 +218,7 @@
 						{@const isUsedElsewhere =
 							!isSelected && Object.values(week.priorities).includes(typedPriority)}
 						{@const usedByDay = isUsedElsewhere
-							? Object.entries(week.priorities).find(([_, p]) => p === priority)?.[0]
+							? Object.entries(week.priorities).find(([, p]) => p === priority)?.[0]
 							: null}
 						{@const usedByDayName = usedByDay ? dayNames[usedByDay as keyof typeof dayNames] : null}
 
@@ -248,4 +248,3 @@
 		{/each}
 	</div>
 </div>
-

@@ -28,7 +28,7 @@ export function validateWeekPriorities(priorities: DayPriorities): {
 	}
 
 	// Check if all priorities are within valid range (1-5)
-	const invalidPriorities = assignedPriorities.filter(p => p < 1 || p > 5);
+	const invalidPriorities = assignedPriorities.filter((p) => p < 1 || p > 5);
 	if (invalidPriorities.length > 0) {
 		return {
 			isValid: false,

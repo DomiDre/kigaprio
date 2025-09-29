@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import Loading from '$lib/components/Loading.svelte';
 	import { getMonthOptions, parseMonthString } from '$lib/utils/dateHelpers';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	let loading = true;
 	let priorities: any[] = [];
@@ -65,7 +66,7 @@
 
 		// Count weeks that have at least one weekday (Mon-Fri) in the month
 		totalWeeks = 0;
-		const tempDate = new Date(firstDay);
+		const tempDate = new SvelteDate(firstDay);
 
 		// Find the first Monday of or before the first day of month
 		while (tempDate.getDay() !== 1) {
@@ -74,13 +75,13 @@
 
 		// Count each week that has at least one weekday in the month
 		while (tempDate <= lastDay) {
-			const weekStart = new Date(tempDate);
-			const weekEnd = new Date(tempDate);
+			const weekStart = new SvelteDate(tempDate);
+			const weekEnd = new SvelteDate(tempDate);
 			weekEnd.setDate(weekEnd.getDate() + 4); // Friday of the same week
 
 			// Check if this week has any weekday in the current month
 			let hasWeekdayInMonth = false;
-			for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+			for (let d = new SvelteDate(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
 				if (d.getMonth() === currentMonthNum && d.getFullYear() === currentYear) {
 					hasWeekdayInMonth = true;
 					break;
@@ -174,7 +175,7 @@
 						bind:value={selectedMonth}
 						class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-800 shadow-sm transition-colors hover:border-purple-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
 					>
-						{#each monthOptions as month}
+						{#each monthOptions as month (month)}
 							<option value={month}>{month}</option>
 						{/each}
 					</select>
@@ -282,7 +283,7 @@
 							Letzte Prioritäten
 						</div>
 						<div class="space-y-2">
-							{#each priorities.slice(0, 3) as priority}
+							{#each priorities.slice(0, 3) as priority (priority)}
 								<div
 									class="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
 								>
@@ -333,4 +334,3 @@
 {:else}
 	<Loading message="Lade..." />
 {/if}
-

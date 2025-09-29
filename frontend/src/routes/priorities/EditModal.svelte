@@ -18,7 +18,6 @@
 
 	let saving = $state(false);
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
-	let lastSavedPriorities = JSON.stringify(editingWeek?.priorities || {});
 	let saveTimeout: NodeJS.Timeout;
 
 	async function selectEditPriority(dayKey: string, priority: Priority) {
@@ -63,7 +62,6 @@
 		saveTimeout = setTimeout(async () => {
 			try {
 				await saveWeek(activeWeekIndex);
-				lastSavedPriorities = JSON.stringify(editingWeek.priorities);
 				saveStatus = 'saved';
 
 				// Reset status after 2 seconds
@@ -291,7 +289,7 @@
 							{@const isUsedElsewhere =
 								!isSelected && Object.values(editingWeek.priorities).includes(typedPriority)}
 							{@const usedByDay = isUsedElsewhere
-								? Object.entries(editingWeek.priorities).find(([_, p]) => p === priority)?.[0]
+								? Object.entries(editingWeek.priorities).find(([, p]) => p === priority)?.[0]
 								: null}
 							{@const usedByDayName = usedByDay
 								? dayNames[usedByDay as keyof typeof dayNames]
@@ -327,4 +325,3 @@
 		</div>
 	</div>
 </div>
-
