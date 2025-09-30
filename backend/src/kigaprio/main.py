@@ -108,7 +108,7 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
                 try:
                     resolved = path.resolve()
                     static_root = static_path.resolve()
-                    if str(resolved).startswith(str(static_root)):
+                    if resolved.is_relative_to(static_root):
                         return resolved
                     else:
                         return None
