@@ -138,14 +138,16 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
                 return FileResponse(index_in_dir)
 
             # Try with .html extension
-            html_file = requested_path.parent / f"{requested_path.name}.html"
+            html_file = (
+                requested_path.parent / f"{requested_path.name}.html"
+            ).resolve()
             if html_file.exists() and html_file.is_file():
                 # Verify it's still within static_root
                 try:
                     html_file.relative_to(static_root)
                     return FileResponse(html_file)
-                except ValueError:
-                    pass
+                except (ValueError, RuntimeError) as e:
+                    raise HTTPException(status_code=400, detail="Invalid path") from e
 
             # Fallback to root index.html for client-side routing
             index_path = static_root / "index.html"
