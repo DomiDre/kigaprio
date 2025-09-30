@@ -16,7 +16,6 @@
 	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, weeks, getDayDates }: Props =
 		$props();
 
-	let saving = $state(false);
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
 	let pendingSavePromise: Promise<void> | null = null;
