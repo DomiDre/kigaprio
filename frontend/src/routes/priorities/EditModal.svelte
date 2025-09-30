@@ -87,9 +87,24 @@
 	}
 
 	function handleClose() {
-		// Clear any pending saves
+		// Don't close if currently saving
+		if (saving && saveStatus === 'saving') {
+			return;
+		}
+
+		// If there's a pending save, execute it immediately
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
+			saveStatus = 'saving';
+			saving = true;
+
+			saveWeek(activeWeekIndex)
+				.catch((error) => console.error('Failed to save before closing:', error))
+				.finally(() => {
+					saving = false;
+					closeEditModal();
+				});
+			return;
 		}
 
 		closeEditModal();
