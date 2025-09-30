@@ -50,9 +50,14 @@ services:
       target: builder
     image: kigaprio-frontend-builder
     restart: "no"
+    user: "0:0"
     volumes:
       - frontend-static:/shared/build
-    command: sh -c "cp -r /app/build/* /shared/build/"
+    command: |
+      sh -c "
+        chown -R node:node /shared
+        cp -r /app/build/* /shared/build/
+      "
 
   pocketbase:
     build:
