@@ -103,11 +103,24 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
             if full_path.startswith("api/"):
                 return {"error": "Not found"}, 404
 
-            # Sanitize the path to prevent traversal attacks
-            # Remove any path traversal sequences
-            sanitized_path = full_path.lstrip("/")
-            if ".." in sanitized_path or sanitized_path.startswith("/"):
+            # Normalize user-provided path safely
+            requested_path = Path(full_path)
+            # Reject absolute paths
+            if requested_path.is_absolute():
                 return {"error": "Invalid path"}, 400
+
+            # Collapse any ".." and "." references
+            normalized_path = requested_path.resolve(strict=False)
+            static_root = static_path.resolve()
+            # Ensure the normalized path is inside static_path
+            try:
+                # `.relative_to` will raise if normalized_path escapes static_root
+                normalized_path.relative_to(static_root)
+            except ValueError:
+                return {"error": "Invalid path"}, 400
+
+            # After robust normalization, we build sanitized_path as relative to static_path
+            sanitized_path = normalized_path.relative_to(static_root)
 
             # Helper to ensure a path stays inside static_path
             def safe_path(path: Path) -> Path | None:
@@ -129,7 +142,7 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
 
             # Try as directory with index.html
             index_in_dir = safe_path(static_path / sanitized_path / "index.html")
-            if index_in_dir and index_in_dir.exists():
+            if index_in_dir and index_in_dir.exists() and index_in_dir.is_file():
                 return FileResponse(index_in_dir)
 
             # Try with .html extension
