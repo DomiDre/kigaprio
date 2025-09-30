@@ -82,13 +82,17 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
         # Mount SvelteKit app directories
         if (static_path / "_app").exists():
             app.mount(
-                "/_app", StaticFiles(directory=static_path / "_app"), name="static_app"
+                "/_app",
+                StaticFiles(directory=static_path / "_app", check_dir=True),
+                name="static_app",
             )
             print("  ✓ Mounted /_app directory")
 
         if (static_path / "assets").exists():
             app.mount(
-                "/assets", StaticFiles(directory=static_path / "assets"), name="assets"
+                "/assets",
+                StaticFiles(directory=static_path / "assets", check_dir=True),
+                name="assets",
             )
             print("  ✓ Mounted /assets directory")
 
@@ -99,12 +103,22 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
             if full_path.startswith("api/"):
                 return {"error": "Not found"}, 404
 
-            # Try exact file match
+            # Try exact file match first
             file_path = static_path / full_path
             if file_path.exists() and file_path.is_file():
                 return FileResponse(file_path)
 
-            # Fallback to index.html for client-side routing
+            # Try as directory with index.html (e.g., /login -> /login/index.html)
+            index_in_dir = static_path / full_path / "index.html"
+            if index_in_dir.exists():
+                return FileResponse(index_in_dir)
+
+            # Try with .html extension (e.g., /about -> /about.html)
+            html_file = static_path / f"{full_path}.html"
+            if html_file.exists():
+                return FileResponse(html_file)
+
+            # Fallback to root index.html for client-side routing
             index_path = static_path / "index.html"
             if index_path.exists():
                 return FileResponse(index_path)

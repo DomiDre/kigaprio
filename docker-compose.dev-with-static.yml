@@ -4,6 +4,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
+    user: "1000:1000"
     image: kigaprio-backend:dev
     volumes:
       - ./backend/src:/app/src
@@ -36,24 +37,6 @@ services:
       - pb_service_email
       - pb_service_password
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: development
-    image: kigaprio-frontend:dev
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
-      - USE_DEV_HTTPS=false
-    ports:
-      - "5173:5173"
-    depends_on:
-      backend:
-        condition: service_healthy
-
   # Optional: Build frontend periodically for testing static serving
   frontend-builder:
     build:
@@ -61,24 +44,31 @@ services:
       dockerfile: Dockerfile
       target: builder
     image: kigaprio-frontend:builder
+    user: "0:0"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend/src:/app/src
+      - frontend-node-modules:/app/node_modules
       - frontend-static:/static-output
     command: |
       sh -c "
-        echo 'Building frontend for static serving...'
-        npm run build
-        rm -rf /static-output/*
-        cp -r /app/build/* /static-output/
-        echo 'Build complete! Static files available at http://localhost:8000'
-        while true; do
-          sleep 30
-          echo 'Rebuilding frontend...'
+        # Fix volume permissions (running as root by default)
+        chown -R node:node /static-output /app/node_modules
+        
+        # Now switch to node user for the actual work
+        su node -c '
+          echo \"Building frontend for static serving...\"
           npm run build
           rm -rf /static-output/*
           cp -r /app/build/* /static-output/
-        done
+          echo \"Build complete! Static files available at http://localhost:8000\"
+          while true; do
+            sleep 30
+            echo \"Rebuilding frontend...\"
+            npm run build
+            rm -rf /static-output/*
+            cp -r /app/build/* /static-output/
+          done
+        '
       "
 
   pocketbase:
@@ -124,6 +114,7 @@ services:
 
 volumes:
   frontend-static:
+  frontend-node-modules:
 
 secrets:
   pb_admin_email:
