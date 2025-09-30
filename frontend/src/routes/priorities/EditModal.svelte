@@ -320,7 +320,6 @@
 										? 'border-2 border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 hover:border-orange-400 hover:shadow-lg dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
 										: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-purple-400'}"
 								onclick={() => selectEditPriority(dayKey, typedPriority)}
-								disabled={saving}
 								title={isUsedElsewhere
 									? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
 									: `Priorität ${priority} wählen`}
