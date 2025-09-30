@@ -16,12 +16,12 @@
 	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, weeks, getDayDates }: Props =
 		$props();
 
-	let saving = $state(false);
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
+	let pendingSavePromise: Promise<void> | null = null;
 
 	async function selectEditPriority(dayKey: string, priority: Priority) {
-		if (!editingWeek || saving) return;
+		if (!editingWeek) return; // Remove the saving check
 
 		// Optimistically update the UI
 		const oldPriority = editingWeek.priorities[dayKey as keyof DayPriorities];
@@ -37,7 +37,6 @@
 		// If this priority was used elsewhere, swap the priorities
 		if (dayUsingPriority) {
 			const [otherDay] = dayUsingPriority;
-			// Give the other day the old priority of the current day (swap)
 			editingWeek.priorities[otherDay as keyof DayPriorities] = oldPriority;
 		}
 
@@ -45,10 +44,10 @@
 		weeks[activeWeekIndex] = { ...editingWeek };
 
 		// Auto-save with debouncing
-		await autoSave();
+		autoSave();
 	}
 
-	async function autoSave() {
+	function autoSave() {
 		// Clear any pending save
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
@@ -56,40 +55,51 @@
 
 		// Show saving status immediately
 		saveStatus = 'saving';
-		saving = true;
 
 		// Debounce the actual save by 500ms
-		saveTimeout = setTimeout(async () => {
-			try {
-				await saveWeek(activeWeekIndex);
-				saveStatus = 'saved';
-
-				// Reset status after 2 seconds
-				setTimeout(() => {
-					if (saveStatus === 'saved') {
-						saveStatus = 'idle';
-					}
-				}, 2000);
-			} catch (error) {
-				console.error('Failed to save:', error);
-				saveStatus = 'error';
-
-				// Reset error status after 3 seconds
-				setTimeout(() => {
-					if (saveStatus === 'error') {
-						saveStatus = 'idle';
-					}
-				}, 3000);
-			} finally {
-				saving = false;
-			}
+		saveTimeout = setTimeout(() => {
+			pendingSavePromise = saveWeek(activeWeekIndex)
+				.then(() => {
+					saveStatus = 'saved';
+					// Reset status after 2 seconds
+					setTimeout(() => {
+						if (saveStatus === 'saved') {
+							saveStatus = 'idle';
+						}
+					}, 2000);
+				})
+				.catch((error) => {
+					console.error('Failed to save:', error);
+					saveStatus = 'error';
+					// Reset error status after 3 seconds
+					setTimeout(() => {
+						if (saveStatus === 'error') {
+							saveStatus = 'idle';
+						}
+					}, 3000);
+				})
+				.finally(() => {
+					pendingSavePromise = null;
+				});
 		}, 500);
 	}
 
-	function handleClose() {
-		// Clear any pending saves
+	async function handleClose() {
+		// If there's a pending debounced save, execute it immediately
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
+			saveStatus = 'saving';
+
+			try {
+				await saveWeek(activeWeekIndex);
+			} catch (error) {
+				console.error('Failed to save before closing:', error);
+			}
+		}
+
+		// Wait for any in-flight save to complete
+		if (pendingSavePromise) {
+			await pendingSavePromise;
 		}
 
 		closeEditModal();
@@ -303,7 +313,6 @@
 										? 'border-2 border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 hover:border-orange-400 hover:shadow-lg dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
 										: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-purple-400'}"
 								onclick={() => selectEditPriority(dayKey, typedPriority)}
-								disabled={saving}
 								title={isUsedElsewhere
 									? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
 									: `Priorität ${priority} wählen`}
