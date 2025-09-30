@@ -103,19 +103,31 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
             if full_path.startswith("api/"):
                 return {"error": "Not found"}, 404
 
+            # Helper to ensure a path stays inside static_path
+            def safe_path(path: Path) -> Path:
+                try:
+                    resolved = path.resolve()
+                    static_root = static_path.resolve()
+                    if str(resolved).startswith(str(static_root)):
+                        return resolved
+                    else:
+                        return None
+                except Exception:
+                    return None
+
             # Try exact file match first
-            file_path = static_path / full_path
-            if file_path.exists() and file_path.is_file():
+            file_path = safe_path(static_path / full_path)
+            if file_path and file_path.exists() and file_path.is_file():
                 return FileResponse(file_path)
 
             # Try as directory with index.html (e.g., /login -> /login/index.html)
-            index_in_dir = static_path / full_path / "index.html"
-            if index_in_dir.exists():
+            index_in_dir = safe_path(static_path / full_path / "index.html")
+            if index_in_dir and index_in_dir.exists():
                 return FileResponse(index_in_dir)
 
             # Try with .html extension (e.g., /about -> /about.html)
-            html_file = static_path / f"{full_path}.html"
-            if html_file.exists():
+            html_file = safe_path(static_path / f"{full_path}.html")
+            if html_file and html_file.exists():
                 return FileResponse(html_file)
 
             # Fallback to root index.html for client-side routing
