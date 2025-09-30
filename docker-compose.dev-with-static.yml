@@ -1,50 +1,41 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    container_name: kigaprio-backend-dev
+    user: "1000:1000"
+    image: kigaprio-backend:dev
     volumes:
       - ./backend/src:/app/src
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/uv.lock:/app/uv.lock:ro
+      - ./scripts/load-secrets.sh:/usr/local/bin/load-secrets.sh:ro
       - frontend-static:/app/static:ro  # Read-only mount of built files
     environment:
       - ENV=development
       - DEBUG=true
       - SERVE_STATIC=true  # Flag to enable static serving
       - CORS_ORIGINS=http://localhost:5173,http://localhost:8000
-      - DATABASE_URL=${DATABASE_URL:-postgresql://user:password@db:5432/kigaprio}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - POCKETBASE_URL=http://pocketbase:8090
     ports:
       - "8000:8000"
+    entrypoint: /usr/local/bin/load-secrets.sh
     command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - db
-      - redis
-    networks:
-      - kigaprio-dev
-
-  # Vite dev server for hot-reload development
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: development
-    container_name: kigaprio-frontend-dev
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - PUBLIC_API_URL=http://localhost:8000
-      - NODE_ENV=development
-    ports:
-      - "5173:5173"
-    networks:
-      - kigaprio-dev
+      pocketbase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - pb_service_email
+      - pb_service_password
 
   # Optional: Build frontend periodically for testing static serving
   frontend-builder:
@@ -52,52 +43,85 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: builder
-    container_name: kigaprio-frontend-builder
+    image: kigaprio-frontend:builder
+    user: "0:0"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - frontend-static:/app/build
+      - ./frontend/src:/app/src
+      - frontend-node-modules:/app/node_modules
+      - frontend-static:/static-output
     command: |
       sh -c "
-        echo 'Building frontend for static serving...'
-        npm run build
-        echo 'Build complete! Static files available at http://localhost:8000'
-        # Watch for changes and rebuild every 30 seconds (optional)
-        while true; do
-          sleep 30
-          echo 'Rebuilding frontend...'
+        # Fix volume permissions (running as root by default)
+        chown -R node:node /static-output /app/node_modules
+        
+        # Now switch to node user for the actual work
+        su node -c '
+          echo \"Building frontend for static serving...\"
           npm run build
-        done
+          rm -rf /static-output/*
+          cp -r /app/build/* /static-output/
+          echo \"Build complete! Static files available at http://localhost:8000\"
+          while true; do
+            sleep 30
+            echo \"Rebuilding frontend...\"
+            npm run build
+            rm -rf /static-output/*
+            cp -r /app/build/* /static-output/
+          done
+        '
       "
-    networks:
-      - kigaprio-dev
 
-  db:
-    image: postgres:16-alpine
-    container_name: kigaprio-db-dev
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=kigaprio
-    volumes:
-      - postgres-data-dev:/var/lib/postgresql/data
+  pocketbase:
+    build:
+      context: ./pocketbase
+      dockerfile: Dockerfile
+      args:
+        - USER_UID=1000
+        - USER_GID=1000
+        - PB_VERSION=0.30.0
+    image: kigaprio-pocketbase
+    restart: unless-stopped
+    expose:
+      - 8090
     ports:
-      - "5432:5432"
-    networks:
-      - kigaprio-dev
+      - "8090:8090"
+    volumes:
+      - ./pocketbase/pb_data:/pb/pb_data
+      - ./pocketbase/pb_public:/pb/pb_public
+      - ./pocketbase/pb_migrations:/pb/pb_migrations
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    secrets:
+      - pb_admin_email
+      - pb_admin_password
 
   redis:
-    image: redis:7-alpine
-    container_name: kigaprio-redis-dev
+    image: redis:8-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
-    networks:
-      - kigaprio-dev
+    volumes:
+      - ./redis:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  postgres-data-dev:
   frontend-static:
+  frontend-node-modules:
 
-networks:
-  kigaprio-dev:
-    driver: bridge
+secrets:
+  pb_admin_email:
+    file: ./.secrets/pb_admin_email
+  pb_admin_password:
+    file: ./.secrets/pb_admin_password
+  pb_service_email:
+    file: ./.secrets/pb_service_email
+  pb_service_password:
+    file: ./.secrets/pb_service_password

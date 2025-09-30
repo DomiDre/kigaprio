@@ -2,15 +2,18 @@
 FROM node:20 AS development
 
 WORKDIR /app
+RUN chown -R node:node /app
+
+USER node
 
 # Copy package files
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 
 # Install dependencies with clean slate
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY --chown=node:node . .
 
 # Expose port for Vite dev server
 EXPOSE 5173
@@ -23,15 +26,18 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 FROM node:20 AS builder
 
 WORKDIR /app
+RUN chown -R node:node /app
+
+USER node
 
 # Copy package files
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 
 # Clean install dependencies
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY --chown=node:node . .
 
 # Build the SvelteKit app
 RUN npm run build

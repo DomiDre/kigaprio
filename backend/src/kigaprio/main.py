@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -82,13 +82,17 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
         # Mount SvelteKit app directories
         if (static_path / "_app").exists():
             app.mount(
-                "/_app", StaticFiles(directory=static_path / "_app"), name="static_app"
+                "/_app",
+                StaticFiles(directory=static_path / "_app", check_dir=True),
+                name="static_app",
             )
             print("  ✓ Mounted /_app directory")
 
         if (static_path / "assets").exists():
             app.mount(
-                "/assets", StaticFiles(directory=static_path / "assets"), name="assets"
+                "/assets",
+                StaticFiles(directory=static_path / "assets", check_dir=True),
+                name="assets",
             )
             print("  ✓ Mounted /assets directory")
 
@@ -97,19 +101,60 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
         async def serve_spa(full_path: str):
             # Skip API routes
             if full_path.startswith("api/"):
-                return {"error": "Not found"}, 404
+                raise HTTPException(status_code=404, detail="Not found")
+
+            # Reject absolute paths
+            if Path(full_path).is_absolute() or full_path.startswith("/"):
+                raise HTTPException(status_code=400, detail="Invalid path")
+
+            # Resolve static root once
+            static_root = static_path.resolve()
+
+            # Handle empty path (root request)
+            if not full_path or full_path == "/":
+                index_path = static_root / "index.html"
+                if index_path.exists():
+                    return FileResponse(index_path)
+                raise HTTPException(status_code=404, detail="Not found")
+
+            # Sanitize the requested path
+            try:
+                # Build the full path and resolve it
+                requested_path = (static_root / full_path).resolve()
+
+                # Security check: ensure the resolved path is within static_root
+                requested_path.relative_to(static_root)
+            except (ValueError, RuntimeError) as e:
+                # Path traversal attempt or invalid path
+                raise HTTPException(status_code=400, detail="Invalid path") from e
 
             # Try exact file match
-            file_path = static_path / full_path
-            if file_path.exists() and file_path.is_file():
-                return FileResponse(file_path)
+            if requested_path.exists() and requested_path.is_file():
+                return FileResponse(requested_path)
 
-            # Fallback to index.html for client-side routing
-            index_path = static_path / "index.html"
+            # Try as directory with index.html
+            index_in_dir = requested_path / "index.html"
+            if index_in_dir.exists() and index_in_dir.is_file():
+                return FileResponse(index_in_dir)
+
+            # Try with .html extension
+            html_file = (
+                requested_path.parent / f"{requested_path.name}.html"
+            ).resolve()
+            if html_file.exists() and html_file.is_file():
+                # Verify it's still within static_root
+                try:
+                    html_file.relative_to(static_root)
+                    return FileResponse(html_file)
+                except (ValueError, RuntimeError) as e:
+                    raise HTTPException(status_code=400, detail="Invalid path") from e
+
+            # Fallback to root index.html for client-side routing
+            index_path = static_root / "index.html"
             if index_path.exists():
                 return FileResponse(index_path)
 
-            return {"error": "Not found"}, 404
+            raise HTTPException(status_code=404, detail="Not found")
 
         print("  ✓ Static file serving configured")
     else:
