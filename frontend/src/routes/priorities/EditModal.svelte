@@ -58,8 +58,6 @@
 
 		// Debounce the actual save by 500ms
 		saveTimeout = setTimeout(() => {
-			saving = true;
-
 			pendingSavePromise = saveWeek(activeWeekIndex)
 				.then(() => {
 					saveStatus = 'saved';
@@ -81,7 +79,6 @@
 					}, 3000);
 				})
 				.finally(() => {
-					saving = false;
 					pendingSavePromise = null;
 				});
 		}, 500);
@@ -92,14 +89,11 @@
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
 			saveStatus = 'saving';
-			saving = true;
 
 			try {
 				await saveWeek(activeWeekIndex);
 			} catch (error) {
 				console.error('Failed to save before closing:', error);
-			} finally {
-				saving = false;
 			}
 		}
 
