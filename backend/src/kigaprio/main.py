@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -101,61 +101,54 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
         async def serve_spa(full_path: str):
             # Skip API routes
             if full_path.startswith("api/"):
-                return {"error": "Not found"}, 404
+                raise HTTPException(status_code=404, detail="Not found")
 
-            # Normalize user-provided path safely
-            requested_path = Path(full_path)
-            # Reject absolute paths
-            if requested_path.is_absolute():
-                return {"error": "Invalid path"}, 400
-
-            # Collapse any ".." and "." references
-            normalized_path = requested_path.resolve(strict=False)
+            # Resolve static root once
             static_root = static_path.resolve()
-            # Ensure the normalized path is inside static_path
+
+            # Handle empty path (root request)
+            if not full_path or full_path == "/":
+                index_path = static_root / "index.html"
+                if index_path.exists():
+                    return FileResponse(index_path)
+                raise HTTPException(status_code=404, detail="Not found")
+
+            # Sanitize the requested path
             try:
-                # `.relative_to` will raise if normalized_path escapes static_root
-                normalized_path.relative_to(static_root)
-            except ValueError:
-                return {"error": "Invalid path"}, 400
+                # Build the full path and resolve it
+                requested_path = (static_root / full_path).resolve()
 
-            # After robust normalization, we build sanitized_path as relative to static_path
-            sanitized_path = normalized_path.relative_to(static_root)
+                # Security check: ensure the resolved path is within static_root
+                requested_path.relative_to(static_root)
+            except (ValueError, RuntimeError) as e:
+                # Path traversal attempt or invalid path
+                raise HTTPException(status_code=400, detail="Invalid path") from e
 
-            # Helper to ensure a path stays inside static_path
-            def safe_path(path: Path) -> Path | None:
-                try:
-                    resolved = path.resolve()
-                    static_root = static_path.resolve()
-                    # Check if resolved path is within static_root
-                    if resolved.is_relative_to(static_root):
-                        return resolved
-                    else:
-                        return None
-                except Exception:
-                    return None
-
-            # Try exact file match first
-            file_path = safe_path(static_path / sanitized_path)
-            if file_path and file_path.exists() and file_path.is_file():
-                return FileResponse(file_path)
+            # Try exact file match
+            if requested_path.exists() and requested_path.is_file():
+                return FileResponse(requested_path)
 
             # Try as directory with index.html
-            index_in_dir = safe_path(static_path / sanitized_path / "index.html")
-            if index_in_dir and index_in_dir.exists() and index_in_dir.is_file():
+            index_in_dir = requested_path / "index.html"
+            if index_in_dir.exists() and index_in_dir.is_file():
                 return FileResponse(index_in_dir)
 
             # Try with .html extension
-            html_file = safe_path(static_path / f"{sanitized_path}.html")
-            if html_file and html_file.exists():
-                return FileResponse(html_file)
+            html_file = requested_path.parent / f"{requested_path.name}.html"
+            if html_file.exists() and html_file.is_file():
+                # Verify it's still within static_root
+                try:
+                    html_file.relative_to(static_root)
+                    return FileResponse(html_file)
+                except ValueError:
+                    pass
 
             # Fallback to root index.html for client-side routing
-            index_path = static_path / "index.html"
+            index_path = static_root / "index.html"
             if index_path.exists():
                 return FileResponse(index_path)
 
-            return {"error": "Not found"}, 404
+            raise HTTPException(status_code=404, detail="Not found")
 
         print("  ✓ Static file serving configured")
     else:
