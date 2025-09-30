@@ -104,7 +104,7 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
                 return {"error": "Not found"}, 404
 
             # Helper to ensure a path stays inside static_path
-            def safe_path(path: Path) -> Path:
+            def safe_path(path: Path) -> Path | None:
                 try:
                     resolved = path.resolve()
                     static_root = static_path.resolve()
