@@ -19,9 +19,10 @@
 	let saving = $state(false);
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
+	let pendingSavePromise: Promise<void> | null = null;
 
 	async function selectEditPriority(dayKey: string, priority: Priority) {
-		if (!editingWeek || saving) return;
+		if (!editingWeek) return; // Remove the saving check
 
 		// Optimistically update the UI
 		const oldPriority = editingWeek.priorities[dayKey as keyof DayPriorities];
@@ -37,7 +38,6 @@
 		// If this priority was used elsewhere, swap the priorities
 		if (dayUsingPriority) {
 			const [otherDay] = dayUsingPriority;
-			// Give the other day the old priority of the current day (swap)
 			editingWeek.priorities[otherDay as keyof DayPriorities] = oldPriority;
 		}
 
@@ -45,10 +45,10 @@
 		weeks[activeWeekIndex] = { ...editingWeek };
 
 		// Auto-save with debouncing
-		await autoSave();
+		autoSave();
 	}
 
-	async function autoSave() {
+	function autoSave() {
 		// Clear any pending save
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
@@ -56,55 +56,57 @@
 
 		// Show saving status immediately
 		saveStatus = 'saving';
-		saving = true;
 
 		// Debounce the actual save by 500ms
-		saveTimeout = setTimeout(async () => {
-			try {
-				await saveWeek(activeWeekIndex);
-				saveStatus = 'saved';
+		saveTimeout = setTimeout(() => {
+			saving = true;
 
-				// Reset status after 2 seconds
-				setTimeout(() => {
-					if (saveStatus === 'saved') {
-						saveStatus = 'idle';
-					}
-				}, 2000);
-			} catch (error) {
-				console.error('Failed to save:', error);
-				saveStatus = 'error';
-
-				// Reset error status after 3 seconds
-				setTimeout(() => {
-					if (saveStatus === 'error') {
-						saveStatus = 'idle';
-					}
-				}, 3000);
-			} finally {
-				saving = false;
-			}
+			pendingSavePromise = saveWeek(activeWeekIndex)
+				.then(() => {
+					saveStatus = 'saved';
+					// Reset status after 2 seconds
+					setTimeout(() => {
+						if (saveStatus === 'saved') {
+							saveStatus = 'idle';
+						}
+					}, 2000);
+				})
+				.catch((error) => {
+					console.error('Failed to save:', error);
+					saveStatus = 'error';
+					// Reset error status after 3 seconds
+					setTimeout(() => {
+						if (saveStatus === 'error') {
+							saveStatus = 'idle';
+						}
+					}, 3000);
+				})
+				.finally(() => {
+					saving = false;
+					pendingSavePromise = null;
+				});
 		}, 500);
 	}
 
-	function handleClose() {
-		// Don't close if currently saving
-		if (saving && saveStatus === 'saving') {
-			return;
-		}
-
-		// If there's a pending save, execute it immediately
+	async function handleClose() {
+		// If there's a pending debounced save, execute it immediately
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
 			saveStatus = 'saving';
 			saving = true;
 
-			saveWeek(activeWeekIndex)
-				.catch((error) => console.error('Failed to save before closing:', error))
-				.finally(() => {
-					saving = false;
-					closeEditModal();
-				});
-			return;
+			try {
+				await saveWeek(activeWeekIndex);
+			} catch (error) {
+				console.error('Failed to save before closing:', error);
+			} finally {
+				saving = false;
+			}
+		}
+
+		// Wait for any in-flight save to complete
+		if (pendingSavePromise) {
+			await pendingSavePromise;
 		}
 
 		closeEditModal();
