@@ -103,6 +103,10 @@ if (ENV == "production" or SERVE_STATIC) and static_path.exists():
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="Not found")
 
+            # Reject absolute paths
+            if Path(full_path).is_absolute() or full_path.startswith("/"):
+                raise HTTPException(status_code=400, detail="Invalid path")
+
             # Resolve static root once
             static_root = static_path.resolve()
 
