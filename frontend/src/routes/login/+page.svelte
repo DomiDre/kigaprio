@@ -3,6 +3,7 @@
 	import { currentUser, isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 	import { onMount } from 'svelte';
+	import Loading from '$lib/components/Loading.svelte';
 
 	let email = '';
 	let password = '';
@@ -10,7 +11,7 @@
 
 	onMount(() => {
 		if ($isAuthenticated) {
-			goto('/');
+			goto('/priorities');
 		}
 	});
 
@@ -18,24 +19,10 @@
 		error = '';
 		try {
 			await apiService.login(email, password);
-			goto('/');
+			goto('/priorities');
 		} catch (err) {
 			error = (err as Error).message;
 		}
-	}
-
-	async function handleLogout() {
-		try {
-			await apiService.logout();
-		} catch (err) {
-			console.error('Logout error:', err);
-		} finally {
-			goto('/');
-		}
-	}
-
-	function handleDashboard() {
-		goto('/');
 	}
 
 	function goToRegister() {
@@ -43,34 +30,20 @@
 	}
 </script>
 
-<div
-	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
->
-	<div class="container mx-auto max-w-4xl px-4 py-8">
-		<!-- Header -->
-		<div class="mb-8 text-center">
-			<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Login Prioliste</h1>
-			<p class="text-gray-600 dark:text-gray-300">Kindergarten Prioliste eingeben</p>
-		</div>
-		<!-- Main Card -->
-		<div class="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
-			{#if $currentUser}
-				<div class="rounded-lg bg-gray-100 p-6 text-center shadow dark:bg-gray-700">
-					<p class="mb-4 text-gray-800 dark:text-gray-100">Willkommen, {$currentUser.email}!</p>
-					<button
-						class="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-semibold text-white shadow-lg transition hover:scale-105"
-						on:click={handleDashboard}
-					>
-						Dashboard
-					</button>
-					<button
-						class="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 font-semibold text-white shadow-lg transition hover:scale-105"
-						on:click={handleLogout}
-					>
-						Abmelden
-					</button>
-				</div>
-			{:else}
+{#if $currentUser && $isAuthenticated}
+	<Loading message="Lade..." />
+{:else}
+	<div
+		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
+	>
+		<div class="container mx-auto max-w-4xl px-4 py-8">
+			<!-- Header -->
+			<div class="mb-8 text-center">
+				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Login Prioliste</h1>
+				<p class="text-gray-600 dark:text-gray-300">Kindergarten Prioliste eingeben</p>
+			</div>
+			<!-- Main Card -->
+			<div class="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
 				<form class="space-y-6" on:submit|preventDefault={handleLogin}>
 					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
 						E-Mail
@@ -114,7 +87,7 @@
 						</p>
 					{/if}
 				</form>
-			{/if}
+			</div>
 		</div>
 	</div>
-</div>
+{/if}
