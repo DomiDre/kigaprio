@@ -177,6 +177,44 @@ export class ApiService {
 			body: JSON.stringify(data)
 		});
 	}
+
+	async exportMonthData(month: string): Promise<Blob> {
+		const response = await this.request(`/export/${month}`, {
+			method: 'GET',
+		});
+
+		if (!response.ok) {
+			throw new Error('Export failed');
+		}
+
+		// Return as Blob directly
+		return await response.blob();
+	}
+
+	async sendReminders(userIds: string[], message: string): Promise<{
+		sent: number;
+		failed: number;
+		details: Array<{
+			userId: string;
+			email: string;
+			status: 'sent' | 'failed';
+			error?: string;
+		}>;
+	}> {
+		const response = await this.request('/reminders/send', {
+			method: 'POST',
+			body: JSON.stringify({
+				userIds,
+				message,
+			}),
+		});
+
+		if (!response.ok) {
+			throw new Error('Failed to send reminders');
+		}
+
+		return await response.json();
+	}
 }
 
 // Export singleton instance
