@@ -401,7 +401,8 @@ async def get_user_submissions(
                 if updated and (not last_activity or updated > last_activity):
                     last_activity = updated
 
-            total_weeks = 4  # Assuming 4 weeks per month
+            # TODO: this is dependent on the month that is being looked at
+            total_weeks = 5  # Assuming 4 weeks per month
 
             if completed_weeks == total_weeks:
                 status = "complete"

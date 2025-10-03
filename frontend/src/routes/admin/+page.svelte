@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { apiService } from '$lib/services/api';
+	import { getMonthOptions } from '$lib/utils/dateHelpers';
 
 	// Types
 	type MonthStats = {
@@ -21,8 +22,9 @@
 		status: 'complete' | 'partial' | 'none';
 	};
 
+	const monthOptions = getMonthOptions();
 	// State
-	let selectedMonth = $state(getCurrentMonth());
+	let selectedMonth = $state(monthOptions[0]);
 	let monthStats = $state<MonthStats | null>(null);
 	let userSubmissions = $state<UserSubmission[]>([]);
 	let isLoading = $state(true);
@@ -46,29 +48,12 @@
 	);
 
 	// Helper functions
-	function getCurrentMonth(): string {
-		const date = new Date();
-		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-	}
-
-	function getMonthOptions(): { value: string; label: string }[] {
-		const options = [];
-		const today = new Date();
-		for (let i = 0; i < 12; i++) {
-			const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-			const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-			const label = date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-			options.push({ value, label });
-		}
-		return options;
-	}
-
-	const monthOptions = getMonthOptions();
 
 	// Derived states
 	let filteredUsers = $derived.by(() => {
 		let filtered = [...userSubmissions];
 
+		console.log(filtered);
 		// Apply search filter
 		if (searchTerm) {
 			filtered = filtered.filter(
@@ -119,6 +104,7 @@
 				apiService.getMonthStats(selectedMonth),
 				apiService.getUserSubmissions(selectedMonth)
 			]);
+			console.log(submissions);
 
 			monthStats = stats;
 			userSubmissions = submissions;
@@ -246,7 +232,7 @@
 						class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
 					>
 						{#each monthOptions as option}
-							<option value={option.value}>{option.label}</option>
+							<option value={option}>{option}</option>
 						{/each}
 					</select>
 
