@@ -53,13 +53,10 @@
 	let filteredUsers = $derived.by(() => {
 		let filtered = [...userSubmissions];
 
-		console.log(filtered);
 		// Apply search filter
 		if (searchTerm) {
-			filtered = filtered.filter(
-				(user) =>
-					user.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-					user.email.toLowerCase().includes(searchTerm.toLowerCase())
+			filtered = filtered.filter((user) =>
+				user.userName.toLowerCase().includes(searchTerm.toLowerCase())
 			);
 		}
 
