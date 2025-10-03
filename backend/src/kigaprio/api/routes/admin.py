@@ -106,7 +106,7 @@ async def get_current_admin(
             user_info = {
                 "id": admin_data["id"],
                 "email": admin_data["email"],
-                "name": admin_data["name"],
+                "name": admin_data["email"],
             }
             redis_client.setex(new_session_key, 900, json.dumps(user_info))
 

@@ -180,7 +180,7 @@ export class ApiService {
 
 	async exportMonthData(month: string): Promise<Blob> {
 		const response = await this.request(`/export/${month}`, {
-			method: 'GET',
+			method: 'GET'
 		});
 
 		if (!response.ok) {
@@ -191,7 +191,10 @@ export class ApiService {
 		return await response.blob();
 	}
 
-	async sendReminders(userIds: string[], message: string): Promise<{
+	async sendReminders(
+		userIds: string[],
+		message: string
+	): Promise<{
 		sent: number;
 		failed: number;
 		details: Array<{
@@ -205,8 +208,8 @@ export class ApiService {
 			method: 'POST',
 			body: JSON.stringify({
 				userIds,
-				message,
-			}),
+				message
+			})
 		});
 
 		if (!response.ok) {
