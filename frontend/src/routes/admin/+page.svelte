@@ -67,7 +67,7 @@
 
 	// Derived states
 	let filteredUsers = $derived.by(() => {
-		let filtered = userSubmissions;
+		let filtered = [...userSubmissions];
 
 		// Apply search filter
 		if (searchTerm) {
@@ -115,51 +115,19 @@
 	async function loadMonthData() {
 		isLoading = true;
 		try {
-			// Simulated API calls - replace with actual apiService calls
 			const [stats, submissions] = await Promise.all([
-				fetchMonthStats(selectedMonth),
-				fetchUserSubmissions(selectedMonth)
+				apiService.getMonthStats(selectedMonth),
+				apiService.getUserSubmissions(selectedMonth)
 			]);
 
 			monthStats = stats;
 			userSubmissions = submissions;
 		} catch (error) {
+			console.error('Error loading month data:', error);
 			showNotification('Fehler beim Laden der Daten', 'error');
 		} finally {
 			isLoading = false;
 		}
-	}
-
-	// Simulated API functions - replace with actual implementations
-	async function fetchMonthStats(month: string): Promise<MonthStats> {
-		// Simulate API call
-		await new Promise((resolve) => setTimeout(resolve, 500));
-		return {
-			totalSubmissions: 156,
-			completedWeeks: 120,
-			pendingWeeks: 36,
-			uniqueUsers: 42,
-			weeklyCompletion: [
-				{ week: 1, completed: 38, total: 42 },
-				{ week: 2, completed: 35, total: 42 },
-				{ week: 3, completed: 30, total: 42 },
-				{ week: 4, completed: 17, total: 42 }
-			]
-		};
-	}
-
-	async function fetchUserSubmissions(month: string): Promise<UserSubmission[]> {
-		// Simulate API call
-		await new Promise((resolve) => setTimeout(resolve, 500));
-		return Array.from({ length: 20 }, (_, i) => ({
-			userId: `user-${i}`,
-			userName: `User ${i + 1}`,
-			email: `user${i + 1}@example.com`,
-			completedWeeks: Math.floor(Math.random() * 5),
-			totalWeeks: 4,
-			lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-			status: Math.random() > 0.7 ? 'complete' : Math.random() > 0.4 ? 'partial' : 'none'
-		}));
 	}
 
 	// Actions
@@ -167,19 +135,21 @@
 		exportLoading = true;
 		try {
 			// Call API to generate Excel file
-			const response = await apiService.exportMonthData(selectedMonth);
+			const blob = await apiService.exportMonthData(selectedMonth);
+
 			// Download the file
-			const blob = new Blob([response], {
-				type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-			});
 			const url = window.URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `priorities_${selectedMonth}.xlsx`;
+			a.download = `prioritaeten_${selectedMonth}.xlsx`;
+			document.body.appendChild(a);
 			a.click();
+			document.body.removeChild(a);
 			window.URL.revokeObjectURL(url);
+
 			showNotification('Export erfolgreich heruntergeladen', 'success');
 		} catch (error) {
+			console.error('Export error:', error);
 			showNotification('Fehler beim Export', 'error');
 		} finally {
 			exportLoading = false;
@@ -188,11 +158,21 @@
 
 	async function sendReminders() {
 		try {
-			await apiService.sendReminders(reminderRecipients, reminderMessage);
-			showNotification(`Erinnerungen an ${reminderRecipients.length} Nutzer gesendet`, 'success');
+			const response = await apiService.sendReminders(
+				reminderRecipients,
+				reminderMessage,
+				selectedMonth
+			);
+
+			showNotification(
+				`Erinnerungen gesendet: ${response.sent} erfolgreich, ${response.failed} fehlgeschlagen`,
+				response.failed > 0 ? 'error' : 'success'
+			);
+
 			showReminderModal = false;
 			reminderRecipients = [];
 		} catch (error) {
+			console.error('Reminder error:', error);
 			showNotification('Fehler beim Senden der Erinnerungen', 'error');
 		}
 	}
@@ -236,7 +216,11 @@
 		loadMonthData();
 	});
 
+	// Effect to reload data when month changes
 	$effect(() => {
+		// Trigger data load when selectedMonth changes
+		// Using a reactive statement to ensure it runs
+		const month = selectedMonth;
 		loadMonthData();
 	});
 </script>

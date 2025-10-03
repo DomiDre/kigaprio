@@ -53,7 +53,7 @@ class UsersResponse(BaseModel):
     """Response from pocketbase upon a request for a users entry"""
 
     id: str
-    email: str
+    email: str | None = None
     emailVisibility: bool
     verified: bool
     name: str

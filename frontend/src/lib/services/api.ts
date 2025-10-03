@@ -61,6 +61,11 @@ export class ApiService {
 			throw new Error('Sitzung abgelaufen. Bitte melden Sie sich erneut an.');
 		}
 
+		// Handle 403 Forbidden - not authorized
+		if (response.status === 403) {
+			throw new Error('Keine Berechtigung für diese Aktion.');
+		}
+
 		// Handle rate limiting
 		if (response.status === 429) {
 			const data = await response.json();
@@ -72,11 +77,16 @@ export class ApiService {
 			throw new Error(data.detail || 'Ein Fehler ist aufgetreten');
 		}
 
+		return response;
+	}
+
+	private async requestJson(endpoint: string, options: RequestInit = {}) {
+		const response = await this.request(endpoint, options);
 		return response.json();
 	}
 
 	async login(identity: string, password: string) {
-		const response = await this.request('/login', {
+		const response = await this.requestJson('/login', {
 			method: 'POST',
 			body: JSON.stringify({ identity, password })
 		});
@@ -89,7 +99,7 @@ export class ApiService {
 
 	async logout() {
 		try {
-			await this.request('/logout', {
+			await this.requestJson('/logout', {
 				method: 'POST'
 			});
 		} catch (error) {
@@ -105,7 +115,7 @@ export class ApiService {
 			throw new Error('Kein Token verfügbar');
 		}
 
-		const response = await this.request('/refresh', {
+		const response = await this.requestJson('/database/refresh', {
 			method: 'POST',
 			body: JSON.stringify({ token })
 		});
@@ -115,7 +125,7 @@ export class ApiService {
 	}
 
 	async verifyMagicWord(magicWord: string) {
-		return this.request('/verify-magic-word', {
+		return this.requestJson('/database/verify-magic-word', {
 			method: 'POST',
 			body: JSON.stringify({ magic_word: magicWord })
 		});
@@ -128,7 +138,7 @@ export class ApiService {
 		name: string;
 		registration_token: string;
 	}) {
-		return this.request('/register', {
+		return this.requestJson('/database/register', {
 			method: 'POST',
 			body: JSON.stringify(data)
 		});
@@ -140,9 +150,9 @@ export class ApiService {
 			params.append('month', month);
 		}
 		const queryString = params.toString();
-		const endpoint = queryString ? `/priorities?${queryString}` : '/priorities';
+		const endpoint = queryString ? `/priolist/priorities?${queryString}` : '/priolist/priorities';
 
-		return this.request(endpoint, {
+		return this.requestJson(endpoint, {
 			method: 'GET'
 		});
 	}
@@ -155,7 +165,7 @@ export class ApiService {
 		startDate: string;
 		endDate: string;
 	}) {
-		return this.request('/priorities', {
+		return this.requestJson('/priolist/priorities', {
 			method: 'POST',
 			body: JSON.stringify(data)
 		});
@@ -172,20 +182,43 @@ export class ApiService {
 			endDate: string;
 		}
 	) {
-		return this.request(`/priorities/${id}`, {
+		return this.requestJson(`/priolist/priorities/${id}`, {
 			method: 'PATCH',
 			body: JSON.stringify(data)
 		});
 	}
 
-	async exportMonthData(month: string): Promise<Blob> {
-		const response = await this.request(`/export/${month}`, {
+	// ==================== Admin Endpoints ====================
+
+	async getMagicWordInfo() {
+		return this.requestJson('/admin/magic-word-info', {
 			method: 'GET'
 		});
+	}
 
-		if (!response.ok) {
-			throw new Error('Export failed');
-		}
+	async updateMagicWord(newMagicWord: string) {
+		return this.requestJson('/admin/update-magic-word', {
+			method: 'POST',
+			body: JSON.stringify({ new_magic_word: newMagicWord })
+		});
+	}
+
+	async getMonthStats(month: string) {
+		return this.requestJson(`/admin/stats/${month}`, {
+			method: 'GET'
+		});
+	}
+
+	async getUserSubmissions(month: string) {
+		return this.requestJson(`/admin/users/${month}`, {
+			method: 'GET'
+		});
+	}
+
+	async exportMonthData(month: string): Promise<Blob> {
+		const response = await this.request(`/admin/export/${month}`, {
+			method: 'GET'
+		});
 
 		// Return as Blob directly
 		return await response.blob();
@@ -193,7 +226,8 @@ export class ApiService {
 
 	async sendReminders(
 		userIds: string[],
-		message: string
+		message: string,
+		month?: string
 	): Promise<{
 		sent: number;
 		failed: number;
@@ -204,19 +238,14 @@ export class ApiService {
 			error?: string;
 		}>;
 	}> {
-		const response = await this.request('/reminders/send', {
+		return this.requestJson('/admin/reminders', {
 			method: 'POST',
 			body: JSON.stringify({
 				userIds,
-				message
+				message,
+				month
 			})
 		});
-
-		if (!response.ok) {
-			throw new Error('Failed to send reminders');
-		}
-
-		return await response.json();
 	}
 }
 

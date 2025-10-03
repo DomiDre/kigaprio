@@ -52,7 +52,7 @@ class MonthStatsResponse(BaseModel):
 class UserSubmissionResponse(BaseModel):
     userId: str
     userName: str
-    email: str
+    email: str | None
     completedWeeks: int
     totalWeeks: int
     lastActivity: str
@@ -351,7 +351,9 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Benutzer"
             )
 
-        users: list[UsersResponse] = users_response.json().get("items", [])
+        users: list[UsersResponse] = [
+            UsersResponse(**x) for x in users_response.json().get("items", [])
+        ]
 
         # Fetch priorities for the month
         priorities_response = await client.get(
@@ -365,7 +367,9 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Prioritäten"
             )
 
-        priorities: list[PriorityResponse] = priorities_response.json().get("items", [])
+        priorities: list[PriorityResponse] = [
+            PriorityResponse(**x) for x in priorities_response.json().get("items", [])
+        ]
 
         # Group priorities by user
         user_priorities: dict[str, list[PriorityResponse]] = {}
