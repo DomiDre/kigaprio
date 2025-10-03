@@ -134,32 +134,9 @@ def check_if_likely_admin(identity: str, redis_client: redis.Redis) -> bool:
     if redis_client.exists(admin_cache_key):
         return True
 
-    # Check 2: Does the email match admin patterns?
-    # Customize these patterns based on your organization
-    admin_patterns = [
-        "@admin.",  # admin.company.com
-        "@staff.",  # staff.company.com
-        "-admin@",  # user-admin@company.com
-        "_admin@",  # user_admin@company.com
-    ]
-
-    for pattern in admin_patterns:
-        if pattern in identity:
-            return True
-
-    # Check 3: Specific admin usernames (if using usernames instead of emails)
-    admin_usernames = [
-        "administrator",
-        "superuser",
-        "root",
-        "admin",
-    ]
-
-    if identity in admin_usernames:
+    ADMIN_MAIL = os.getenv("PB_ADMIN_EMAIL")
+    if ADMIN_MAIL is None:
+        return False
+    if identity.lower().strip() == ADMIN_MAIL.lower().strip():
         return True
-
-    # Check 4: Check for special prefix/suffix in username
-    if identity.startswith("admin_") or identity.endswith("_admin"):
-        return True
-
     return False
