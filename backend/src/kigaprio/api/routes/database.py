@@ -328,15 +328,6 @@ async def login_user(
                 auth_data = await _try_user_auth(
                     client, request.identity.lower(), request.password
                 )
-                if not auth_data:
-                    # User auth failed, try admin as fallback
-                    auth_data = await _try_admin_auth(
-                        client, request.identity.lower(), request.password
-                    )
-                    if auth_data:
-                        is_admin = True
-                        # Cache this identity as admin for future logins
-                        cache_admin_identity(request.identity.lower(), redis_client)
 
             if not auth_data:
                 # Both authentication attempts failed
@@ -373,7 +364,7 @@ async def login_user(
 
             return LoginResponse(
                 token=auth_data["token"],
-                record={**auth_data["record"], "is_admin": is_admin},
+                record={**session_info, "is_admin": is_admin},
                 message="Erfolgreich als Administrator angemeldet"
                 if is_admin
                 else "Erfolgreich angemeldet",
@@ -440,7 +431,7 @@ async def refresh_token(
             )
             return {
                 "token": auth_data["token"],
-                "record": auth_data["record"],
+                "record": user_info,
                 "message": "Token erfolgreich aktualisiert",
             }
 
