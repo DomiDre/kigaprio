@@ -5,15 +5,19 @@ from datetime import datetime
 
 import httpx
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
 from kigaprio.services.magic_word import (
     get_magic_word_from_cache_or_db,
 )
-from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import get_client_ip
+from kigaprio.services.redis_service import (
+    cache_admin_identity,
+    get_redis,
+    remove_admin_identity,
+)
+from kigaprio.utils import check_if_likely_admin, get_client_ip
 
 router = APIRouter()
 security = HTTPBearer()
@@ -50,6 +54,77 @@ class LoginResponse(BaseModel):
     token: str
     record: dict
     message: str | None = None
+
+
+async def _try_admin_auth(
+    client: httpx.AsyncClient, identity: str, password: str
+) -> dict | None:
+    """
+    Attempt admin authentication against PocketBase.
+    Returns auth data if successful, None otherwise.
+    """
+    try:
+        response = await client.post(
+            f"{POCKETBASE_URL}/api/collections/_superusers/auth-with-password",
+            json={
+                "identity": identity,
+                "password": password,
+            },
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception:
+        return None
+
+
+async def get_current_user(
+    authorization: str = Header(None),
+    redis_client: redis.Redis = Depends(get_redis),
+):
+    """Extract user info from token, including admin status"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.replace("Bearer ", "")
+    session_key = f"session:{token}"
+
+    user_data = redis_client.get(session_key)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+
+    return json.loads(str(user_data))
+
+
+async def require_admin(current_user: dict = Depends(get_current_user)):
+    """Ensure the current user is an admin"""
+    if not current_user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+async def _try_user_auth(
+    client: httpx.AsyncClient, identity: str, password: str
+) -> dict | None:
+    """
+    Attempt regular user authentication against PocketBase.
+    Returns auth data if successful, None otherwise.
+    """
+    try:
+        response = await client.post(
+            f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+            json={
+                "identity": identity,
+                "password": password,
+            },
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception:
+        return None
 
 
 @router.post("/verify-magic-word")
@@ -191,8 +266,8 @@ async def login_user(
 ) -> LoginResponse:
     """Authenticate a user and return auth token from PocketBase.
 
-    This endpoint proxies the authentication to PocketBase's auth-with-password endpoint.
-    Rate limiting is implemented to prevent brute force attacks.
+    This endpoint intelligently determines whether the user is likely an admin
+    and authenticates against the appropriate collection.
     """
 
     # Rate limiting by IP
@@ -223,56 +298,85 @@ async def login_user(
     redis_client.incr(identity_rate_limit_key)
     redis_client.expire(identity_rate_limit_key, 60)  # 1 min expiry
 
+    # Determine if this might be an admin login
+    is_likely_admin = check_if_likely_admin(request.identity.lower(), redis_client)
+
     try:
-        # Proxy authentication to PocketBase
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
-                json={
-                    "identity": request.identity.lower(),
-                    "password": request.password,
-                },
-            )
+            auth_data = None
+            is_admin = False
 
-            if response.status_code != 200:
-                error_data = response.json()
-
-                # Don't reveal whether email exists or not (security best practice)
-                if response.status_code == 400:
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Ungültige Anmeldedaten",
-                    )
-
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=error_data.get("message", "Anmeldung fehlgeschlagen"),
+            if is_likely_admin:
+                # Try admin authentication first
+                auth_data = await _try_admin_auth(
+                    client, request.identity.lower(), request.password
                 )
+                if auth_data:
+                    is_admin = True
+                    # Cache this identity as admin for future logins
+                    cache_admin_identity(request.identity.lower(), redis_client)
+                else:
+                    # Admin auth failed, try regular user
+                    auth_data = await _try_user_auth(
+                        client, request.identity.lower(), request.password
+                    )
+                    if auth_data:
+                        # This identity is not an admin, remove from cache if present
+                        remove_admin_identity(request.identity.lower(), redis_client)
+            else:
+                # Try regular user authentication first
+                auth_data = await _try_user_auth(
+                    client, request.identity.lower(), request.password
+                )
+                if not auth_data:
+                    # User auth failed, try admin as fallback
+                    auth_data = await _try_admin_auth(
+                        client, request.identity.lower(), request.password
+                    )
+                    if auth_data:
+                        is_admin = True
+                        # Cache this identity as admin for future logins
+                        cache_admin_identity(request.identity.lower(), redis_client)
 
-            # Parse successful response
-            auth_data = response.json()
+            if not auth_data:
+                # Both authentication attempts failed
+                raise HTTPException(
+                    status_code=401,
+                    detail="Ungültige Anmeldedaten",
+                )
 
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
             redis_client.delete(identity_rate_limit_key)
 
-            # store logged in sessions in redis
+            # Store session
             session_key = f"session:{auth_data['token']}"
-            user_info = {
+            session_info = {
                 "id": auth_data["record"]["id"],
                 "email": auth_data["record"]["email"],
-                "name": auth_data["record"]["name"],
+                "name": auth_data["record"].get(
+                    "name", "Admin" if is_admin else "User"
+                ),
+                "is_admin": is_admin,
+                "type": "superuser" if is_admin else "user",
             }
+
+            # Different TTL for admin vs regular users
+            ttl = (
+                900 if is_admin else (14 * 24 * 3600)
+            )  # 15 min for admin, 14 days for users
             redis_client.setex(
                 session_key,
-                14 * 24 * 3600,  # 14 days, same as token lifetime
-                json.dumps(user_info),
+                ttl,
+                json.dumps(session_info),
             )
 
             return LoginResponse(
                 token=auth_data["token"],
-                record=auth_data["record"],
-                message="Erfolgreich angemeldet",
+                record={**auth_data["record"], "is_admin": is_admin},
+                message="Erfolgreich als Administrator angemeldet"
+                if is_admin
+                else "Erfolgreich angemeldet",
             )
 
     except HTTPException:

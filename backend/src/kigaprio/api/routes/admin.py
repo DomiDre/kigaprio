@@ -127,39 +127,6 @@ async def get_current_admin(
         ) from e
 
 
-@router.post("/login")
-async def admin_login(
-    request: AdminLoginRequest, redis_client: redis.Redis = Depends(get_redis)
-) -> AdminAuthResponse:
-    """Authenticate a PocketBase admin and return a token"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/_superusers/auth-with-password",
-                json={"identity": request.identity, "password": request.password},
-            )
-
-            if response.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid admin credentials")
-
-            data = response.json()
-            token = data.get("token")
-            admin = data.get("record")
-
-            # Cache admin session
-            redis_client.setex(
-                f"admin_session:{token}",
-                900,  # 15 minutes
-                json.dumps(admin),
-            )
-            return AdminAuthResponse(token=token, admin=admin)
-
-    except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=503, detail="Authentication service unavailable"
-        ) from e
-
-
 # ==================== Admin Protected Endpoints ====================
 @router.get("/magic-word-info")
 async def get_magic_word_info(
