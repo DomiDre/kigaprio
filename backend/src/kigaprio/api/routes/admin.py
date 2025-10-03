@@ -7,10 +7,12 @@ from typing import Any
 import httpx
 import pandas as pd
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
+from kigaprio.api.routes.database import UsersResponse
+from kigaprio.api.routes.priolist import PriorityResponse
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
@@ -69,67 +71,39 @@ class ReminderResponse(BaseModel):
 
 
 async def get_current_admin(
-    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     redis_client: redis.Redis = Depends(get_redis),
 ) -> dict[str, Any]:
-    """Verify admin token and return admin data"""
+    """Check if token is in redis cache and of an admin, otherwise deny access"""
     token = credentials.credentials
 
     # Check if token is cached
-    session_key = f"admin_session:{token}"
-    cached_admin = redis_client.get(session_key)
-    if cached_admin:
-        return {"token": token, "user": json.loads(str(cached_admin))}
+    session_key = f"session:{token}"
+    session_data = redis_client.get(session_key)
+    if not session_data:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
 
-    # Verify with PocketBase
-    try:
-        async with httpx.AsyncClient() as client:
-            # First, get admin data using the token
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/_superusers/auth-refresh",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+    user_data = json.loads(str(session_data))
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=401, detail="Invalid or expired admin token"
-                )
+    # Check if user is admin
+    if not user_data.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
-            auth_data = response.json()
-            new_token = auth_data["token"]
-            admin_data = auth_data["record"]
-
-            redis_client.delete(session_key)
-
-            new_session_key = f"admin_session:{new_token}"
-            user_info = {
-                "id": admin_data["id"],
-                "email": admin_data["email"],
-                "name": admin_data["email"],
-            }
-            redis_client.setex(new_session_key, 900, json.dumps(user_info))
-
-            if new_token != token:
-                request.state.new_token = new_token
-
-            return {
-                "token": token,  # Original token (for this request)
-                "new_token": new_token
-                if new_token != token
-                else None,  # New token if changed
-                "user": admin_data,
-            }
-
-    except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=503, detail="Authentication service unavailable"
-        ) from e
+    # Return admin data in expected format
+    return {
+        "token": token,
+        "user": {
+            "id": user_data["id"],
+            "email": user_data["email"],
+            "name": user_data["name"],
+        },
+    }
 
 
 # ==================== Admin Protected Endpoints ====================
 @router.get("/magic-word-info")
 async def get_magic_word_info(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     redis_client: redis.Redis = Depends(get_redis),
     admin: dict[str, Any] = Depends(get_current_admin),
 ):
@@ -143,9 +117,11 @@ async def get_magic_word_info(
             )
 
         async with httpx.AsyncClient() as client:
+            token = credentials.credentials
             response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/system_settings/records",
                 params={"filter": 'key="registration_magic_word"'},
+                headers={"Authorization": f"Bearer {token}"},
             )
 
             last_updated = None
@@ -276,7 +252,7 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Benutzer"
             )
 
-        users = users_response.json().get("items", [])
+        users: list[UsersResponse] = users_response.json().get("items", [])
 
         # Fetch priorities for the month
         priorities_response = await client.get(
@@ -290,12 +266,12 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Prioritäten"
             )
 
-        priorities = priorities_response.json().get("items", [])
+        priorities: list[PriorityResponse] = priorities_response.json().get("items", [])
 
         # Group priorities by user
-        user_priorities = {}
+        user_priorities: dict[str, list[PriorityResponse]] = {}
         for priority in priorities:
-            user_id = priority["userId"]
+            user_id = priority.userId
             if user_id not in user_priorities:
                 user_priorities[user_id] = []
             user_priorities[user_id].append(priority)
@@ -303,14 +279,14 @@ async def get_user_submissions(
         # Build user submission list
         user_submissions = []
         for user in users:
-            user_id = user["id"]
+            user_id = user.id
             user_records = user_priorities.get(user_id, [])
 
             completed_weeks = 0
             last_activity = None
 
             for record in user_records:
-                priorities_dict = record.get("priorities", {})
+                priorities_dict = record.priorities
                 valid_priorities = [
                     p for p in priorities_dict.values() if p is not None
                 ]
@@ -318,7 +294,7 @@ async def get_user_submissions(
                 if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
                     completed_weeks += 1
 
-                updated = record.get("updated", record.get("created"))
+                updated = record.updated
                 if updated and (not last_activity or updated > last_activity):
                     last_activity = updated
 
@@ -334,8 +310,8 @@ async def get_user_submissions(
             user_submissions.append(
                 UserSubmissionResponse(
                     userId=user_id,
-                    userName=user.get("name", "Unknown"),
-                    email=user.get("email", ""),
+                    userName=user.name,
+                    email=user.email,
                     completedWeeks=completed_weeks,
                     totalWeeks=total_weeks,
                     lastActivity=last_activity or datetime.now().isoformat(),

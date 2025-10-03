@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 from datetime import datetime
+from typing import Literal
 
 import httpx
 import redis
@@ -13,11 +14,9 @@ from kigaprio.services.magic_word import (
     get_magic_word_from_cache_or_db,
 )
 from kigaprio.services.redis_service import (
-    cache_admin_identity,
     get_redis,
-    remove_admin_identity,
 )
-from kigaprio.utils import check_if_likely_admin, get_client_ip
+from kigaprio.utils import get_client_ip
 
 router = APIRouter()
 security = HTTPBearer()
@@ -50,33 +49,35 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
-class LoginResponse(BaseModel):
+class UsersResponse(BaseModel):
+    """Response from pocketbase upon a request for a users entry"""
+
+    id: str
+    email: str
+    emailVisibility: bool
+    verified: bool
+    name: str
+    role: Literal["user"] | Literal["service"] | Literal["admin"] | Literal["generic"]
+    avatar: str
+    collectionId: str
+    collectionName: str
+    created: str
+    updated: str
+
+
+class DatabaseLoginResponse(BaseModel):
+    """Response from pocketbase upon login request"""
+
     token: str
-    record: dict
-    message: str | None = None
+    record: UsersResponse
 
 
-async def _try_admin_auth(
-    client: httpx.AsyncClient, identity: str, password: str
-) -> dict | None:
-    """
-    Attempt admin authentication against PocketBase.
-    Returns auth data if successful, None otherwise.
-    """
-    try:
-        response = await client.post(
-            f"{POCKETBASE_URL}/api/collections/_superusers/auth-with-password",
-            json={
-                "identity": identity,
-                "password": password,
-            },
-        )
+class LoginResponse(BaseModel):
+    """Response by fastapi upon a successful login request"""
 
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception:
-        return None
+    token: str
+    record: UsersResponse
+    message: str
 
 
 async def get_current_user(
@@ -104,9 +105,9 @@ async def require_admin(current_user: dict = Depends(get_current_user)):
     return current_user
 
 
-async def _try_user_auth(
+async def try_user_auth(
     client: httpx.AsyncClient, identity: str, password: str
-) -> dict | None:
+) -> DatabaseLoginResponse | None:
     """
     Attempt regular user authentication against PocketBase.
     Returns auth data if successful, None otherwise.
@@ -121,7 +122,7 @@ async def _try_user_auth(
         )
 
         if response.status_code == 200:
-            return response.json()
+            return DatabaseLoginResponse(**response.json())
         return None
     except Exception:
         return None
@@ -298,36 +299,14 @@ async def login_user(
     redis_client.incr(identity_rate_limit_key)
     redis_client.expire(identity_rate_limit_key, 60)  # 1 min expiry
 
-    # Determine if this might be an admin login
-    is_likely_admin = check_if_likely_admin(request.identity.lower(), redis_client)
-
     try:
         async with httpx.AsyncClient() as client:
             auth_data = None
             is_admin = False
 
-            if is_likely_admin:
-                # Try admin authentication first
-                auth_data = await _try_admin_auth(
-                    client, request.identity.lower(), request.password
-                )
-                if auth_data:
-                    is_admin = True
-                    # Cache this identity as admin for future logins
-                    cache_admin_identity(request.identity.lower(), redis_client)
-                else:
-                    # Admin auth failed, try regular user
-                    auth_data = await _try_user_auth(
-                        client, request.identity.lower(), request.password
-                    )
-                    if auth_data:
-                        # This identity is not an admin, remove from cache if present
-                        remove_admin_identity(request.identity.lower(), redis_client)
-            else:
-                # Try regular user authentication first
-                auth_data = await _try_user_auth(
-                    client, request.identity.lower(), request.password
-                )
+            auth_data = await try_user_auth(
+                client, request.identity.lower(), request.password
+            )
 
             if not auth_data:
                 # Both authentication attempts failed
@@ -335,19 +314,18 @@ async def login_user(
                     status_code=401,
                     detail="Ungültige Anmeldedaten",
                 )
+            is_admin = auth_data.record.role == "admin"
 
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
             redis_client.delete(identity_rate_limit_key)
 
             # Store session
-            session_key = f"session:{auth_data['token']}"
+            session_key = f"session:{auth_data.token}"
             session_info = {
-                "id": auth_data["record"]["id"],
-                "email": auth_data["record"]["email"],
-                "name": auth_data["record"].get(
-                    "name", "Admin" if is_admin else "User"
-                ),
+                "id": auth_data.record.id,
+                "email": auth_data.record.email,
+                "name": auth_data.record.name,
                 "is_admin": is_admin,
                 "type": "superuser" if is_admin else "user",
             }
@@ -363,8 +341,8 @@ async def login_user(
             )
 
             return LoginResponse(
-                token=auth_data["token"],
-                record={**session_info, "is_admin": is_admin},
+                token=auth_data.token,
+                record=auth_data.record,
                 message="Erfolgreich als Administrator angemeldet"
                 if is_admin
                 else "Erfolgreich angemeldet",

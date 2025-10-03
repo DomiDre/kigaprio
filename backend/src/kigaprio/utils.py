@@ -117,26 +117,3 @@ def get_client_ip(request: Request) -> str:
 
     # Fall back to direct connection
     return request.client.host if request.client else "127.0.0.1"
-
-
-def check_if_likely_admin(identity: str, redis_client: redis.Redis) -> bool:
-    """
-    Determine if an identity is likely to be an admin based on various heuristics.
-
-    Checks in order:
-    1. Redis cache of known admin identities
-    2. Special admin email patterns/domains
-    3. Special username patterns
-    """
-
-    # Check 1: Is this identity in our admin cache?
-    admin_cache_key = f"known_admin:{identity}"
-    if redis_client.exists(admin_cache_key):
-        return True
-
-    ADMIN_MAIL = os.getenv("PB_ADMIN_EMAIL")
-    if ADMIN_MAIL is None:
-        return False
-    if identity.lower().strip() == ADMIN_MAIL.lower().strip():
-        return True
-    return False
