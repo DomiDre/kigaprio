@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 from datetime import datetime
@@ -74,30 +75,128 @@ async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     redis_client: redis.Redis = Depends(get_redis),
 ) -> dict[str, Any]:
-    """Check if token is in redis cache and of an admin, otherwise deny access"""
+    """Check if token is in redis cache and of an admin, otherwise verify with PocketBase"""
+
     token = credentials.credentials
-
-    # Check if token is cached
     session_key = f"session:{token}"
+
+    # First, try to get session from Redis cache
     session_data = redis_client.get(session_key)
-    if not session_data:
-        raise HTTPException(status_code=401, detail="Session expired or invalid")
 
-    user_data = json.loads(str(session_data))
+    if session_data:
+        # Session found in cache
+        user_data = json.loads(str(session_data))
 
-    # Check if user is admin
-    if not user_data.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
+        # Check if user is admin
+        if not user_data.get("is_admin", False):
+            raise HTTPException(status_code=403, detail="Admin access required")
 
-    # Return admin data in expected format
-    return {
-        "token": token,
-        "user": {
-            "id": user_data["id"],
-            "email": user_data["email"],
-            "name": user_data["name"],
-        },
-    }
+        # Return admin data in expected format
+        return {
+            "token": token,
+            "user": {
+                "id": user_data["id"],
+                "email": user_data["email"],
+                "name": user_data["name"],
+            },
+        }
+
+    # Session not in cache
+    try:
+        async with httpx.AsyncClient() as client:
+            # First, just check if the token is valid by making a simple request
+            test_response = await client.get(
+                f"{POCKETBASE_URL}/api/collections/users/records",
+                params={"perPage": 1, "fields": "id"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            if test_response.status_code == 401:
+                # Token is invalid or expired
+                raise HTTPException(
+                    status_code=401, detail="Session expired or invalid"
+                )
+
+            if test_response.status_code != 200:
+                raise HTTPException(
+                    status_code=503, detail="Unable to verify authentication"
+                )
+
+            # Token is valid. Now we need to determine if this is an admin.
+            # We'll decode the JWT token to get the user ID
+            # PocketBase tokens are JWT tokens with the user ID in the payload
+            try:
+                # JWT structure: header.payload.signature
+                # We just need the payload
+                parts = token.split(".")
+                if len(parts) != 3:
+                    raise ValueError("Invalid token format")
+
+                # Decode payload (add padding if necessary)
+                payload = parts[1]
+                payload += "=" * (4 - len(payload) % 4)  # Add padding
+                decoded_payload = base64.urlsafe_b64decode(payload)
+                token_data = json.loads(decoded_payload)
+
+                user_id = token_data.get("id")
+                if not user_id:
+                    raise ValueError("No user ID in token")
+
+                # Now fetch the specific user's data to check their role
+                user_response = await client.get(
+                    f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+                if user_response.status_code != 200:
+                    raise HTTPException(
+                        status_code=401, detail="Unable to fetch user data"
+                    )
+
+                user_record = user_response.json()
+                is_admin = user_record.get("role") == "admin"
+
+                if not is_admin:
+                    # Non-admin user - just deny access, don't modify anything
+                    raise HTTPException(status_code=403, detail="Admin access required")
+
+                # Admin user - safe to recreate session in cache
+                session_info = {
+                    "id": user_record["id"],
+                    "email": user_record["email"],
+                    "name": user_record["name"],
+                    "is_admin": True,
+                    "type": "superuser",
+                }
+
+                # Store with admin TTL (15 minutes)
+                redis_client.setex(
+                    session_key,
+                    900,  # 15 min for admin
+                    json.dumps(session_info),
+                )
+
+                return {
+                    "token": token,
+                    "user": {
+                        "id": user_record["id"],
+                        "email": user_record["email"],
+                        "name": user_record["name"],
+                    },
+                }
+
+            except (ValueError, KeyError, json.JSONDecodeError) as e:
+                # Can't decode token - fall back to denying access
+                raise HTTPException(
+                    status_code=401, detail="Invalid token format"
+                ) from e
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=503, detail="Authentication service unavailable"
+        ) from e
 
 
 # ==================== Admin Protected Endpoints ====================
