@@ -39,6 +39,7 @@ services:
       retries: 3
       start_period: 40s
     secrets:
+      - pb_admin_email
       - pb_service_email
       - pb_service_password
 
