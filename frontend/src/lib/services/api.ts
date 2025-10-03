@@ -115,7 +115,7 @@ export class ApiService {
 			throw new Error('Kein Token verfügbar');
 		}
 
-		const response = await this.requestJson('/database/refresh', {
+		const response = await this.requestJson('/refresh', {
 			method: 'POST',
 			body: JSON.stringify({ token })
 		});
@@ -125,7 +125,7 @@ export class ApiService {
 	}
 
 	async verifyMagicWord(magicWord: string) {
-		return this.requestJson('/database/verify-magic-word', {
+		return this.requestJson('/verify-magic-word', {
 			method: 'POST',
 			body: JSON.stringify({ magic_word: magicWord })
 		});
@@ -138,7 +138,7 @@ export class ApiService {
 		name: string;
 		registration_token: string;
 	}) {
-		return this.requestJson('/database/register', {
+		return this.requestJson('/register', {
 			method: 'POST',
 			body: JSON.stringify(data)
 		});
@@ -150,7 +150,7 @@ export class ApiService {
 			params.append('month', month);
 		}
 		const queryString = params.toString();
-		const endpoint = queryString ? `/priolist/priorities?${queryString}` : '/priolist/priorities';
+		const endpoint = queryString ? `/priorities?${queryString}` : '/priolist/priorities';
 
 		return this.requestJson(endpoint, {
 			method: 'GET'
@@ -165,7 +165,7 @@ export class ApiService {
 		startDate: string;
 		endDate: string;
 	}) {
-		return this.requestJson('/priolist/priorities', {
+		return this.requestJson('/priorities', {
 			method: 'POST',
 			body: JSON.stringify(data)
 		});
@@ -182,7 +182,7 @@ export class ApiService {
 			endDate: string;
 		}
 	) {
-		return this.requestJson(`/priolist/priorities/${id}`, {
+		return this.requestJson(`/priorities/${id}`, {
 			method: 'PATCH',
 			body: JSON.stringify(data)
 		});
