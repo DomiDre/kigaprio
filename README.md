@@ -8,22 +8,27 @@ A web application to submit priorities of each day respective for each week allo
 ### Performance & Architecture
 
 ⚡ Async Processing - Non-blocking request handling with FastAPI's async capabilities
+
 🎨 Modern Frontend - Compiled Svelte app served as static assets
+
 🚀 Fast Dependencies - UV-powered backend for rapid package installation and management
 
 ### Data & Reporting
 
 📊 Excel Generation - Automated report creation and export functionality
+
 💾 PocketBase Integration - Lightweight database accessible exclusively through FastAPI
 
 ### Security
 
 🔐 Authentication - PocketBase auth system protecting all API endpoints
+
 👥 Role-Based Access - Granular permission control for different user roles
 
 ### DevOps
 
 🐳 Docker Support - Containerized setup for both development and production environments
+
 🔧 Environment Flexibility - Easy switching between dev and prod configurations
 
 ## Quick Start
