@@ -34,6 +34,7 @@ services:
       redis:
         condition: service_healthy
     secrets:
+      - pb_admin_email
       - pb_service_email
       - pb_service_password
 

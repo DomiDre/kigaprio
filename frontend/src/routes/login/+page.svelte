@@ -88,6 +88,28 @@
 					{/if}
 				</form>
 			</div>
+
+			<!-- Footer -->
+			<div class="mt-8 text-center">
+				<div class="flex flex-wrap justify-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+					<a
+						href="https://github.com/domidre/kigaprio"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+					>
+						GitHub
+					</a>
+					<span class="text-gray-400">•</span>
+					<a href="/imprint" class="transition-colors hover:text-blue-600 dark:hover:text-blue-400">
+						Impressum
+					</a>
+					<span class="text-gray-400">•</span>
+					<a href="/privacy" class="transition-colors hover:text-blue-600 dark:hover:text-blue-400">
+						Datenschutz
+					</a>
+				</div>
+			</div>
 		</div>
 	</div>
 {/if}

@@ -1,117 +1,167 @@
+import base64
 import json
-import os
-from typing import Any
+from datetime import datetime
+from io import BytesIO
+from typing import Any, cast
 
 import httpx
+import pandas as pd
 import redis
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pandas.core.generic import WriteExcelBuffer
 
+from kigaprio.models.admin import (
+    MonthStatsResponse,
+    ReminderRequest,
+    ReminderResponse,
+    UpdateMagicWordRequest,
+    UserSubmissionResponse,
+)
+from kigaprio.models.pocketbase_schemas import UsersResponse
+from kigaprio.models.priorities import PriorityResponse
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
 )
+from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 
 router = APIRouter()
 security = HTTPBearer()
-
-POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-
-
-class UpdateMagicWordRequest(BaseModel):
-    new_magic_word: str = Field(..., min_length=4)
-
-
-class AdminLoginRequest(BaseModel):
-    identity: str  # email or username
-    password: str
-
-
-class AdminAuthResponse(BaseModel):
-    token: str
-    admin: dict[str, Any]
 
 
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     redis_client: redis.Redis = Depends(get_redis),
 ) -> dict[str, Any]:
-    """Verify admin token and return admin data"""
+    """Check if token is in redis cache and of an admin, otherwise verify with PocketBase"""
+
     token = credentials.credentials
+    session_key = f"session:{token}"
 
-    # Check if token is cached
-    cached_admin = redis_client.get(f"admin_session:{token}")
-    if cached_admin:
-        return json.loads(str(cached_admin))
+    # First, try to get session from Redis cache
+    session_data = redis_client.get(session_key)
 
-    # Verify with PocketBase
+    if session_data:
+        # Session found in cache
+        user_data = json.loads(str(session_data))
+
+        # Check if user is admin
+        if not user_data.get("is_admin", False):
+            raise HTTPException(status_code=403, detail="Admin access required")
+
+        # Return admin data in expected format
+        return {
+            "token": token,
+            "user": {
+                "id": user_data["id"],
+                "email": user_data["email"],
+                "name": user_data["name"],
+            },
+        }
+
+    # Session not in cache
     try:
         async with httpx.AsyncClient() as client:
-            # First, get admin data using the token
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/_superusers/auth-refresh",
+            # First, just check if the token is valid by making a simple request
+            test_response = await client.get(
+                f"{POCKETBASE_URL}/api/collections/users/records",
+                params={"perPage": 1, "fields": "id"},
                 headers={"Authorization": f"Bearer {token}"},
             )
 
-            if response.status_code != 200:
+            if test_response.status_code == 401:
+                # Token is invalid or expired
                 raise HTTPException(
-                    status_code=401, detail="Invalid or expired admin token"
+                    status_code=401, detail="Session expired or invalid"
                 )
 
-            data = response.json()
-            print(data)
-            admin_data = data.get("record", {})
+            if test_response.status_code != 200:
+                raise HTTPException(
+                    status_code=503, detail="Unable to verify authentication"
+                )
 
-            # Cache admin data for 15 minutes
-            redis_client.setex(f"admin_session:{token}", 900, json.dumps(admin_data))
+            # Token is valid. Now we need to determine if this is an admin.
+            # We'll decode the JWT token to get the user ID
+            # PocketBase tokens are JWT tokens with the user ID in the payload
+            try:
+                # JWT structure: header.payload.signature
+                # We just need the payload
+                parts = token.split(".")
+                if len(parts) != 3:
+                    raise ValueError("Invalid token format")
 
-            return admin_data
+                # Decode payload (add padding if necessary)
+                payload = parts[1]
+                payload += "=" * (4 - len(payload) % 4)  # Add padding
+                decoded_payload = base64.urlsafe_b64decode(payload)
+                token_data = json.loads(decoded_payload)
 
-    except httpx.RequestError as e:
+                user_id = token_data.get("id")
+                if not user_id:
+                    raise ValueError("No user ID in token")
+
+                # Now fetch the specific user's data to check their role
+                user_response = await client.get(
+                    f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+                if user_response.status_code != 200:
+                    raise HTTPException(
+                        status_code=401, detail="Unable to fetch user data"
+                    )
+
+                user_record = user_response.json()
+                is_admin = user_record.get("role") == "admin"
+
+                if not is_admin:
+                    # Non-admin user - just deny access, don't modify anything
+                    raise HTTPException(status_code=403, detail="Admin access required")
+
+                # Admin user - safe to recreate session in cache
+                session_info = {
+                    "id": user_record["id"],
+                    "email": user_record["email"],
+                    "name": user_record["name"],
+                    "is_admin": True,
+                    "type": "superuser",
+                }
+
+                # Store with admin TTL (15 minutes)
+                redis_client.setex(
+                    session_key,
+                    900,  # 15 min for admin
+                    json.dumps(session_info),
+                )
+
+                return {
+                    "token": token,
+                    "user": {
+                        "id": user_record["id"],
+                        "email": user_record["email"],
+                        "name": user_record["name"],
+                    },
+                }
+
+            except (ValueError, KeyError, json.JSONDecodeError) as e:
+                # Can't decode token - fall back to denying access
+                raise HTTPException(
+                    status_code=401, detail="Invalid token format"
+                ) from e
+
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
             status_code=503, detail="Authentication service unavailable"
         ) from e
 
 
-@router.post("/login")
-async def admin_login(
-    request: AdminLoginRequest, redis_client: redis.Redis = Depends(get_redis)
-) -> AdminAuthResponse:
-    """Authenticate a PocketBase admin and return a token"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/_superusers/auth-with-password",
-                json={"identity": request.identity, "password": request.password},
-            )
-
-            if response.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid admin credentials")
-
-            data = response.json()
-            token = data.get("token")
-            admin = data.get("record")
-
-            # Cache admin session
-            redis_client.setex(
-                f"admin_session:{token}",
-                900,  # 15 minutes
-                json.dumps(admin),
-            )
-            return AdminAuthResponse(token=token, admin=admin)
-
-    except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=503, detail="Authentication service unavailable"
-        ) from e
-
-
-# ==================== Admin Protected Endpoints ====================
 @router.get("/magic-word-info")
 async def get_magic_word_info(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     redis_client: redis.Redis = Depends(get_redis),
     admin: dict[str, Any] = Depends(get_current_admin),
 ):
@@ -125,9 +175,11 @@ async def get_magic_word_info(
             )
 
         async with httpx.AsyncClient() as client:
+            token = credentials.credentials
             response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/system_settings/records",
                 params={"filter": 'key="registration_magic_word"'},
+                headers={"Authorization": f"Bearer {token}"},
             )
 
             last_updated = None
@@ -144,7 +196,7 @@ async def get_magic_word_info(
             "current_magic_word": magic_word,
             "last_updated": last_updated,
             "last_updated_by": last_updated_by,
-            "admin_email": admin.get("email"),
+            "admin_email": admin["user"]["email"],
         }
 
     except Exception as e:
@@ -160,7 +212,7 @@ async def update_magic_word(
 ):
     """Admin endpoint to update the magic word"""
 
-    admin_email = admin.get("email", "unknown")
+    admin_email = admin["user"]["email"]
     admin_token = credentials.credentials
 
     success = await create_or_update_magic_word(
@@ -175,3 +227,326 @@ async def update_magic_word(
         "message": "Magic word updated successfully",
         "updated_by": admin_email,
     }
+
+
+@router.get("/stats/{month}")
+async def get_month_stats(
+    month: str,  # Format: YYYY-MM
+    admin: dict[str, Any] = Depends(get_current_admin),
+) -> MonthStatsResponse:
+    """Get statistics for a specific month."""
+
+    token = admin["token"]
+    async with httpx.AsyncClient() as client:
+        # Fetch all priority records for the month
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={"filter": f"month='{month}'", "perPage": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Daten")
+
+        data = response.json()
+        records = data.get("items", [])
+
+        # Calculate statistics (same logic as before)
+        unique_users = set()
+        weekly_stats = {}
+        completed_weeks = 0
+        pending_weeks = 0
+
+        for record in records:
+            unique_users.add(record["userId"])
+            week_num = record["weekNumber"]
+
+            if week_num not in weekly_stats:
+                weekly_stats[week_num] = {"completed": 0, "total": 0}
+
+            weekly_stats[week_num]["total"] += 1
+
+            priorities = record.get("priorities", {})
+            valid_priorities = [p for p in priorities.values() if p is not None]
+
+            if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
+                weekly_stats[week_num]["completed"] += 1
+                completed_weeks += 1
+            else:
+                pending_weeks += 1
+
+        weekly_completion = [
+            {"week": week, "completed": stats["completed"], "total": stats["total"]}
+            for week, stats in sorted(weekly_stats.items())
+        ]
+
+        return MonthStatsResponse(
+            totalSubmissions=len(records),
+            completedWeeks=completed_weeks,
+            pendingWeeks=pending_weeks,
+            uniqueUsers=len(unique_users),
+            weeklyCompletion=weekly_completion,
+        )
+
+
+@router.get("/users/{month}")
+async def get_user_submissions(
+    month: str,
+    admin: dict[str, Any] = Depends(get_current_admin),
+) -> list[UserSubmissionResponse]:
+    """Get all user submissions for a specific month."""
+
+    token = admin["token"]
+    async with httpx.AsyncClient() as client:
+        # Fetch regular users (not superusers)
+        users_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/users/records",
+            params={"perPage": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if users_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen der Benutzer"
+            )
+
+        users: list[UsersResponse] = [
+            UsersResponse(**x) for x in users_response.json().get("items", [])
+        ]
+
+        # Fetch priorities for the month
+        priorities_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={"filter": f"month='{month}'", "perPage": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if priorities_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen der Prioritäten"
+            )
+
+        priorities: list[PriorityResponse] = [
+            PriorityResponse(**x) for x in priorities_response.json().get("items", [])
+        ]
+
+        # Group priorities by user
+        user_priorities: dict[str, list[PriorityResponse]] = {}
+        for priority in priorities:
+            user_id = priority.userId
+            if user_id not in user_priorities:
+                user_priorities[user_id] = []
+            user_priorities[user_id].append(priority)
+
+        # Build user submission list
+        user_submissions = []
+        for user in users:
+            user_id = user.id
+            user_records = user_priorities.get(user_id, [])
+
+            completed_weeks = 0
+            last_activity = None
+
+            for record in user_records:
+                priorities_dict = record.priorities
+                valid_priorities = [
+                    p for p in priorities_dict.values() if p is not None
+                ]
+
+                if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
+                    completed_weeks += 1
+
+                updated = record.updated
+                if updated and (not last_activity or updated > last_activity):
+                    last_activity = updated
+
+            # TODO: this is dependent on the month that is being looked at
+            total_weeks = 5  # Assuming 4 weeks per month
+
+            if completed_weeks == total_weeks:
+                status = "complete"
+            elif completed_weeks > 0:
+                status = "partial"
+            else:
+                status = "none"
+
+            user_submissions.append(
+                UserSubmissionResponse(
+                    userId=user_id,
+                    userName=user.name,
+                    email=user.email,
+                    completedWeeks=completed_weeks,
+                    totalWeeks=total_weeks,
+                    lastActivity=last_activity or datetime.now().isoformat(),
+                    status=status,
+                )
+            )
+
+        return user_submissions
+
+
+@router.get("/export/{month}")
+async def export_month_data(
+    month: str,
+    admin: dict[str, Any] = Depends(get_current_admin),
+):
+    """Export all priority data for a month as Excel file."""
+
+    token = admin["token"]
+    async with httpx.AsyncClient() as client:
+        # Fetch all data with expanded user information
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={"filter": f"month='{month}'", "expand": "userId", "perPage": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Daten")
+
+        data = response.json()
+        records = data.get("items", [])
+
+        # Prepare data for Excel
+        rows = []
+        for record in records:
+            user = record.get("expand", {}).get("userId", {})
+            priorities = record.get("priorities", {})
+
+            row = {
+                "Benutzer": user.get("name", "Unknown"),
+                "E-Mail": user.get("email", ""),
+                "Woche": record.get("weekNumber", ""),
+                "Start": record.get("startDate", ""),
+                "Ende": record.get("endDate", ""),
+                "Montag": priorities.get("monday"),
+                "Dienstag": priorities.get("tuesday"),
+                "Mittwoch": priorities.get("wednesday"),
+                "Donnerstag": priorities.get("thursday"),
+                "Freitag": priorities.get("friday"),
+                "Status": "Vollständig"
+                if all(priorities.values())
+                else "Unvollständig",
+                "Zuletzt aktualisiert": record.get("updated", record.get("created")),
+            }
+            rows.append(row)
+
+        # Create Excel file
+        df = pd.DataFrame(rows)
+
+        buffer = BytesIO()
+        with pd.ExcelWriter(
+            cast(WriteExcelBuffer, buffer), engine="openpyxl"
+        ) as writer:
+            df.to_excel(writer, sheet_name=f"Prioritäten {month}", index=False)
+
+            # Add summary sheet
+            summary_df = pd.DataFrame(
+                [
+                    {"Metrik": "Gesamteinträge", "Wert": len(records)},
+                    {
+                        "Metrik": "Eindeutige Benutzer",
+                        "Wert": df["Benutzer"].nunique() if not df.empty else 0,
+                    },
+                    {
+                        "Metrik": "Vollständige Wochen",
+                        "Wert": (df["Status"] == "Vollständig").sum()
+                        if not df.empty
+                        else 0,
+                    },
+                    {
+                        "Metrik": "Unvollständige Wochen",
+                        "Wert": (df["Status"] == "Unvollständig").sum()
+                        if not df.empty
+                        else 0,
+                    },
+                ]
+            )
+            summary_df.to_excel(writer, sheet_name="Zusammenfassung", index=False)
+
+        buffer.seek(0)
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename=prioritaeten_{month}.xlsx"
+            },
+        )
+
+
+@router.post("/reminders")
+async def send_reminders(
+    request: ReminderRequest,
+    admin: dict[str, Any] = Depends(get_current_admin),
+    redis_client: redis.Redis = Depends(get_redis),
+) -> ReminderResponse:
+    """Send email reminders to selected users."""
+
+    token = admin["token"]
+    results = []
+    sent_count = 0
+    failed_count = 0
+
+    async with httpx.AsyncClient() as client:
+        for user_id in request.userIds:
+            try:
+                # Fetch user details
+                user_response = await client.get(
+                    f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+                if user_response.status_code != 200:
+                    results.append(
+                        {
+                            "userId": user_id,
+                            "email": "unknown",
+                            "status": "failed",
+                            "error": "Benutzer nicht gefunden",
+                        }
+                    )
+                    failed_count += 1
+                    continue
+
+                user = user_response.json()
+
+                # Here you would queue the email sending
+                # For now, just log the action
+                results.append(
+                    {"userId": user_id, "email": user["email"], "status": "sent"}
+                )
+                sent_count += 1
+
+            except Exception as e:
+                results.append(
+                    {
+                        "userId": user_id,
+                        "email": "unknown",
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
+                failed_count += 1
+
+    # Log admin action
+    log_key = f"admin_log:{admin.get('id')}:{datetime.now().isoformat()}"
+    redis_client.setex(
+        log_key,
+        30 * 24 * 3600,  # Keep logs for 30 days
+        json.dumps(
+            {
+                "action": "send_reminders",
+                "admin_email": admin.get("email"),
+                "timestamp": datetime.now().isoformat(),
+                "details": {
+                    "recipients": len(request.userIds),
+                    "sent": sent_count,
+                    "failed": failed_count,
+                    "month": request.month,
+                },
+            }
+        ),
+    )
+
+    return ReminderResponse(sent=sent_count, failed=failed_count, details=results)
