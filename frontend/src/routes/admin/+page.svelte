@@ -203,7 +203,7 @@
 	$effect(() => {
 		// Trigger data load when selectedMonth changes
 		// Using a reactive statement to ensure it runs
-		const month = selectedMonth;
+		void selectedMonth;
 		loadMonthData();
 	});
 </script>
@@ -228,7 +228,7 @@
 						bind:value={selectedMonth}
 						class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
 					>
-						{#each monthOptions as option}
+						{#each monthOptions as option (option)}
 							<option value={option}>{option}</option>
 						{/each}
 					</select>
@@ -422,7 +422,7 @@
 					Wöchentlicher Fortschritt
 				</h2>
 				<div class="space-y-4">
-					{#each monthStats.weeklyCompletion as week}
+					{#each monthStats.weeklyCompletion as week (week)}
 						<div class="flex items-center gap-4">
 							<span class="w-20 text-sm font-medium text-gray-600 dark:text-gray-400"
 								>Woche {week.week}</span

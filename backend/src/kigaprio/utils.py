@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 import httpx
@@ -8,10 +7,8 @@ from fastapi import Depends, HTTPException, Request, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.config import settings
+from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
-
-POCKETBASE_URL = os.getenv("POCKETBASE_URL")
-assert POCKETBASE_URL is not None, "Pocketbase URL not specified by env"
 
 security = HTTPBearer()
 

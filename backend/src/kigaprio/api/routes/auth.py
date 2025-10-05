@@ -1,18 +1,24 @@
 import json
-import os
 import secrets
 from datetime import datetime
-from typing import Literal
 
 import httpx
 import redis
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, EmailStr, Field
 
+from kigaprio.models.auth import (
+    DatabaseLoginResponse,
+    LoginRequest,
+    LoginResponse,
+    MagicWordRequest,
+    MagicWordResponse,
+    RegisterRequest,
+)
 from kigaprio.services.magic_word import (
     get_magic_word_from_cache_or_db,
 )
+from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import (
     get_redis,
 )
@@ -20,64 +26,6 @@ from kigaprio.utils import get_client_ip
 
 router = APIRouter()
 security = HTTPBearer()
-
-# Configuration
-POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-
-
-class MagicWordRequest(BaseModel):
-    magic_word: str = Field(..., min_length=1)
-
-
-class MagicWordResponse(BaseModel):
-    success: bool
-    token: str | None = None
-    message: str | None = None
-
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=1)
-    passwordConfirm: str
-    name: str = Field(..., min_length=1)
-    registration_token: str
-
-
-class LoginRequest(BaseModel):
-    identity: str = Field(..., min_length=1, description="Email or username")
-    password: str = Field(..., min_length=1)
-
-
-class UsersResponse(BaseModel):
-    """Response from pocketbase upon a request for a users entry"""
-
-    id: str
-    email: str | None = None
-    emailVisibility: bool
-    verified: bool
-    name: str
-    role: Literal["user"] | Literal["service"] | Literal["admin"] | Literal["generic"]
-    avatar: str
-    collectionId: str
-    collectionName: str
-    created: str
-    updated: str
-
-
-class DatabaseLoginResponse(BaseModel):
-    """Response from pocketbase upon login request"""
-
-    token: str
-    record: UsersResponse
-
-
-class LoginResponse(BaseModel):
-    """Response by fastapi upon a successful login request"""
-
-    token: str
-    record: UsersResponse
-    message: str
 
 
 async def get_current_user(

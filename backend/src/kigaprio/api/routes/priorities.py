@@ -1,53 +1,16 @@
-import os
-
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 
+from kigaprio.models.priorities import (
+    PriorityRecord,
+    PriorityResponse,
+)
+from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 from kigaprio.utils import verify_token
 
 router = APIRouter()
-
-# Configuration
-POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-
-
-class Priority(BaseModel):
-    id: int
-    name: str
-    color: str
-
-
-class DayPriorities(BaseModel):
-    monday: int | None = None
-    tuesday: int | None = None
-    wednesday: int | None = None
-    thursday: int | None = None
-    friday: int | None = None
-
-
-class PriorityRecord(BaseModel):
-    userId: str
-    month: str
-    weekNumber: int
-    priorities: DayPriorities
-    startDate: str
-    endDate: str
-
-
-class PriorityResponse(BaseModel):
-    id: str
-    userId: str
-    month: str
-    weekNumber: int
-    priorities: dict
-    startDate: str
-    endDate: str
-    created: str
-    updated: str
 
 
 @router.get("", response_model=list[PriorityResponse])

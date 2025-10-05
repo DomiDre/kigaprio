@@ -8,7 +8,8 @@ import aiofiles
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from kigaprio.config import settings
-from kigaprio.models.schemas import ErrorResponse, FileInfo, UploadResponse
+from kigaprio.models.request import ErrorResponse
+from kigaprio.models.upload import FileInfo, UploadResponse
 from kigaprio.utils import validate_file
 
 router = APIRouter()

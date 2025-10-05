@@ -169,3 +169,7 @@ init-secrets:
 # Initialize pocketbase directories for storage
 pocketbase-init: init-secrets
     ./pocketbase/init.sh
+
+# Reset redis cache
+redis-clear:
+    docker compose -f ../docker-compose.dev.yml exec redis redis-cli FLUSHALL

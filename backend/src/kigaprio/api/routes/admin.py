@@ -1,74 +1,34 @@
 import base64
 import json
-import os
 from datetime import datetime
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pandas as pd
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pandas.core.generic import WriteExcelBuffer
 
-from kigaprio.api.routes.database import UsersResponse
-from kigaprio.api.routes.priolist import PriorityResponse
+from kigaprio.models.admin import (
+    MonthStatsResponse,
+    ReminderRequest,
+    ReminderResponse,
+    UpdateMagicWordRequest,
+    UserSubmissionResponse,
+)
+from kigaprio.models.pocketbase_schemas import UsersResponse
+from kigaprio.models.priorities import PriorityResponse
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
 )
+from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 
 router = APIRouter()
 security = HTTPBearer()
-
-POCKETBASE_URL = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-
-
-class UpdateMagicWordRequest(BaseModel):
-    new_magic_word: str = Field(..., min_length=4)
-
-
-class AdminLoginRequest(BaseModel):
-    identity: str  # email or username
-    password: str
-
-
-class AdminAuthResponse(BaseModel):
-    token: str
-    admin: dict[str, Any]
-
-
-class MonthStatsResponse(BaseModel):
-    totalSubmissions: int
-    completedWeeks: int
-    pendingWeeks: int
-    uniqueUsers: int
-    weeklyCompletion: list[dict[str, Any]]
-
-
-class UserSubmissionResponse(BaseModel):
-    userId: str
-    userName: str
-    email: str | None
-    completedWeeks: int
-    totalWeeks: int
-    lastActivity: str
-    status: str  # 'complete' | 'partial' | 'none'
-
-
-class ReminderRequest(BaseModel):
-    userIds: list[str]
-    message: str
-    month: str | None = None
-
-
-class ReminderResponse(BaseModel):
-    sent: int
-    failed: int
-    details: list[dict[str, Any]]
 
 
 async def get_current_admin(
@@ -199,7 +159,6 @@ async def get_current_admin(
         ) from e
 
 
-# ==================== Admin Protected Endpoints ====================
 @router.get("/magic-word-info")
 async def get_magic_word_info(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -476,7 +435,9 @@ async def export_month_data(
         df = pd.DataFrame(rows)
 
         buffer = BytesIO()
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:  # type: ignore
+        with pd.ExcelWriter(
+            cast(WriteExcelBuffer, buffer), engine="openpyxl"
+        ) as writer:
             df.to_excel(writer, sheet_name=f"Prioritäten {month}", index=False)
 
             # Add summary sheet

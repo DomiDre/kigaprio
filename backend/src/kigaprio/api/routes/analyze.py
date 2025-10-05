@@ -8,12 +8,12 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 
 from kigaprio.config import settings
-from kigaprio.models.schemas import (
+from kigaprio.models.analysis import (
     AnalysisRequest,
     AnalysisResponse,
-    ErrorResponse,
     JobStatus,
 )
+from kigaprio.models.request import ErrorResponse
 from kigaprio.services.excel_generator import ExcelGenerator
 from kigaprio.services.file_processor import FileProcessor
 
