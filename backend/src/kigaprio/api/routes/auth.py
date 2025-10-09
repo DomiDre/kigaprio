@@ -68,7 +68,6 @@ async def try_user_auth(
                 "password": password,
             },
         )
-
         if response.status_code == 200:
             return DatabaseLoginResponse(**response.json())
         return None
@@ -153,15 +152,15 @@ async def register_user(
     redis_client.delete(token_key)
 
     # Check for duplicate registration attempts
-    email_key = f"reg_email:{request.email.lower()}"
-    if redis_client.exists(email_key):
+    identity_key = f"reg_identity:{request.identity}"
+    if redis_client.exists(identity_key):
         raise HTTPException(
             status_code=429,
             detail="Eine Registrierung für diese E-Mail-Adresse läuft bereits",
         )
 
     # Set temporary lock on email (5 minutes)
-    redis_client.setex(email_key, 300, "registering")
+    redis_client.setex(identity_key, 300, "registering")
 
     try:
         # Proxy registration to PocketBase
@@ -169,7 +168,7 @@ async def register_user(
             response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/records",
                 json={
-                    "email": request.email.lower(),
+                    "username": request.identity,
                     "password": request.password,
                     "passwordConfirm": request.passwordConfirm,
                     "name": request.name,
@@ -204,7 +203,7 @@ async def register_user(
             return user_data
     finally:
         # Remove email lock
-        redis_client.delete(email_key)
+        redis_client.delete(identity_key)
 
 
 @router.post("/login")
@@ -231,7 +230,7 @@ async def login_user(
         )
 
     # Rate limiting by identity (email/username)
-    identity_rate_limit_key = f"rate_limit:login:identity:{request.identity.lower()}"
+    identity_rate_limit_key = f"rate_limit:login:identity:{request.identity}"
     identity_attempts = redis_client.get(identity_rate_limit_key)
 
     if identity_attempts and int(str(identity_attempts)) >= 5:
@@ -252,9 +251,7 @@ async def login_user(
             auth_data = None
             is_admin = False
 
-            auth_data = await try_user_auth(
-                client, request.identity.lower(), request.password
-            )
+            auth_data = await try_user_auth(client, request.identity, request.password)
 
             if not auth_data:
                 # Both authentication attempts failed
@@ -271,8 +268,7 @@ async def login_user(
             # Store session
             session_key = f"session:{auth_data.token}"
             session_info = {
-                "id": auth_data.record.id,
-                "email": auth_data.record.email,
+                "username": auth_data.record.username,
                 "name": auth_data.record.name,
                 "is_admin": is_admin,
                 "type": "superuser" if is_admin else "user",
@@ -290,7 +286,6 @@ async def login_user(
 
             return LoginResponse(
                 token=auth_data.token,
-                record=auth_data.record,
                 message="Erfolgreich als Administrator angemeldet"
                 if is_admin
                 else "Erfolgreich angemeldet",

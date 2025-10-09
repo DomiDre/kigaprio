@@ -12,7 +12,7 @@ mkdir -p "$SECRETS_DIR"
 declare -a secrets=(
 	"pb_admin_email:PROMPT"
 	"pb_admin_password:RANDOM"
-	"pb_service_email:PROMPT"
+	"pb_service_id:PROMPT"
 	"pb_service_password:RANDOM"
 )
 
@@ -41,4 +41,3 @@ for item in "${secrets[@]}"; do
 		fi
 	fi
 done
-

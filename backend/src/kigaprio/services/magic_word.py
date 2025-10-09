@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 
-SERVICE_ACCOUNT_EMAIL = os.getenv("PB_SERVICE_EMAIL")
+SERVICE_ACCOUNT_ID = os.getenv("PB_SERVICE_ID")
 SERVICE_ACCOUNT_PASSWORD = os.getenv("PB_SERVICE_PASSWORD")
 
 
@@ -28,7 +28,7 @@ async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | No
             response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
                 json={
-                    "identity": SERVICE_ACCOUNT_EMAIL,
+                    "identity": SERVICE_ACCOUNT_ID,
                     "password": SERVICE_ACCOUNT_PASSWORD,
                 },
             )

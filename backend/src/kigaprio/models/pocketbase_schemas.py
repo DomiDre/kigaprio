@@ -13,8 +13,8 @@ class UsersResponse(BaseModel):
     emailVisibility: bool
     verified: bool
     name: str
+    username: str
     role: Literal["user"] | Literal["service"] | Literal["admin"] | Literal["generic"]
-    avatar: str
     collectionId: str
     collectionName: str
     created: str
