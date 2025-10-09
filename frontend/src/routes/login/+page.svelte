@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { currentUser, isAuthenticated } from '$lib/stores/auth';
+	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
 
-	let email = '';
+	let username = '';
 	let password = '';
 	let error = '';
 
@@ -18,7 +18,7 @@
 	async function handleLogin() {
 		error = '';
 		try {
-			await apiService.login(email, password);
+			await apiService.login(username, password);
 			goto('/priorities');
 		} catch (err) {
 			error = (err as Error).message;
@@ -30,7 +30,7 @@
 	}
 </script>
 
-{#if $currentUser && $isAuthenticated}
+{#if $isAuthenticated}
 	<Loading message="Lade..." />
 {:else}
 	<div
@@ -46,10 +46,10 @@
 			<div class="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
 				<form class="space-y-6" on:submit|preventDefault={handleLogin}>
 					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-						E-Mail
+						Username
 						<input
-							type="email"
-							bind:value={email}
+							type="name"
+							bind:value={username}
 							required
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:bg-gray-700 dark:text-white"

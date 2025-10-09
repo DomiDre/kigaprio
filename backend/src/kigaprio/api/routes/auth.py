@@ -22,7 +22,7 @@ from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import (
     get_redis,
 )
-from kigaprio.utils import get_client_ip
+from kigaprio.utils import extract_session_info_from_record, get_client_ip
 
 router = APIRouter()
 security = HTTPBearer()
@@ -259,7 +259,6 @@ async def login_user(
                     status_code=401,
                     detail="Ungültige Anmeldedaten",
                 )
-            is_admin = auth_data.record.role == "admin"
 
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
@@ -267,12 +266,8 @@ async def login_user(
 
             # Store session
             session_key = f"session:{auth_data.token}"
-            session_info = {
-                "username": auth_data.record.username,
-                "name": auth_data.record.name,
-                "is_admin": is_admin,
-                "type": "superuser" if is_admin else "user",
-            }
+            session_info = extract_session_info_from_record(auth_data.record)
+            is_admin: bool = session_info.is_admin
 
             # Different TTL for admin vs regular users
             ttl = (
@@ -281,7 +276,7 @@ async def login_user(
             redis_client.setex(
                 session_key,
                 ttl,
-                json.dumps(session_info),
+                session_info.json(),
             )
 
             return LoginResponse(

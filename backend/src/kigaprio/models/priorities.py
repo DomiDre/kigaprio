@@ -18,7 +18,7 @@ class DayPriorities(BaseModel):
 
 
 class PriorityRecord(BaseModel):
-    userId: str
+    userId: str | None = None
     month: str
     weekNumber: int
     priorities: DayPriorities

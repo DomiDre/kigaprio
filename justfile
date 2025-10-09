@@ -172,4 +172,4 @@ pocketbase-init: init-secrets
 
 # Reset redis cache
 redis-clear:
-    docker compose -f ../docker-compose.dev.yml exec redis redis-cli FLUSHALL
+    docker compose -f ./docker-compose.dev.yml exec redis redis-cli FLUSHALL

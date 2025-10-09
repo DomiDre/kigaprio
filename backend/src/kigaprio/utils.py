@@ -7,6 +7,8 @@ from fastapi import Depends, HTTPException, Request, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.config import settings
+from kigaprio.models.auth import SessionInfo, TokenVerificationData
+from kigaprio.models.pocketbase_schemas import UsersResponse
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 
@@ -44,7 +46,7 @@ async def verify_token(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     redis_client: redis.Redis = Depends(get_redis),
-):
+) -> TokenVerificationData:
     """Verify the authentication token - first check Redis, then PocketBase if needed."""
     token = credentials.credentials
     session_key = f"session:{token}"
@@ -52,7 +54,9 @@ async def verify_token(
 
     if cached_user:
         # Token found in cache - it's valid
-        return {"token": token, "user": json.loads(str(cached_user))}
+        return TokenVerificationData(
+            token=token, user=SessionInfo(**json.loads(cached_user))
+        )
 
     # Token not in cache - verify with PocketBase
     async with httpx.AsyncClient() as client:
@@ -70,34 +74,42 @@ async def verify_token(
 
         auth_data = response.json()
         new_token = auth_data["token"]
-        user_data = auth_data["record"]
+        user_data = UsersResponse(**auth_data["record"])
 
         # Delete old session and create new one with refreshed token
         redis_client.delete(session_key)  # Remove old token
 
         new_session_key = f"session:{new_token}"
-        user_info = {
-            "id": user_data["id"],
-            "email": user_data["email"],
-            "name": user_data["name"],
-        }
+        session_info = extract_session_info_from_record(user_data)
+        is_admin: bool = session_info.is_admin
+        ttl = (
+            900 if is_admin else (14 * 24 * 3600)
+        )  # 15 min for admin, 14 days for users
+
         redis_client.setex(
             new_session_key,
-            14 * 24 * 3600,  # 14 days
-            json.dumps(user_info),
+            ttl,
+            session_info.json(),
         )
 
         if new_token != token:
             request.state.new_token = new_token
 
-        # Return BOTH tokens so we can inform the client
-        return {
-            "token": token,  # Original token (for this request)
-            "new_token": new_token
-            if new_token != token
-            else None,  # New token if changed
-            "user": user_data,
-        }
+        return TokenVerificationData(
+            token=token,
+            new_token=new_token if new_token != token else None,
+            user=session_info,
+        )
+
+
+def extract_session_info_from_record(record: UsersResponse) -> SessionInfo:
+    is_admin = record.role == "admin"
+    return SessionInfo(
+        id=record.id,
+        username=record.username,
+        name=record.name,
+        is_admin=is_admin,
+    )
 
 
 def get_client_ip(request: Request) -> str:

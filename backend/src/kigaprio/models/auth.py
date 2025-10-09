@@ -40,3 +40,16 @@ class LoginResponse(BaseModel):
 
     token: str
     message: str
+
+
+class SessionInfo(BaseModel):
+    id: str
+    username: str
+    name: str
+    is_admin: bool
+
+
+class TokenVerificationData(BaseModel):
+    token: str
+    new_token: str | None = None
+    user: SessionInfo

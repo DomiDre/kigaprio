@@ -5,9 +5,8 @@ import type { PageLoad } from './$types';
 export const load: PageLoad = async () => {
 	if (browser) {
 		const token = localStorage.getItem('auth_token');
-		const user = localStorage.getItem('auth_user');
 
-		if (!token || !user) {
+		if (!token) {
 			throw redirect(307, '/login');
 		}
 	}

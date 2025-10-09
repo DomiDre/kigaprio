@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { currentUser, isAuthenticated, isAdmin } from '$lib/stores/auth';
+	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 	import { goto } from '$app/navigation';
 	import Loading from '$lib/components/Loading.svelte';
@@ -135,18 +135,18 @@
 	}
 
 	onMount(() => {
-		if ($isAuthenticated && $currentUser) {
+		if ($isAuthenticated) {
 			loadPriorities();
 		}
 	});
 
 	// Reload priorities when month changes
-	$: if (selectedMonth && $isAuthenticated && $currentUser) {
+	$: if (selectedMonth && $isAuthenticated) {
 		loadPriorities();
 	}
 </script>
 
-{#if $isAuthenticated && $currentUser}
+{#if $isAuthenticated}
 	<div
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
@@ -174,41 +174,39 @@
 					Prioritäten
 				</a>
 
-				{#if $isAdmin}
-					<a
-						href="/admin"
-						class="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-200 hover:bg-purple-700"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-							/>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-							/>
-						</svg>
-						Admin Panel
-					</a>
-				{/if}
+				<!-- {#if $isAdmin} -->
+				<!-- 	<a -->
+				<!-- 		href="/admin" -->
+				<!-- 		class="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-200 hover:bg-purple-700" -->
+				<!-- 	> -->
+				<!-- 		<svg -->
+				<!-- 			xmlns="http://www.w3.org/2000/svg" -->
+				<!-- 			class="h-5 w-5" -->
+				<!-- 			fill="none" -->
+				<!-- 			viewBox="0 0 24 24" -->
+				<!-- 			stroke="currentColor" -->
+				<!-- 		> -->
+				<!-- 			<path -->
+				<!-- 				stroke-linecap="round" -->
+				<!-- 				stroke-linejoin="round" -->
+				<!-- 				stroke-width="2" -->
+				<!-- 				d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" -->
+				<!-- 			/> -->
+				<!-- 			<path -->
+				<!-- 				stroke-linecap="round" -->
+				<!-- 				stroke-linejoin="round" -->
+				<!-- 				stroke-width="2" -->
+				<!-- 				d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" -->
+				<!-- 			/> -->
+				<!-- 		</svg> -->
+				<!-- 		Admin Panel -->
+				<!-- 	</a> -->
+				<!-- {/if} -->
 			</div>
 
 			<!-- Dashboard Header -->
 			<div class="mb-10 flex flex-col items-center">
-				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">
-					Willkommen, {$currentUser?.name?.split(' ')[0] || 'zurück'}!
-				</h1>
+				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Willkommen, zurück!</h1>
 				<p class="text-center text-gray-600 dark:text-gray-300">
 					{#if allWeeksCompleted}
 						Super! Alle Wochen für {getMonthName(selectedMonth)} sind priorisiert!
@@ -363,16 +361,10 @@
 
 			<!-- Profile Card -->
 			<div class="flex items-center gap-4 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
-				<div
-					class="flex h-16 w-16 items-center justify-center rounded-full bg-purple-200 text-xl font-bold text-purple-800 dark:bg-purple-800 dark:text-purple-100"
-				>
-					{$currentUser?.name?.charAt(0).toUpperCase() || '?'}
-				</div>
 				<div class="flex-1">
 					<div class="font-semibold text-gray-800 dark:text-white">
-						{$currentUser?.name || 'Account'}
+						{'Account'}
 					</div>
-					<div class="text-sm text-gray-500 dark:text-gray-400">{$currentUser?.email}</div>
 				</div>
 				<a
 					href="/account"
