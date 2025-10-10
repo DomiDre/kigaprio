@@ -6,8 +6,8 @@ from fastapi import HTTPException
 
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 
-SERVICE_ACCOUNT_ID = Path("/run/secrets/pb_service_id").read_text()
-SERVICE_ACCOUNT_PASSWORD = Path("/run/secrets/pb_service_password").read_text()
+SERVICE_ACCOUNT_ID = Path("/run/secrets/pb_service_id").read_text().strip()
+SERVICE_ACCOUNT_PASSWORD = Path("/run/secrets/pb_service_password").read_text().strip()
 
 
 async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | None:

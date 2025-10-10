@@ -15,6 +15,7 @@ from kigaprio.models.auth import (
     MagicWordResponse,
     RegisterRequest,
 )
+from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.magic_word import (
     get_magic_word_from_cache_or_db,
 )
@@ -163,6 +164,19 @@ async def register_user(
     redis_client.setex(identity_key, 300, "registering")
 
     try:
+        # Create data encryption key
+        encryption_data = EncryptionManager.create_user_encryption_data(
+            request.password
+        )
+        dek = EncryptionManager.get_user_dek(
+            request.password,
+            encryption_data["salt"],
+            encryption_data["user_wrapped_dek"],
+        )
+
+        # encrypt sensitive data
+        encrypted_fields = EncryptionManager.encrypt_fields({"name": request.name}, dek)
+
         # Proxy registration to PocketBase
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -171,8 +185,11 @@ async def register_user(
                     "username": request.identity,
                     "password": request.password,
                     "passwordConfirm": request.passwordConfirm,
-                    "name": request.name,
                     "role": "user",
+                    "salt": encryption_data["salt"],
+                    "user_wrapped_dek": encryption_data["user_wrapped_dek"],
+                    "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
+                    "encrypted_fields": encrypted_fields,
                 },
             )
 
