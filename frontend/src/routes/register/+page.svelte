@@ -1,10 +1,10 @@
 <!-- src/routes/register/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { currentUser } from '$lib/stores/auth';
+	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 
-	let email = $state('');
+	let username = $state('');
 	let password = $state('');
 	let passwordConfirm = $state('');
 	let fullName = $state('');
@@ -15,7 +15,7 @@
 	let magicWordVerified = $state(false);
 
 	$effect(() => {
-		if ($currentUser) {
+		if ($isAuthenticated) {
 			goto('/');
 		}
 	});
@@ -75,7 +75,7 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					email,
+					identity: username,
 					password,
 					passwordConfirm: password,
 					name: fullName,
@@ -216,15 +216,18 @@
 					</div>
 
 					<div>
-						<label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-							Email Adresse
+						<label
+							for="username"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+						>
+							Loginname
 						</label>
 						<input
-							id="email"
-							type="email"
-							bind:value={email}
+							id="username"
+							type="text"
+							bind:value={username}
 							required
-							placeholder="Email eingeben"
+							placeholder="Username eingeben"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 									   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 									   dark:border-gray-600 dark:bg-gray-700 dark:text-white"

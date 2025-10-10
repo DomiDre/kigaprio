@@ -32,7 +32,7 @@ services:
         condition: service_healthy
     secrets:
       - pb_admin_email
-      - pb_service_email
+      - pb_service_id
       - pb_service_password
 
   frontend:
@@ -100,9 +100,8 @@ secrets:
     file: ./.secrets/pb_admin_email
   pb_admin_password:
     file: ./.secrets/pb_admin_password
-  pb_service_email:
-    file: ./.secrets/pb_service_email
+  pb_service_id:
+    file: ./.secrets/pb_service_id
   pb_service_password:
     file: ./.secrets/pb_service_password
   
-

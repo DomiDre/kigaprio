@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { apiService } from '$lib/services/api';
-	import { isAdmin } from '$lib/stores/auth';
 	import { getMonthOptions } from '$lib/utils/dateHelpers';
 
 	// Types
@@ -37,6 +36,8 @@
 	let showNotifications = $state(false);
 	let notificationMessage = $state('');
 	let notificationType = $state<'success' | 'error'>('success');
+
+	let isAdmin = $state(false);
 
 	// Admin verification state
 	let isVerifying = $state(true);
@@ -100,7 +101,7 @@
 	// Admin verification on mount
 	onMount(async () => {
 		// Quick check before even trying API
-		if (!$isAdmin) {
+		if (!isAdmin) {
 			goto('/dashboard');
 			return;
 		}

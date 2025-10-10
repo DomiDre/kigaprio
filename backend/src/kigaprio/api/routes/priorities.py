@@ -2,6 +2,7 @@ import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from kigaprio.models.auth import TokenVerificationData
 from kigaprio.models.priorities import (
     PriorityRecord,
     PriorityResponse,
@@ -16,12 +17,12 @@ router = APIRouter()
 @router.get("", response_model=list[PriorityResponse])
 async def get_user_priorities(
     month: str | None = Query(None, description="Filter by month (YYYY-MM)"),
-    auth_data: dict = Depends(verify_token),
+    auth_data: TokenVerificationData = Depends(verify_token),
 ):
     """Get all priorities for the authenticated user, optionally filtered by month."""
 
-    user_id = auth_data["user"]["id"]
-    token = auth_data["token"]
+    user_id = auth_data.user.id
+    token = auth_data.token
 
     # Build filter
     filter_parts = [f'userId = "{user_id}"']
@@ -60,12 +61,12 @@ async def get_user_priorities(
 @router.get("/{priority_id}", response_model=PriorityResponse)
 async def get_priority(
     priority_id: str,
-    auth_data: dict = Depends(verify_token),
+    auth_data: TokenVerificationData = Depends(verify_token),
 ):
     """Get a specific priority record by ID."""
 
-    user_id = auth_data["user"]["id"]
-    token = auth_data["token"]
+    user_id = auth_data.user.id
+    token = auth_data.token
 
     try:
         async with httpx.AsyncClient() as client:
@@ -107,13 +108,13 @@ async def get_priority(
 @router.post("", response_model=PriorityResponse)
 async def create_priority(
     priority: PriorityRecord,
-    auth_data: dict = Depends(verify_token),
+    auth_data: TokenVerificationData = Depends(verify_token),
     redis_client: redis.Redis = Depends(get_redis),
 ):
     """Create a new priority record for the authenticated user."""
 
-    user_id = auth_data["user"]["id"]
-    token = auth_data["token"]
+    user_id = auth_data.user.id
+    token = auth_data.token
 
     # Ensure userId matches authenticated user
     priority.userId = user_id
@@ -183,12 +184,12 @@ async def create_priority(
 async def update_priority(
     priority_id: str,
     priority: PriorityRecord,
-    auth_data: dict = Depends(verify_token),
+    auth_data: TokenVerificationData = Depends(verify_token),
 ):
     """Update an existing priority record."""
 
-    user_id = auth_data["user"]["id"]
-    token = auth_data["token"]
+    user_id = auth_data.user.id
+    token = auth_data.token
 
     # Ensure userId matches authenticated user
     priority.userId = user_id
@@ -250,12 +251,12 @@ async def update_priority(
 @router.delete("/{priority_id}")
 async def delete_priority(
     priority_id: str,
-    auth_data: dict = Depends(verify_token),
+    auth_data: TokenVerificationData = Depends(verify_token),
 ):
     """Delete a priority record."""
 
-    user_id = auth_data["user"]["id"]
-    token = auth_data["token"]
+    user_id = auth_data.user.id
+    token = auth_data.token
 
     try:
         async with httpx.AsyncClient() as client:

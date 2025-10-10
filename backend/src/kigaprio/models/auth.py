@@ -1,6 +1,6 @@
 """Pydantic models for auth routes"""
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from kigaprio.models.pocketbase_schemas import UsersResponse
 
@@ -16,7 +16,7 @@ class MagicWordResponse(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    identity: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
     passwordConfirm: str
     name: str = Field(..., min_length=1)
@@ -31,7 +31,7 @@ class DatabaseLoginResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    identity: str = Field(..., min_length=1, description="Email or username")
+    identity: str = Field(..., min_length=1, description="Username")
     password: str = Field(..., min_length=1)
 
 
@@ -39,5 +39,17 @@ class LoginResponse(BaseModel):
     """Response by fastapi upon a successful login request"""
 
     token: str
-    record: UsersResponse
     message: str
+
+
+class SessionInfo(BaseModel):
+    id: str
+    username: str
+    name: str
+    is_admin: bool
+
+
+class TokenVerificationData(BaseModel):
+    token: str
+    new_token: str | None = None
+    user: SessionInfo

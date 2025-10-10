@@ -92,7 +92,7 @@ export class ApiService {
 		});
 
 		// Store auth data
-		authStore.setAuth(response.token, response.record);
+		authStore.setAuth(response.token);
 
 		return response;
 	}
@@ -120,7 +120,7 @@ export class ApiService {
 			body: JSON.stringify({ token })
 		});
 
-		authStore.setAuth(response.token, response.record);
+		authStore.setAuth(response.token);
 		return response;
 	}
 
@@ -132,7 +132,7 @@ export class ApiService {
 	}
 
 	async register(data: {
-		email: string;
+		identity: string;
 		password: string;
 		passwordConfirm: string;
 		name: string;
@@ -158,7 +158,6 @@ export class ApiService {
 	}
 
 	async createPriority(data: {
-		userId: string;
 		month: string;
 		weekNumber: number;
 		priorities: any;
@@ -174,7 +173,6 @@ export class ApiService {
 	async updatePriority(
 		id: string,
 		data: {
-			userId: string;
 			month: string;
 			weekNumber: number;
 			priorities: any;

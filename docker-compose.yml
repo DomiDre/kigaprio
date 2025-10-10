@@ -98,8 +98,8 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    expose:
+      - 6379
     volumes:
       - ./redis:/data
     command: redis-server --appendonly yes --appendfsync everysec
@@ -127,5 +127,6 @@ secrets:
 
 networks:
   kigaprio-prod:
+    internal: true
   proxy:
     external: true
