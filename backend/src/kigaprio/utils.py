@@ -107,7 +107,6 @@ def extract_session_info_from_record(record: UsersResponse) -> SessionInfo:
     return SessionInfo(
         id=record.id,
         username=record.username,
-        name=record.name,
         is_admin=is_admin,
     )
 

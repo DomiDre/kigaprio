@@ -12,9 +12,12 @@ class UsersResponse(BaseModel):
     email: str | None = None
     emailVisibility: bool
     verified: bool
-    name: str
     username: str
     role: Literal["user"] | Literal["service"] | Literal["admin"] | Literal["generic"]
+    admin_wrapped_dek: str
+    user_wrapped_dek: str
+    salt: str
+    encrypted_fields: str
     collectionId: str
     collectionName: str
     created: str

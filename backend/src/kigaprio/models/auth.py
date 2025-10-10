@@ -45,7 +45,6 @@ class LoginResponse(BaseModel):
 class SessionInfo(BaseModel):
     id: str
     username: str
-    name: str
     is_admin: bool
 
 
