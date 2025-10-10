@@ -362,9 +362,7 @@
 			<!-- Profile Card -->
 			<div class="flex items-center gap-4 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 				<div class="flex-1">
-					<div class="font-semibold text-gray-800 dark:text-white">
-						{'Account'}
-					</div>
+					<div class="font-semibold text-gray-800 dark:text-white">Account</div>
 				</div>
 				<a
 					href="/account"

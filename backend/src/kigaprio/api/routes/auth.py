@@ -249,7 +249,6 @@ async def login_user(
     try:
         async with httpx.AsyncClient() as client:
             auth_data = None
-            is_admin = False
 
             auth_data = await try_user_auth(client, request.identity, request.password)
 
@@ -276,7 +275,7 @@ async def login_user(
             redis_client.setex(
                 session_key,
                 ttl,
-                session_info.json(),
+                session_info.model_dump_json(),
             )
 
             return LoginResponse(

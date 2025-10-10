@@ -55,7 +55,7 @@ async def verify_token(
     if cached_user:
         # Token found in cache - it's valid
         return TokenVerificationData(
-            token=token, user=SessionInfo(**json.loads(cached_user))
+            token=token, user=SessionInfo(**json.loads(str(cached_user)))
         )
 
     # Token not in cache - verify with PocketBase
@@ -81,7 +81,7 @@ async def verify_token(
 
         new_session_key = f"session:{new_token}"
         session_info = extract_session_info_from_record(user_data)
-        is_admin: bool = session_info.is_admin
+        is_admin = session_info.is_admin
         ttl = (
             900 if is_admin else (14 * 24 * 3600)
         )  # 15 min for admin, 14 days for users
@@ -89,7 +89,7 @@ async def verify_token(
         redis_client.setex(
             new_session_key,
             ttl,
-            session_info.json(),
+            session_info.model_dump_json(),
         )
 
         if new_token != token:
