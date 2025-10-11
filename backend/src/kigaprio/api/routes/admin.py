@@ -579,10 +579,10 @@ async def get_user_for_admin(
                 raise HTTPException(status_code=204, detail="User nicht gefunden")
 
             user_record = UsersResponse(**response_data["items"][0])
-        except Exception:
+        except Exception as e:
             raise HTTPException(
                 status_code=500, detail="Unbekannter Fehler beim abrufen des Benutzer"
-            )
+            ) from e
 
     return {
         "username": user_record.username,
