@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
@@ -15,10 +17,10 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 class EncryptionManager:
     """Manages field-level encryption for sensitive user data."""
 
-    ADMIN_MASTER_KEY = Path("/run/secrets/admin_master_key").read_text().strip()
+    ADMIN_PUBLIC_KEY_PEM = Path("/run/secrets/admin_public_key").read_bytes()
 
-    KDF_ITERATIONS = 600000  # OWASP recommendation for PBKDF2
-    KEY_SIZE = 32  # 256 bits for AES-256
+    KDF_ITERATIONS = 600000
+    KEY_SIZE = 32
 
     @staticmethod
     def generate_dek() -> bytes:
@@ -87,6 +89,37 @@ class EncryptionManager:
         return plaintext.decode()
 
     @classmethod
+    def _load_admin_public_key(cls) -> RSAPublicKey:
+        """Load admin's RSA public key."""
+        public_key = serialization.load_pem_public_key(
+            cls.ADMIN_PUBLIC_KEY_PEM, backend=default_backend()
+        )
+        # Type check and cast
+        if not isinstance(public_key, RSAPublicKey):
+            raise TypeError(f"Expected RSA public key, got {type(public_key)}")
+
+        return public_key
+
+    @classmethod
+    def wrap_dek_with_admin_key(cls, dek: bytes) -> str:
+        """
+        Wrap DEK with admin's PUBLIC key.
+        Server can do this, but CANNOT unwrap!
+        """
+        public_key = cls._load_admin_public_key()
+
+        encrypted_dek = public_key.encrypt(
+            dek,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None,
+            ),
+        )
+
+        return base64.b64encode(encrypted_dek).decode()
+
+    @classmethod
     def create_user_encryption_data(cls, password: str) -> dict[str, str]:
         """
         Create encryption data for a new user.
@@ -112,9 +145,8 @@ class EncryptionManager:
             base64.b64encode(dek).decode(), password_key
         )
 
-        # Encrypt DEK with admin master key
-        admin_key = base64.b64decode(cls.ADMIN_MASTER_KEY)
-        admin_wrapped_dek = cls.encrypt_data(base64.b64encode(dek).decode(), admin_key)
+        # Encrypt DEK with admin public key for external decryption using private key
+        admin_wrapped_dek = cls.wrap_dek_with_admin_key(dek)
 
         return {
             "salt": base64.b64encode(salt).decode(),
@@ -138,22 +170,6 @@ class EncryptionManager:
         salt_bytes = base64.b64decode(salt)
         password_key = cls.derive_key_from_password(password, salt_bytes)
         dek_b64 = cls.decrypt_data(user_wrapped_dek, password_key)
-        return base64.b64decode(dek_b64)
-
-    @classmethod
-    def get_admin_dek(cls, admin_wrapped_dek: str) -> bytes:
-        """
-        Retrieve user's DEK using admin master key.
-
-        Args:
-            admin_wrapped_dek: Encrypted DEK from PocketBase
-            admin_master_key: Admin master key (optional, uses env var if not provided)
-
-        Returns:
-            Decrypted DEK
-        """
-        admin_key = base64.b64decode(cls.ADMIN_MASTER_KEY)
-        dek_b64 = cls.decrypt_data(admin_wrapped_dek, admin_key)
         return base64.b64decode(dek_b64)
 
     @classmethod
@@ -233,23 +249,6 @@ def get_user_data(password: str, user_record: dict[str, Any]) -> dict[str, Any]:
     dek = EncryptionManager.get_user_dek(
         password, user_record["salt"], user_record["user_wrapped_dek"]
     )
-
-    # Decrypt fields
-    decrypted_fields = EncryptionManager.decrypt_fields(
-        user_record["encrypted_fields"], dek
-    )
-
-    return decrypted_fields
-
-
-def get_user_data_as_admin(user_record: dict[str, Any]) -> dict[str, Any]:
-    """
-    Admin retrieves and decrypts user data.
-
-    This would be called when an admin needs to access user data.
-    """
-    # Get DEK using admin master key
-    dek = EncryptionManager.get_admin_dek(user_record["admin_wrapped_dek"])
 
     # Decrypt fields
     decrypted_fields = EncryptionManager.decrypt_fields(

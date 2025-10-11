@@ -56,8 +56,7 @@ async def get_current_admin(
             "token": token,
             "user": {
                 "id": user_data["id"],
-                "email": user_data["email"],
-                "name": user_data["name"],
+                "username": user_data["username"],
             },
         }
 
@@ -123,8 +122,7 @@ async def get_current_admin(
                 # Admin user - safe to recreate session in cache
                 session_info = {
                     "id": user_record["id"],
-                    "email": user_record["email"],
-                    "name": user_record["name"],
+                    "username": user_record["username"],
                     "is_admin": True,
                     "type": "superuser",
                 }
@@ -140,8 +138,7 @@ async def get_current_admin(
                     "token": token,
                     "user": {
                         "id": user_record["id"],
-                        "email": user_record["email"],
-                        "name": user_record["name"],
+                        "username": user_record["username"],
                     },
                 }
 
@@ -196,7 +193,6 @@ async def get_magic_word_info(
             "current_magic_word": magic_word,
             "last_updated": last_updated,
             "last_updated_by": last_updated_by,
-            "admin_email": admin["user"]["email"],
         }
 
     except Exception as e:
@@ -212,11 +208,11 @@ async def update_magic_word(
 ):
     """Admin endpoint to update the magic word"""
 
-    admin_email = admin["user"]["email"]
+    admin_id = admin["user"]["username"]
     admin_token = credentials.credentials
 
     success = await create_or_update_magic_word(
-        request.new_magic_word, admin_token, redis_client, admin_email
+        request.new_magic_word, admin_token, redis_client, admin_id
     )
 
     if not success:
@@ -225,7 +221,7 @@ async def update_magic_word(
     return {
         "success": True,
         "message": "Magic word updated successfully",
-        "updated_by": admin_email,
+        "updated_by": admin_id,
     }
 
 
@@ -373,7 +369,7 @@ async def get_user_submissions(
             user_submissions.append(
                 UserSubmissionResponse(
                     userId=user_id,
-                    userName=user.name,
+                    userName=user.username,
                     email=user.email,
                     completedWeeks=completed_weeks,
                     totalWeeks=total_weeks,
@@ -550,3 +546,47 @@ async def send_reminders(
     )
 
     return ReminderResponse(sent=sent_count, failed=failed_count, details=results)
+
+
+@router.get("/users/info/{user_id}")
+async def get_user_for_admin(
+    user_id: str,
+    admin: dict[str, Any] = Depends(get_current_admin),  # Your auth dependency
+):
+    """
+    Return encrypted user data.
+    Server CANNOT decrypt this - admin must decrypt client-side!
+    """
+    token = admin["token"]
+    async with httpx.AsyncClient() as client:
+        try:
+            # Fetch user details
+            user_response = await client.get(
+                f"{POCKETBASE_URL}/api/collections/users/records",
+                params={"filter": f"username='{user_id}'"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if user_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500, detail="Fehler beim Abrufen des Benutzer"
+                )
+            response_data = user_response.json()
+            if "items" not in response_data or "totalItems" not in response_data:
+                raise HTTPException(
+                    status_code=500, detail="In Antwort fehlen erwartete Felder"
+                )
+            if response_data["totalItems"] != 1:
+                raise HTTPException(status_code=204, detail="User nicht gefunden")
+
+            user_record = UsersResponse(**response_data["items"][0])
+        except Exception:
+            raise HTTPException(
+                status_code=500, detail="Unbekannter Fehler beim abrufen des Benutzer"
+            )
+
+    return {
+        "username": user_record.username,
+        "admin_wrapped_dek": user_record.admin_wrapped_dek,  # RSA encrypted
+        "encrypted_fields": user_record.encrypted_fields,
+        "created": user_record.created,
+    }

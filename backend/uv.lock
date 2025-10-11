@@ -1551,6 +1551,7 @@ dependencies = [
     { name = "pypdf" },
     { name = "python-multipart" },
     { name = "redis" },
+    { name = "requests" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1586,6 +1587,7 @@ requires-dist = [
     { name = "pypdf", specifier = ">=6.0.0" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "redis", specifier = ">=6.4.0" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.35.0" },
 ]
 
