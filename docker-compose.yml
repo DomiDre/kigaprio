@@ -39,8 +39,8 @@ services:
       retries: 3
       start_period: 40s
     secrets:
-      - pb_admin_email
-      - pb_service_email
+      - admin_public_key
+      - pb_service_id
       - pb_service_password
 
   # Build frontend and copy static files
@@ -115,12 +115,14 @@ volumes:
   frontend-static:
 
 secrets:
+  admin_public_key:
+    file: ./.secrets/admin_public_key.pem
   pb_admin_email:
     file: ./.secrets/pb_admin_email
   pb_admin_password:
     file: ./.secrets/pb_admin_password
-  pb_service_email:
-    file: ./.secrets/pb_service_email
+  pb_service_id:
+    file: ./.secrets/pb_service_id
   pb_service_password:
     file: ./.secrets/pb_service_password
   
