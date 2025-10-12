@@ -1,109 +1,228 @@
 # KigaPrio
 
-[![CI](https://github.com/DomiDre/kigaprio/actions/workflows/ci.yml/badge.svg)](https://github.com/DomiDre/kigaprio/actions/workflows/ci.yml)
+<div align="center">
 
-A web application to submit priorities of each day respective for each week allow the administration to generate spreadsheets for overview.
+[![CI Status](https://github.com/DomiDre/kigaprio/actions/workflows/ci.yml/badge.svg)](https://github.com/DomiDre/kigaprio/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen.svg)](https://www.docker.com/)
+[![GDPR Compliant](https://img.shields.io/badge/GDPR-Compliant-green.svg)](ARCHITECTURE.md#gdpr-compliance)
 
-## Features
-### Performance & Architecture
+**Privacy-First Childcare Priority Management System**
 
-⚡ Async Processing - Non-blocking request handling with FastAPI's async capabilities
+[Features](#features) • [Quick Start](#quick-start) • [Architecture](#architecture) • [Contributing](#contributing)
 
-🎨 Modern Frontend - Compiled Svelte app served as static assets
+</div>
 
-🚀 Fast Dependencies - UV-powered backend for rapid package installation and management
+---
 
-### Data & Reporting
+## 📋 Overview
 
-📊 Excel Generation - Automated report creation and export functionality
+KigaPrio is a secure web application designed for childcare facilities to manage daily and weekly priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
 
-💾 PocketBase Integration - Lightweight database accessible exclusively through FastAPI
+### Key Capabilities
+- 🔐 **Server-side encryption** with user-controlled security levels
+- 📊 **Administrative reporting** with Excel generation for monthly overviews
+- 👥 **Multi-role support** for parents and administrators
+- 🛡️ **GDPR-compliant** data handling and storage
+- 📱 **Responsive design** for mobile and desktop access
 
-### Security
+## 🏗️ Architecture
 
-🔐 Authentication - PocketBase auth system protecting all API endpoints
+KigaPrio implements a privacy-first architecture with multiple layers of security. For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-👥 Role-Based Access - Granular permission control for different user roles
+### Technology Stack
 
-### DevOps
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Backend** | FastAPI + Python 3.11 | Async API server with data validation |
+| **Frontend** | SvelteKit | Modern reactive UI framework |
+| **Database** | PocketBase | SQLite-based with built-in auth |
+| **Cache** | Redis | Session management (memory-only) |
+| **Proxy** | Traefik | TLS termination and routing |
+| **Container** | Docker + Docker Compose | Consistent deployment environment |
 
-🐳 Docker Support - Containerized setup for both development and production environments
+### Security Model
 
-🔧 Environment Flexibility - Easy switching between dev and prod configurations
+Three-tier security system allowing users to choose their preferred balance:
 
-## Quick Start
+- **🔒 High Security**: Session-based, no server storage
+- **⚖️ Balanced Mode**: Split-key encryption with timeout (default)
+- **🔓 Convenience**: Persistent client storage for trusted devices
+
+Details in [ARCHITECTURE.md](ARCHITECTURE.md#three-tier-security-model).
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker Engine ≥ 24.0
+- Docker Compose ≥ 2.20
+- [just](https://github.com/casey/just) command runner
+- 2GB available RAM
+- 1GB available disk space
 
 ### Development Setup
 
-1. **Clone and setup**:
+1. **Clone the repository**
 ```bash
-git clone https://github.com/DomiDre/kigaprio
+git clone https://github.com/DomiDre/kigaprio.git
 cd kigaprio
 ```
 
-2. **Install just & docker**
-All default scripts are collected in the `justfile`. Consider [installing it](https://github.com/casey/just) or look up commands from it.
-
-The environment is defined for usage in docker containers.
-
-3. **Development setup**:
-Build dev containers
+2. **Start development environment**
 ```bash
+# Build development containers
 just dev-build
-```
 
-Run development setup (both backend, frontend and also loads pocketbase and redis instance)
-```bash
+# Start all services (FastAPI, SvelteKit, PocketBase, Redis)
 just dev
 ```
 
-### Production Setup
+3. **Access the application**
+- Frontend: http://localhost:3000
+- API Documentation: http://localhost:8000/api/docs
+- PocketBase Admin: http://localhost:8090/_/
 
-**Prepare production environment**:
-Initialize secrets with
+### Production Deployment
+
+1. **Initialize environment**
 ```bash
+# Generate secure secrets
 just init-secrets
-```
 
-And initialize pocketbase folders with
-```bash
+# Initialize PocketBase storage
 just pocketbase-init
 ```
 
-**Run production environment**:
+2. **Deploy**
 ```bash
+# Build production images
 just build
+
+# Start production services
 just prod
 ```
 
-## API Endpoints
+## 📁 Project Structure
 
-To get backend API endpoints, run for example `just dev` and go to `http://localhost:8000/api/docs`
-to view swagger-ui interface.
+```
+kigaprio/
+├── backend/              # FastAPI application
+│   ├── src/kigaprio/     # Application code
+│   │   ├── api/          # API endpoints
+│   │   ├── middleware/   # Middleware in requests, e.g. token refresh
+│   │   ├── models/       # Data models
+│   │   ├── scripts/      # Python scripts, e.g. initial admin private key generation
+│   │   └── services/     # Business logic
+│   └── pyproject.toml    # Python dependencies
+├── frontend/             # SvelteKit application
+│   ├── src/              # Source code
+│   │   ├── routes/       # Page routes
+│   │   ├── lib/          # Shared components
+│   └── static/           # Static assets
+├── justfile              # Command automation
+└── docker-compose.yml    # Service orchestration
+```
 
-## Development Workflow
+## 🔧 Development
 
-1. **Code changes**: The development setup includes volume mounts, so code changes are reflected immediately
-2. **Linting**: 
+### Available Commands
+
+```bash
+# Development
+just dev           # Start development environment
+just dev-build     # Build development containers
+just lint          # Run linters
+just format        # Auto-format code
+
+# Production
+just build         # Build production images
+just prod          # Start production environment
+just logs          # View production logs
+```
+
+### Code Quality
+
+The project maintains code quality through:
+
+- **Linting**: Ruff for Python, ESLint for JavaScript
+- **Formatting**: Ruff for Python, Prettier for JavaScript
+- **Type Checking**: mypy for Python, TypeScript for frontend
+- **Pre-commit Hooks**: Automated checks before commits
+
+### API Documentation
+
+Interactive API documentation is available via Swagger UI:
+- Development: http://localhost:8000/api/docs
+
+## 🔒 Security
+
+### Data Protection
+
+- **Encryption at Rest**: AES-256-GCM for all sensitive data
+- **Encryption in Transit**: TLS 1.3 for all connections
+- **Key Management**: User-specific keys with secure derivation
+- **No Persistent Storage**: Plaintext data exists only transiently during processing, immediately discarded after use
+
+### GDPR Compliance
+
+Full compliance with GDPR requirements including:
+- Right to access (data export)
+- Right to rectification (data editing)
+- Right to erasure (account deletion)
+- Data portability (JSON/CSV export)
+- Privacy by design
+
+See [ARCHITECTURE.md](ARCHITECTURE.md#gdpr-compliance) for details.
+
+### Security Headers
+
+All responses include security headers:
+- `Strict-Transport-Security`
+- `Content-Security-Policy`
+- `X-Frame-Options`
+- `X-Content-Type-Options`
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. **Check existing issues** or create a new one
+2. **Fork the repository**
+3. **Create a feature branch**
    ```bash
-   just lint
-   just format
+   git checkout -b feature/your-feature-name
    ```
+4. **Make your changes** following code style guidelines
+5. **Test thoroughly**
+6. **Submit a pull request** with clear description
 
-Unit tests are not yet properly implemented, so there is no workflow for that.
+### Development Guidelines
 
+- Follow existing code style
+- Add tests for new functionality
+- Update documentation as needed
+- Ensure all checks pass before submitting PR
 
-## Contributing
+## 📚 Documentation
 
-See issues for open problems that are going to be worked upon. If something is missing feel free to add issues.
+- [Architecture Document](ARCHITECTURE.md) - Detailed system design
+- [API Documentation](http://localhost:8000/api/docs) - Interactive API docs (need to run dev server)
 
-To provide an implementation of anything:
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Make changes and test
-4. Submit pull request
+## 📄 License
 
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
-## License
+## 🙏 Acknowledgments
 
-GNU GPLv3 - see LICENSE file for details.
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [SvelteKit](https://kit.svelte.dev/) - Full-stack web framework
+- [PocketBase](https://pocketbase.io/) - Open source backend
+- [Docker](https://www.docker.com/) - Container platform
+
+## 📞 Support
+
+For issues and questions:
+- **Bug Reports**: [GitHub Issues](https://github.com/DomiDre/kigaprio/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/DomiDre/kigaprio/discussions)
