@@ -22,3 +22,4 @@ class UsersResponse(BaseModel):
     collectionName: str
     created: str
     updated: str
+    security_tier: Literal["balanced"] | Literal["high"] | Literal["convenience"]

@@ -22,6 +22,23 @@ class EncryptionManager:
     KDF_ITERATIONS = 600000
     KEY_SIZE = 32
 
+    # Server-side key for encrypting cached DEK parts (balanced mode)
+    # In production, this should be loaded from a secure location
+    _SERVER_CACHE_KEY: bytes | None = None
+
+    @classmethod
+    def _get_server_cache_key(cls) -> bytes:
+        """Get or generate server-side key for encrypting cached DEK parts."""
+        if cls._SERVER_CACHE_KEY is None:
+            # Try to load from environment or secrets
+            cache_key_path = Path("/run/secrets/server_cache_key")
+            if cache_key_path.exists():
+                cls._SERVER_CACHE_KEY = cache_key_path.read_bytes()
+            else:
+                # Fallback: generate ephemeral key (lost on restart - acceptable for cache)
+                cls._SERVER_CACHE_KEY = AESGCM.generate_key(bit_length=256)
+        return cls._SERVER_CACHE_KEY
+
     @staticmethod
     def generate_dek() -> bytes:
         """Generate a new Data Encryption Key (DEK) for a user."""
@@ -165,7 +182,7 @@ class EncryptionManager:
             user_wrapped_dek: Encrypted DEK from PocketBase
 
         Returns:
-            Decrypted DEK
+            Decrypted DEK (32 bytes)
         """
         salt_bytes = base64.b64decode(salt)
         password_key = cls.derive_key_from_password(password, salt_bytes)
@@ -237,6 +254,76 @@ class EncryptionManager:
             "user_wrapped_dek": new_user_wrapped_dek,
             # Note: admin_wrapped_dek stays the same!
         }
+
+    @staticmethod
+    def split_dek(dek: bytes) -> tuple[str, str]:
+        """Split DEK into two parts using XOR for balanced security mode.
+
+        Args:
+            dek: Raw DEK bytes (32 bytes)
+
+        Returns:
+            tuple: (server_part_b64, client_part_b64) - both base64 encoded
+        """
+        # Generate random server part (same length as DEK)
+        server_part_bytes = os.urandom(len(dek))
+
+        # XOR to create client part
+        client_part_bytes = bytes(
+            a ^ b for a, b in zip(dek, server_part_bytes, strict=False)
+        )
+
+        return (
+            base64.b64encode(server_part_bytes).decode("utf-8"),
+            base64.b64encode(client_part_bytes).decode("utf-8"),
+        )
+
+    @classmethod
+    def encrypt_dek_part(cls, dek_part: str) -> str:
+        """Encrypt a DEK part before caching using server-side key.
+
+        Args:
+            dek_part: Base64-encoded DEK part
+
+        Returns:
+            Base64-encoded encrypted DEK part
+        """
+        server_key = cls._get_server_cache_key()
+        return cls.encrypt_data(dek_part, server_key)
+
+    @classmethod
+    def decrypt_dek_part(cls, encrypted_dek_part: str) -> str:
+        """Decrypt a cached DEK part using server-side key.
+
+        Args:
+            encrypted_dek_part: Base64-encoded encrypted DEK part
+
+        Returns:
+            Base64-encoded DEK part
+        """
+        server_key = cls._get_server_cache_key()
+        return cls.decrypt_data(encrypted_dek_part, server_key)
+
+    @staticmethod
+    def reconstruct_dek(server_part: str, client_part: str) -> bytes:
+        """Reconstruct DEK from split parts (balanced mode).
+
+        Args:
+            server_part: Base64 encoded server part
+            client_part: Base64 encoded client part
+
+        Returns:
+            Reconstructed DEK as raw bytes (32 bytes)
+        """
+        server_bytes = base64.b64decode(server_part)
+        client_bytes = base64.b64decode(client_part)
+
+        # XOR to reconstruct original DEK
+        dek_bytes = bytes(
+            a ^ b for a, b in zip(server_bytes, client_bytes, strict=False)
+        )
+
+        return dek_bytes
 
 
 def get_user_data(password: str, user_record: dict[str, Any]) -> dict[str, Any]:
