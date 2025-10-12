@@ -328,7 +328,6 @@ async def login_user(
                 session_info.model_dump_json(),
             )
 
-            print(dek_data)
             return LoginResponse(
                 token=token,
                 security_tier=security_tier,
