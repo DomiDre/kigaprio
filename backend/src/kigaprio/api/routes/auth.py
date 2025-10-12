@@ -4,7 +4,7 @@ from datetime import datetime
 
 import httpx
 import redis
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.models.auth import (
@@ -27,31 +27,6 @@ from kigaprio.utils import extract_session_info_from_record, get_client_ip
 
 router = APIRouter()
 security = HTTPBearer()
-
-
-async def get_current_user(
-    authorization: str = Header(None),
-    redis_client: redis.Redis = Depends(get_redis),
-):
-    """Extract user info from token, including admin status"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.replace("Bearer ", "")
-    session_key = f"session:{token}"
-
-    user_data = redis_client.get(session_key)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Session expired or invalid")
-
-    return json.loads(str(user_data))
-
-
-async def require_admin(current_user: dict = Depends(get_current_user)):
-    """Ensure the current user is an admin"""
-    if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return current_user
 
 
 async def try_user_auth(
