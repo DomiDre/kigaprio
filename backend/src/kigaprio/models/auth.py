@@ -55,6 +55,7 @@ class LoginResponse(BaseModel):
 class SessionInfo(BaseModel):
     id: str
     username: str
+    security_tier: Literal["high", "balanced", "convenience"]
     is_admin: bool
 
 
@@ -62,3 +63,9 @@ class TokenVerificationData(BaseModel):
     token: str
     new_token: str | None = None
     user: SessionInfo
+
+
+class DEKData(BaseModel):
+    dek: bytes
+    user_id: str
+    security_tier: str
