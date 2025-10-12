@@ -29,28 +29,6 @@ router = APIRouter()
 security = HTTPBearer()
 
 
-async def try_user_auth(
-    client: httpx.AsyncClient, identity: str, password: str
-) -> DatabaseLoginResponse | None:
-    """
-    Attempt regular user authentication against PocketBase.
-    Returns auth data if successful, None otherwise.
-    """
-    try:
-        response = await client.post(
-            f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
-            json={
-                "identity": identity,
-                "password": password,
-            },
-        )
-        if response.status_code == 200:
-            return DatabaseLoginResponse(**response.json())
-        return None
-    except Exception:
-        return None
-
-
 @router.post("/verify-magic-word")
 async def verify_magic_word(
     request: MagicWordRequest,
@@ -242,14 +220,20 @@ async def login_user(
         async with httpx.AsyncClient() as client:
             auth_data = None
 
-            auth_data = await try_user_auth(client, request.identity, request.password)
-
-            if not auth_data:
-                # Both authentication attempts failed
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": request.identity,
+                    "password": request.password,
+                },
+            )
+            if response.status_code != 200:
                 raise HTTPException(
                     status_code=401,
                     detail="Ungültige Anmeldedaten",
                 )
+
+            auth_data = DatabaseLoginResponse(**response.json())
 
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
