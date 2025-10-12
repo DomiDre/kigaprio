@@ -17,7 +17,7 @@
 
 ## 📋 Overview
 
-KigaPrio is a secure web application designed for childcare facilities to manage daily and weekly priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
+KigaPrio is a secure web application designed for childcare facilities to manage daily priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
 
 ### Key Capabilities
 - 🔐 **Server-side encryption** with user-controlled security levels
