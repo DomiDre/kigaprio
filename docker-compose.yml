@@ -11,7 +11,7 @@ services:
     environment:
       - ENV=production
       - DEBUG=false
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_URL=redis://redis:6379
       - POCKETBASE_URL=http://pocketbase:8090
     labels:
       - "traefik.enable=true"
