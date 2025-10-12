@@ -64,7 +64,7 @@ All encryption and decryption operations occur server-side to ensure:
 - **Prevention of database poisoning**
 - **Consistent security implementation**
 
-### 2. Zero-Knowledge Architecture
+### 2. No Persistent Storage of Plaintext
 - Server never persistently stores plaintext data
 - Admin private key never exists on server
 - User passwords immediately discarded after key derivation
