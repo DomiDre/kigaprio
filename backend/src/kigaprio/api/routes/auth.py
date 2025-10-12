@@ -143,6 +143,7 @@ async def register_user(
                     "user_wrapped_dek": encryption_data["user_wrapped_dek"],
                     "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
                     "encrypted_fields": encrypted_fields,
+                    "security_tier": "balanced",
                 },
             )
 
