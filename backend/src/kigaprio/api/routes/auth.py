@@ -1,3 +1,4 @@
+import base64
 import json
 import secrets
 from datetime import datetime
@@ -293,7 +294,6 @@ async def login_user(
 
                     dek_data = {
                         "client_key_part": client_part,
-                        "storage_type": "sessionStorage",
                     }
 
                     # Session TTL: 8 hours max for balanced mode
@@ -302,18 +302,16 @@ async def login_user(
                 case "high":
                     # High security: full DEK to client, nothing cached on server
                     dek_data = {
-                        "dek": dek,
-                        "storage_type": "sessionStorage",
+                        "dek": base64.b64encode(dek).decode("utf-8"),
                     }
 
                     # Session TTL: tab lifetime (client manages this)
-                    session_ttl = 8 * 3600  # Max duration for session record
+                    session_ttl = 8 * 3600  # Max duration for session record, 8h
 
                 case "convenience":
                     # Convenience: full DEK to client, persistent storage
                     dek_data = {
-                        "dek": dek,
-                        "storage_type": "localStorage",
+                        "dek": base64.b64encode(dek).decode("utf-8"),
                     }
 
                     # Session TTL: until explicit logout
@@ -330,6 +328,7 @@ async def login_user(
                 session_info.model_dump_json(),
             )
 
+            print(dek_data)
             return LoginResponse(
                 token=token,
                 security_tier=security_tier,

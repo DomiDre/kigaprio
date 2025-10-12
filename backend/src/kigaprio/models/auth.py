@@ -51,9 +51,6 @@ class LoginResponse(BaseModel):
     # For balanced mode
     client_key_part: str | None = None
 
-    # Storage instruction for client
-    storage_type: Literal["sessionStorage", "localStorage"]
-
 
 class SessionInfo(BaseModel):
     id: str
