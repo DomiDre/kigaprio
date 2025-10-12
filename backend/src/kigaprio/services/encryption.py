@@ -1,11 +1,13 @@
 """Field-level encryption system allowing for password changes by using data encryption keys"""
 
 import base64
+import datetime
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+import redis
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -324,6 +326,58 @@ class EncryptionManager:
         )
 
         return dek_bytes
+
+    @classmethod
+    def get_dek_from_request(
+        cls,
+        dek_or_client_part: str,
+        user_id: str,
+        token: str,
+        security_tier: Literal["high", "balanced", "convenience"],
+        redis_client: redis.Redis,
+    ) -> bytes:
+        """Reconstruct DEK from request data based on security tier.
+
+        Args:
+            dek_or_client_part: Either full DEK (base64) or client key part (base64)
+            user_id: User ID for cache lookup
+            token: Session token for cache lookup
+            security_tier: User's security tier
+            redis_client: Redis client for cache access
+
+        Returns:
+            Reconstructed DEK as bytes
+
+        Raises:
+            ValueError: If DEK cannot be reconstructed
+        """
+        if security_tier == "balanced":
+            # Need to reconstruct from split parts
+            dek_cache_key = f"dek:{user_id}:{token}"
+            cached_data = redis_client.get(dek_cache_key)
+
+            if not cached_data:
+                raise ValueError(
+                    "DEK cache expired or not found. Please re-authenticate."
+                )
+
+            cache_info = json.loads(str(cached_data))
+            encrypted_server_part = cache_info["encrypted_server_part"]
+
+            # Decrypt server part
+            server_part = cls.decrypt_dek_part(encrypted_server_part)
+
+            # Reconstruct DEK from both parts
+            dek = cls.reconstruct_dek(server_part, dek_or_client_part)
+
+            # Update last accessed time and refresh TTL
+            cache_info["last_accessed"] = datetime.datetime.now().isoformat()
+            redis_client.setex(dek_cache_key, 1800, json.dumps(cache_info))
+
+            return dek
+        else:
+            # High or convenience mode: full DEK provided
+            return base64.b64decode(dek_or_client_part)
 
 
 def get_user_data(password: str, user_record: dict[str, Any]) -> dict[str, Any]:
