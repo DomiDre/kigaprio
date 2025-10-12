@@ -20,6 +20,16 @@ services:
       - "traefik.http.routers.kigaprio-backend.tls=true"
       - "traefik.http.routers.kigaprio-backend.tls.certresolver=myresolver"
       - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
+      
+      # Attach security headers middleware to the router
+      - "traefik.http.routers.kigaprio-backend.middlewares=security-headers@docker"
+      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.security-headers.headers.contentSecurityPolicy=default-src 'self'; script-src 'self'"
+      - "traefik.http.middlewares.security-headers.headers.customFrameOptionsValue=DENY"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+
     depends_on:
       pocketbase:
         condition: service_healthy
