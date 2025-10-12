@@ -1,9 +1,8 @@
 # KigaPrio System Architecture
 
 ## System Overview
-
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 graph TB
     subgraph Internet["🌐 Internet"]
         Client["👤 Parent UI<br/>Login & Submit Data"]
@@ -31,9 +30,9 @@ graph TB
     StaticVolume -->|"Serve"| Backend
     AdminInterface -->|"HTTPS"| Traefik
 
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef database fill:#ffcdd2,stroke:#333,stroke-width:2px,color:#000
-    classDef client fill:#fff,stroke:#333,stroke-width:2px,color:#000
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef database fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef client fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
 
     class Traefik backend
     class Backend backend
@@ -41,11 +40,6 @@ graph TB
     class Redis database
     class Client client
     class AdminInterface client
-
-    style Internet fill:#e1f5ff,stroke:#333,stroke-width:2px,color:#000
-    style Docker fill:#f5f5f5,stroke:#333,stroke-width:2px,color:#000
-    style InternalNet fill:#ffebee,stroke:#d32f2f,stroke-width:3px,color:#000
-    style ProxyNet fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
 ```
 
 ### Terms and Used Tools
@@ -176,7 +170,7 @@ Users choose security level at login, balancing security with convenience:
 ### Login and Session Creation (Four-Tier)
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Start["👤 User Login:<br/>Username + Password<br/>+ Security Tier"]
     Verify["🔐 Verify Password<br/>(PocketBase)"]
@@ -219,10 +213,10 @@ flowchart TD
     Balanced --> Done
     Convenience --> Done
     
-    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef database fill:#ffcdd2,stroke:#333,stroke-width:2px,color:#000
-    classDef security fill:#ffecb3,stroke:#f57c00,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef database fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef security fill:#ffecb3,stroke:#f57c00,stroke-width:2px
 
     class Start action
     class Verify backend
@@ -258,7 +252,7 @@ flowchart TD
 ### Registration Flow
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Start["👤 User Registers:<br/>Password<br/>Child Names<br/>Security Tier"] 
     GenDEK["🔑 Generate DEK<br/>(256-bit AES)"]
@@ -280,10 +274,10 @@ flowchart TD
     Store --> Session
     Session --> Done["✅ Registered"]
     
-    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef database fill:#ffcdd2,stroke:#333,stroke-width:2px,color:#000
-    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef database fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px
 
     class Start action
     class GenDEK backend
@@ -293,7 +287,7 @@ flowchart TD
     class Encrypt backend
     class Store database
     class Session backend
-    style Done fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
+    class Done backend
 ```
 
 ---
@@ -305,7 +299,7 @@ flowchart TD
 #### 🔴 Maximum Security
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Request["👤 User Action:<br/>View/Edit Data"]
     Auth["🔐 Verify PB Session"]
@@ -329,9 +323,9 @@ flowchart TD
     Cleanup --> Return
     Return --> Done
     
-    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef database fill:#ffcdd2,stroke:#333,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef database fill:#ffcdd2,stroke:#c62828,stroke-width:2px
     
     class Request action
     class Prompt action
@@ -350,7 +344,7 @@ flowchart TD
 #### 🟠 High Security
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Request["👤 Submit:<br/>Plaintext data<br/>+ DEK"]
     Auth["🔐 Authenticate"]
@@ -371,10 +365,10 @@ flowchart TD
     Store --> Cleanup
     Cleanup --> Done
     
-    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef database fill:#ffcdd2,stroke:#333,stroke-width:2px,color:#000
-    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef database fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     
     class Request action
     class Validate validate
@@ -387,7 +381,7 @@ flowchart TD
 #### 🟡 Balanced Security
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Request["👤 Submit:<br/>Plaintext data<br/>+ client_part"]
     Auth["🔐 Authenticate"]
@@ -418,10 +412,10 @@ flowchart TD
     Encrypt --> Store
     Store --> Done
     
-    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef database fill:#ffcdd2,stroke:#333,stroke-width:2px,color:#000
-    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef database fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     
     class Request action
     class Validate validate
@@ -434,7 +428,7 @@ flowchart TD
 #### 🟢 Convenience Mode
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Request["👤 Submit:<br/>Plaintext data<br/>+ DEK"]
     Auth["🔐 Authenticate"]
@@ -454,9 +448,9 @@ flowchart TD
     Store --> Cleanup
     Cleanup --> Done
     
-    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef backend fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000
-    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef validate fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     
     class Request action
     class Validate validate
@@ -472,7 +466,7 @@ flowchart TD
 All security tiers must re-authenticate:
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#fff','primaryTextColor':'#000','primaryBorderColor':'#333','lineColor':'#333','secondaryColor':'#f5f5f5','tertiaryColor':'#fff','background':'#ffffff','mainBkg':'#ffffff','clusterBkg':'#f9f9f9','clusterBorder':'#666'}}}%%
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
     Start["👤 Change Password"]
     Verify["🔐 Verify Old"]
@@ -493,9 +487,19 @@ flowchart TD
     Invalidate --> NewSession
     NewSession --> Done
     
-    style Start fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
-    style Invalidate fill:#ffccbc,stroke:#e64a19,stroke-width:2px,color:#000
-    style Done fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef backend fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef security fill:#ffccbc,stroke:#e64a19,stroke-width:2px
+    
+    class Start action
+    class Verify backend
+    class Fetch backend
+    class Unwrap backend
+    class Rewrap backend
+    class Update backend
+    class Invalidate security
+    class NewSession backend
+    class Done backend
 ```
 
 ---
