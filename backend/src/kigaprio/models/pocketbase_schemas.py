@@ -28,11 +28,11 @@ class UsersResponse(BaseModel):
 class PriorityRecord(BaseModel):
     """Encrypted priority record (stored in database)."""
 
-    id: str | None = None
+    id: str
     userId: str
     month: str
     encrypted_fields: str
-    collectionId: str | None = None
-    collectionName: str | None = None
-    created: str | None = None
-    updated: str | None = None
+    collectionId: str
+    collectionName: str
+    created: str
+    updated: str
