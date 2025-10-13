@@ -92,34 +92,34 @@ Users select their preferred security level at login, balancing security with co
 ### High Security Mode
 **Target Use Case**: Shared devices, elevated privacy requirements
 
-| Aspect | Implementation |
-|--------|---------------|
-| **DEK Storage** | Client sessionStorage only |
-| **Session Duration** | Browser tab lifetime |
+| Aspect                | Implementation |
+|-----------------------|---------------|
+| **DEK Storage**       | Client sessionStorage only |
+| **Session Duration**  | Browser tab lifetime |
 | **Re-authentication** | Required for each new tab |
-| **Server Exposure** | Zero (transient processing only) |
+| **Server Exposure**   | Zero (transient processing only) |
 | **XSS Vulnerability** | Medium (DEK in sessionStorage) |
 
 ### Balanced Security Mode (Default)
 **Target Use Case**: Personal devices, regular usage
 
-| Aspect | Implementation |
-|--------|---------------|
-| **DEK Storage** | Split-key system (server cache + client) |
-| **Session Duration** | 30-minute inactivity timeout, 8-hour maximum |
+| Aspect                | Implementation |
+|-----------------------|---------------|
+| **DEK Storage**       | Split-key system (server cache + client) |
+| **Session Duration**  | 30-minute inactivity timeout, 8-hour maximum |
 | **Re-authentication** | After timeout or maximum duration |
-| **Server Exposure** | Encrypted DEK fragment only |
+| **Server Exposure**   | Encrypted DEK fragment only |
 | **XSS Vulnerability** | Low (requires both key parts) |
 
 ### Convenience Mode
 **Target Use Case**: Trusted personal devices, low-sensitivity scenarios
 
-| Aspect | Implementation |
-|--------|---------------|
-| **DEK Storage** | Client localStorage (persistent) |
-| **Session Duration** | Until explicit logout |
+| Aspect                | Implementation |
+|-----------------------|---------------|
+| **DEK Storage**       | Client localStorage (persistent) |
+| **Session Duration**  | Until explicit logout |
 | **Re-authentication** | Only on logout/password change |
-| **Server Exposure** | Zero (transient processing only) |
+| **Server Exposure**   | Zero (transient processing only) |
 | **XSS Vulnerability** | High (full DEK in localStorage) |
 
 ---
@@ -266,12 +266,12 @@ redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allk
 
 ### Client Storage
 
-| Security Tier | Storage Type | Key | Persistence |
-|--------------|--------------|-----|-------------|
-| High | sessionStorage | `dek` | Tab session only |
-| Balanced | sessionStorage | `client_key_part` | Tab session only |
-| Convenience | localStorage | `dek` | Until logout |
-| All | Cookie (HttpOnly) | `pb_auth` | 30 days |
+| Security Tier | Storage Type      | Key               | Persistence |
+|---------------|-------------------|-------------------|-------------|
+| High          | sessionStorage    | `dek`             | Tab session only |
+| Balanced      | sessionStorage    | `client_key_part` | Tab session only |
+| Convenience   | localStorage      | `dek`             | Until logout |
+| All           | Cookie (HttpOnly) | `pb_auth`         | 30 days |
 
 ---
 
@@ -288,13 +288,13 @@ redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allk
 
 ### User Rights Implementation
 
-| Right | Implementation |
-|-------|---------------|
-| **Access** (Art. 15) | Authenticated data export |
+| Right                       | Implementation |
+|-----------------------------|---------------|
+| **Access** (Art. 15)        | Authenticated data export |
 | **Rectification** (Art. 16) | Direct edit interface |
-| **Erasure** (Art. 17) | Account deletion with cascade |
-| **Portability** (Art. 20) | JSON/CSV export formats |
-| **Object** (Art. 21) | Account deactivation option |
+| **Erasure** (Art. 17)       | Account deletion with cascade |
+| **Portability** (Art. 20)   | JSON/CSV export formats |
+| **Object** (Art. 21)        | Account deactivation option |
 
 ### Technical Measures (Article 32)
 
