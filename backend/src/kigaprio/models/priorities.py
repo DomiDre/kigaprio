@@ -15,7 +15,6 @@ class WeekPriority(BaseModel):
 
 
 class PriorityRecordCore(BaseModel):
-    userId: str | None = None
     month: str
     weeks: list[WeekPriority]
 

@@ -8,6 +8,7 @@ from kigaprio.models.priorities import (
     PriorityRecordCore,
     PriorityResponse,
 )
+from kigaprio.models.request import SuccessResponse
 from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
@@ -146,7 +147,7 @@ async def get_priority(
         ) from e
 
 
-@router.post("", response_model=PriorityResponse)
+@router.post("", response_model=SuccessResponse)
 async def create_priority(
     priority: PriorityRecordCore,
     auth_data: TokenVerificationData = Depends(verify_token),
@@ -157,9 +158,6 @@ async def create_priority(
 
     user_id = auth_data.user.id
     token = auth_data.token
-
-    # Ensure userId matches authenticated user
-    priority.userId = user_id
 
     # Check for duplicate month
     duplicate_check_key = f"priority_check:{user_id}:{priority.month}"
@@ -199,9 +197,9 @@ async def create_priority(
 
             # Create encrypted record
             encrypted_priority = {
-                "userId": priority.userId,
+                "userId": user_id,
                 "month": priority.month,
-                "encrypted_data": encrypted_data,
+                "encrypted_fields": encrypted_data,
             }
 
             response = await client.post(
@@ -219,16 +217,7 @@ async def create_priority(
                     ),
                 )
 
-            # Return decrypted response
-            created_record = PriorityRecord(**response.json())
-            return PriorityResponse(
-                id=created_record.id,
-                userId=created_record.userId,
-                month=created_record.month,
-                weeks=priority.weeks,
-                created=created_record.created,
-                updated=created_record.updated,
-            )
+            return SuccessResponse(message="Prioritaet erfolgreich angelegt")
 
     except HTTPException:
         raise
@@ -241,7 +230,7 @@ async def create_priority(
         redis_client.delete(duplicate_check_key)
 
 
-@router.patch("/{priority_id}", response_model=PriorityResponse)
+@router.patch("/{priority_id}", response_model=SuccessResponse)
 async def update_priority(
     priority_id: str,
     priority: PriorityRecordCore,
@@ -252,9 +241,6 @@ async def update_priority(
 
     user_id = auth_data.user.id
     token = auth_data.token
-
-    # Ensure userId matches authenticated user
-    priority.userId = user_id
 
     try:
         async with httpx.AsyncClient() as client:
@@ -291,9 +277,9 @@ async def update_priority(
 
             # Update with encrypted data
             encrypted_priority = {
-                "userId": priority.userId,
+                "userId": user_id,
                 "month": priority.month,
-                "encrypted_data": encrypted_data,
+                "encrypted_fields": encrypted_data,
             }
 
             response = await client.patch(
@@ -311,16 +297,7 @@ async def update_priority(
                     ),
                 )
 
-            # Return decrypted response
-            updated_record = PriorityRecord(**response.json())
-            return PriorityResponse(
-                id=updated_record.id,
-                userId=updated_record.userId,
-                month=updated_record.month,
-                weeks=priority.weeks,
-                created=updated_record.created,
-                updated=updated_record.updated,
-            )
+            return SuccessResponse(message="Prioritaet erfolgreich aktualisiert")
 
     except HTTPException:
         raise
