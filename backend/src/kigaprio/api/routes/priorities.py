@@ -1,5 +1,6 @@
 import httpx
 import redis
+from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, HTTPException
 
 from kigaprio.models.auth import DEKData, TokenVerificationData
@@ -55,10 +56,16 @@ async def get_user_priorities(
                 encrypted_record = PriorityRecord(**item)
 
                 # Decrypt the weeks data
-                decrypted_weeks = EncryptionManager.decrypt_fields(
-                    encrypted_record.encrypted_fields,
-                    dek_data.dek,
-                )
+                try:
+                    decrypted_weeks = EncryptionManager.decrypt_fields(
+                        encrypted_record.encrypted_fields,
+                        dek_data.dek,
+                    )
+                except InvalidTag as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Entschluesselung der Daten fehlgeschlagen",
+                    ) from e
 
                 decrypted_items.append(
                     PriorityResponse(
@@ -125,10 +132,16 @@ async def get_priority(
                 )
 
             # Decrypt weeks data
-            decrypted_weeks = EncryptionManager.decrypt_fields(
-                encrypted_record.encrypted_fields,
-                dek_data.dek,
-            )
+            try:
+                decrypted_weeks = EncryptionManager.decrypt_fields(
+                    encrypted_record.encrypted_fields,
+                    dek_data.dek,
+                )
+            except InvalidTag as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Entschluesselung der Daten fehlgeschlagen",
+                ) from e
 
             return PriorityResponse(
                 month=encrypted_record.month,
