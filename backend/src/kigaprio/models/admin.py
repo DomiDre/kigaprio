@@ -27,14 +27,12 @@ class MonthStatsResponse(BaseModel):
     weeklyCompletion: list[dict[str, Any]]
 
 
-class UserSubmissionResponse(BaseModel):
-    userId: str
+class UserPriorityRecordForAdmin(BaseModel):
+    adminWrappedDek: str
     userName: str
-    email: str | None
-    completedWeeks: int
-    totalWeeks: int
-    lastActivity: str
-    status: str  # 'complete' | 'partial' | 'none'
+    month: str
+    userEncryptedFields: str
+    prioritiesEncryptedFields: str
 
 
 class ReminderRequest(BaseModel):

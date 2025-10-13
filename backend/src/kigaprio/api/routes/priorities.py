@@ -284,7 +284,6 @@ async def delete_priority(
                     detail="Fehler bei dem Versuch die Priorität zu löschen.",
                 )
 
-            existing_data = check_response.json()
             items = check_response.json()["items"]
             if len(items) == 0:
                 raise HTTPException(

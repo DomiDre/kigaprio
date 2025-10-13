@@ -16,10 +16,9 @@ from kigaprio.models.admin import (
     ReminderRequest,
     ReminderResponse,
     UpdateMagicWordRequest,
-    UserSubmissionResponse,
+    UserPriorityRecordForAdmin,
 )
-from kigaprio.models.pocketbase_schemas import UsersResponse
-from kigaprio.models.priorities import PriorityResponse
+from kigaprio.models.pocketbase_schemas import PriorityRecord, UsersResponse
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
@@ -289,8 +288,11 @@ async def get_month_stats(
 async def get_user_submissions(
     month: str,
     admin: dict[str, Any] = Depends(get_current_admin),
-) -> list[UserSubmissionResponse]:
-    """Get all user submissions for a specific month."""
+) -> list[UserPriorityRecordForAdmin]:
+    """Get all user submissions for a specific month, data is still
+    encrypted and needs to be decrypted locally using admin private key
+    and respective admin_wrapped_deks
+    """
 
     token = admin["token"]
     async with httpx.AsyncClient() as client:
@@ -310,7 +312,7 @@ async def get_user_submissions(
             UsersResponse(**x) for x in users_response.json().get("items", [])
         ]
 
-        # Fetch priorities for the month
+        # Fetch priorities for the month (of all users)
         priorities_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={"filter": f"month='{month}'", "perPage": 500},
@@ -322,59 +324,37 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Prioritäten"
             )
 
-        priorities: list[PriorityResponse] = [
-            PriorityResponse(**x) for x in priorities_response.json().get("items", [])
+        priorities: list[PriorityRecord] = [
+            PriorityRecord(**x) for x in priorities_response.json().get("items", [])
         ]
 
-        # Group priorities by user
-        user_priorities: dict[str, list[PriorityResponse]] = {}
+        # Make priorities be lookupable by user
+        user_priorities: dict[str, PriorityRecord] = {}
         for priority in priorities:
             user_id = priority.userId
-            if user_id not in user_priorities:
-                user_priorities[user_id] = []
-            user_priorities[user_id].append(priority)
+            if user_id in user_priorities:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Ein Nutzer hat mehrere Prio Eintragungen für den Monat {month}. Dies sollte nicht passieren. Bitte melden zur Prüfung",
+                )
+            user_priorities[user_id] = priority
 
         # Build user submission list
         user_submissions = []
         for user in users:
             user_id = user.id
-            user_records = user_priorities.get(user_id, [])
-
-            completed_weeks = 0
-            last_activity = None
-
-            for record in user_records:
-                priorities_dict = record.priorities
-                valid_priorities = [
-                    p for p in priorities_dict.values() if p is not None
-                ]
-
-                if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
-                    completed_weeks += 1
-
-                updated = record.updated
-                if updated and (not last_activity or updated > last_activity):
-                    last_activity = updated
-
-            # TODO: this is dependent on the month that is being looked at
-            total_weeks = 5  # Assuming 4 weeks per month
-
-            if completed_weeks == total_weeks:
-                status = "complete"
-            elif completed_weeks > 0:
-                status = "partial"
-            else:
-                status = "none"
+            priority = user_priorities.get(user_id)
+            if priority is None:
+                # user did not submit anything to priorities
+                continue
 
             user_submissions.append(
-                UserSubmissionResponse(
-                    userId=user_id,
+                UserPriorityRecordForAdmin(
+                    adminWrappedDek=user.admin_wrapped_dek,
                     userName=user.username,
-                    email=user.email,
-                    completedWeeks=completed_weeks,
-                    totalWeeks=total_weeks,
-                    lastActivity=last_activity or datetime.now().isoformat(),
-                    status=status,
+                    month=priority.month,
+                    userEncryptedFields=user.encrypted_fields,
+                    prioritiesEncryptedFields=priority.encrypted_fields,
                 )
             )
 
