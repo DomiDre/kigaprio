@@ -79,6 +79,10 @@ All encryption and decryption operations occur server-side to ensure:
 - Encryption keys user-specific
 - No tracking or analytics
 
+### 5. Role-based access control
+- Data access restricted on database level by API rules
+- Additionally restricted on backend level by role based access
+
 ---
 
 ## Three-Tier Security Model
@@ -324,15 +328,16 @@ redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allk
 
 ### Attack Resistance Matrix
 
-| Attack Vector | High | Balanced | Convenience | Mitigation |
-|--------------|------|----------|-------------|------------|
-| Database breach | ✅ Protected | ✅ Protected | ✅ Protected | AES-256 encryption |
-| Server compromise | ✅ No DEK | ⚠️ Partial DEK | ✅ No DEK | Split-key/transient |
-| Network eavesdropping | ✅ TLS | ✅ TLS | ✅ TLS | HTTPS enforced |
-| XSS attack | ⚠️ Session | ✅ Split-key | ❌ Full DEK | CSP headers |
-| Device theft | ✅ Session | ✅ Session | ❌ Persistent | Storage choice |
-| CSRF attack | ✅ Protected | ✅ Protected | ✅ Protected | Token validation |
-| Session hijacking | ✅ Limited | ✅ Limited | ⚠️ Extended | Timeout/rotation |
+| Attack Vector          | High         | Balanced      | Convenience   | Mitigation |
+|------------------------|--------------|---------------|---------------|------------|
+| Database breach        | ✅ Protected | ✅ Protected  | ✅ Protected  | AES-256 encryption |
+| Server compromise      | ✅ No DEK    | ⚠️ Partial DEK | ✅ No DEK     | Split-key/transient |
+| Network eavesdropping  | ✅ TLS       | ✅ TLS        | ✅ TLS        | HTTPS enforced |
+| XSS attack             | ⚠️ Session    | ✅ Split-key  | ❌ Full DEK   | CSP headers |
+| Device theft           | ✅ Session   | ✅ Session    | ❌ Persistent | Storage choice |
+| CSRF attack            | ✅ Protected | ✅ Protected  | ✅ Protected  | Token validation |
+| Session hijacking      | ✅ Limited   | ✅ Limited    | ⚠️ Extended    | Timeout/rotation |
+| Role escalation        | ✅ Protected | ✅ Protected  | ✅ Protected  | Disallowed on backend and database |
 
 ### Security Headers
 
