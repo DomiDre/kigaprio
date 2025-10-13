@@ -1,20 +1,13 @@
 import base64
 import json
-from datetime import datetime
-from io import BytesIO
-from typing import Any, cast
+from typing import Any
 
 import httpx
-import pandas as pd
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pandas.core.generic import WriteExcelBuffer
 
 from kigaprio.models.admin import (
-    MonthStatsResponse,
-    ReminderRequest,
-    ReminderResponse,
     UpdateMagicWordRequest,
     UserPriorityRecordForAdmin,
 )
@@ -224,66 +217,6 @@ async def update_magic_word(
     }
 
 
-@router.get("/stats/{month}")
-async def get_month_stats(
-    month: str,  # Format: YYYY-MM
-    admin: dict[str, Any] = Depends(get_current_admin),
-) -> MonthStatsResponse:
-    """Get statistics for a specific month."""
-
-    token = admin["token"]
-    async with httpx.AsyncClient() as client:
-        # Fetch all priority records for the month
-        response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={"filter": f"month='{month}'", "perPage": 500},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Daten")
-
-        data = response.json()
-        records = data.get("items", [])
-
-        # Calculate statistics (same logic as before)
-        unique_users = set()
-        weekly_stats = {}
-        completed_weeks = 0
-        pending_weeks = 0
-
-        for record in records:
-            unique_users.add(record["userId"])
-            week_num = record["weekNumber"]
-
-            if week_num not in weekly_stats:
-                weekly_stats[week_num] = {"completed": 0, "total": 0}
-
-            weekly_stats[week_num]["total"] += 1
-
-            priorities = record.get("priorities", {})
-            valid_priorities = [p for p in priorities.values() if p is not None]
-
-            if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
-                weekly_stats[week_num]["completed"] += 1
-                completed_weeks += 1
-            else:
-                pending_weeks += 1
-
-        weekly_completion = [
-            {"week": week, "completed": stats["completed"], "total": stats["total"]}
-            for week, stats in sorted(weekly_stats.items())
-        ]
-
-        return MonthStatsResponse(
-            totalSubmissions=len(records),
-            completedWeeks=completed_weeks,
-            pendingWeeks=pending_weeks,
-            uniqueUsers=len(unique_users),
-            weeklyCompletion=weekly_completion,
-        )
-
-
 @router.get("/users/{month}")
 async def get_user_submissions(
     month: str,
@@ -359,173 +292,6 @@ async def get_user_submissions(
             )
 
         return user_submissions
-
-
-@router.get("/export/{month}")
-async def export_month_data(
-    month: str,
-    admin: dict[str, Any] = Depends(get_current_admin),
-):
-    """Export all priority data for a month as Excel file."""
-
-    token = admin["token"]
-    async with httpx.AsyncClient() as client:
-        # Fetch all data with expanded user information
-        response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={"filter": f"month='{month}'", "expand": "userId", "perPage": 500},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Daten")
-
-        data = response.json()
-        records = data.get("items", [])
-
-        # Prepare data for Excel
-        rows = []
-        for record in records:
-            user = record.get("expand", {}).get("userId", {})
-            priorities = record.get("priorities", {})
-
-            row = {
-                "Benutzer": user.get("name", "Unknown"),
-                "E-Mail": user.get("email", ""),
-                "Woche": record.get("weekNumber", ""),
-                "Start": record.get("startDate", ""),
-                "Ende": record.get("endDate", ""),
-                "Montag": priorities.get("monday"),
-                "Dienstag": priorities.get("tuesday"),
-                "Mittwoch": priorities.get("wednesday"),
-                "Donnerstag": priorities.get("thursday"),
-                "Freitag": priorities.get("friday"),
-                "Status": "Vollständig"
-                if all(priorities.values())
-                else "Unvollständig",
-                "Zuletzt aktualisiert": record.get("updated", record.get("created")),
-            }
-            rows.append(row)
-
-        # Create Excel file
-        df = pd.DataFrame(rows)
-
-        buffer = BytesIO()
-        with pd.ExcelWriter(
-            cast(WriteExcelBuffer, buffer), engine="openpyxl"
-        ) as writer:
-            df.to_excel(writer, sheet_name=f"Prioritäten {month}", index=False)
-
-            # Add summary sheet
-            summary_df = pd.DataFrame(
-                [
-                    {"Metrik": "Gesamteinträge", "Wert": len(records)},
-                    {
-                        "Metrik": "Eindeutige Benutzer",
-                        "Wert": df["Benutzer"].nunique() if not df.empty else 0,
-                    },
-                    {
-                        "Metrik": "Vollständige Wochen",
-                        "Wert": (df["Status"] == "Vollständig").sum()
-                        if not df.empty
-                        else 0,
-                    },
-                    {
-                        "Metrik": "Unvollständige Wochen",
-                        "Wert": (df["Status"] == "Unvollständig").sum()
-                        if not df.empty
-                        else 0,
-                    },
-                ]
-            )
-            summary_df.to_excel(writer, sheet_name="Zusammenfassung", index=False)
-
-        buffer.seek(0)
-
-        return Response(
-            content=buffer.getvalue(),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename=prioritaeten_{month}.xlsx"
-            },
-        )
-
-
-@router.post("/reminders")
-async def send_reminders(
-    request: ReminderRequest,
-    admin: dict[str, Any] = Depends(get_current_admin),
-    redis_client: redis.Redis = Depends(get_redis),
-) -> ReminderResponse:
-    """Send email reminders to selected users."""
-
-    token = admin["token"]
-    results = []
-    sent_count = 0
-    failed_count = 0
-
-    async with httpx.AsyncClient() as client:
-        for user_id in request.userIds:
-            try:
-                # Fetch user details
-                user_response = await client.get(
-                    f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-
-                if user_response.status_code != 200:
-                    results.append(
-                        {
-                            "userId": user_id,
-                            "email": "unknown",
-                            "status": "failed",
-                            "error": "Benutzer nicht gefunden",
-                        }
-                    )
-                    failed_count += 1
-                    continue
-
-                user = user_response.json()
-
-                # Here you would queue the email sending
-                # For now, just log the action
-                results.append(
-                    {"userId": user_id, "email": user["email"], "status": "sent"}
-                )
-                sent_count += 1
-
-            except Exception as e:
-                results.append(
-                    {
-                        "userId": user_id,
-                        "email": "unknown",
-                        "status": "failed",
-                        "error": str(e),
-                    }
-                )
-                failed_count += 1
-
-    # Log admin action
-    log_key = f"admin_log:{admin.get('id')}:{datetime.now().isoformat()}"
-    redis_client.setex(
-        log_key,
-        30 * 24 * 3600,  # Keep logs for 30 days
-        json.dumps(
-            {
-                "action": "send_reminders",
-                "admin_email": admin.get("email"),
-                "timestamp": datetime.now().isoformat(),
-                "details": {
-                    "recipients": len(request.userIds),
-                    "sent": sent_count,
-                    "failed": failed_count,
-                    "month": request.month,
-                },
-            }
-        ),
-    )
-
-    return ReminderResponse(sent=sent_count, failed=failed_count, details=results)
 
 
 @router.get("/users/info/{user_id}")

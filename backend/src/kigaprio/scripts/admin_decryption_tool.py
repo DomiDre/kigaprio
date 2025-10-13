@@ -7,6 +7,7 @@ import argparse
 import base64
 import json
 import os
+import time
 from getpass import getpass
 from pathlib import Path
 from typing import Any
@@ -72,29 +73,36 @@ class AdminDecryptor:
 
         return json.loads(plaintext.decode())
 
-    def fetch_and_decrypt_user(self, user_id: str) -> dict:
+    def fetch_and_decrypt(self, month: str) -> list:
         """
         Complete flow: fetch encrypted data, unwrap DEK, decrypt fields.
         """
         # 1. Fetch encrypted data from server
         response = requests.get(
-            f"{self.api_url}/api/v1/admin/users/info/{user_id}",
+            f"{self.api_url}/api/v1/admin/users/{month}",
             headers={"Authorization": f"Bearer {self.admin_token}"},
         )
         response.raise_for_status()
-        user_data = response.json()
+        encrypted_user_data = response.json()
 
-        # 2. Unwrap DEK using admin's private key
-        dek = self.get_admin_dek(user_data["admin_wrapped_dek"])
+        # 2. Unwrap DEK using admin's private key for all entries
+        collected_data = []
+        for entry in encrypted_user_data:
+            dek = self.get_admin_dek(entry["adminWrappedDek"])
 
-        # 3. Decrypt user fields using DEK
-        decrypted_fields = self.decrypt_fields(user_data["encrypted_fields"], dek)
-
-        return {
-            "username": user_data["username"],
-            "created": user_data.get("created"),
-            **decrypted_fields,  # fullName, etc.
-        }
+            # 3. Decrypt user fields using DEK
+            decrypted_user = self.decrypt_fields(entry["userEncryptedFields"], dek)
+            decrypted_prio = self.decrypt_fields(
+                entry["prioritiesEncryptedFields"], dek
+            )
+            collected_data.append(
+                {
+                    "username": entry["userName"],
+                    "childNames": decrypted_user,
+                    "priorities": decrypted_prio,
+                }
+            )
+        return collected_data
 
 
 def main():
@@ -103,30 +111,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s user123
-  %(prog)s user123 --api-url https://api.example.com
-  %(prog)s user123 --key-path /path/to/key.pem --token mytoken123
-
-Environment Variables:
-  API_URL       Backend API URL (default: http://localhost:8000)
-  ADMIN_TOKEN   Admin JWT authentication token (required if not passed via --token)
+  %(prog)s 2025-10 --key-path /path/to/key.pem
         """,
     )
 
     # Positional arguments
-    parser.add_argument("user_id", help="User ID to decrypt data for")
+    parser.add_argument("month", help="Month to fetch data for")
 
     # Optional arguments
     parser.add_argument(
         "--api-url",
         default=os.getenv("API_URL", "http://localhost:8000"),
         help="Backend API URL (default: %(default)s or $API_URL)",
-    )
-
-    parser.add_argument(
-        "--token",
-        default=os.getenv("ADMIN_TOKEN"),
-        help="Admin JWT token (default: $ADMIN_TOKEN)",
     )
 
     parser.add_argument(
@@ -141,29 +137,38 @@ Environment Variables:
 
     args = parser.parse_args()
 
-    # Validate required arguments
-    if not args.token:
-        parser.error(
-            "ADMIN_TOKEN is required. Set via --token or $ADMIN_TOKEN environment variable"
-        )
+    username = input("Enter username: ")
+    password = getpass("Enter password: ")
+    response = requests.post(
+        f"{args.api_url}/api/v1/login",
+        json={"identity": username, "password": password},
+    )
+    if response.status_code != 200:
+        print("Failed to login")
+        return 1
+    login_body = response.json()
 
+    assert "Administrator" in login_body.get("message"), "Not logged in as admin"
+    token = login_body["token"]
     if args.verbose:
         print(f"API URL: {args.api_url}")
         print(f"Key path: {args.key_path}")
-        print(f"User ID: {args.user_id}")
+        print(f"Month: {args.month}")
         print()
 
     try:
         decryptor = AdminDecryptor(
             private_key_path=args.key_path,
             api_url=args.api_url,
-            admin_token=args.token,
+            admin_token=token,
         )
 
         if args.verbose:
-            print(f"Fetching and decrypting user {args.user_id}...")
+            print(f"Fetching and decrypting user {args.month}...")
 
-        decrypted_data = decryptor.fetch_and_decrypt_user(args.user_id)
+        t0 = time.time()
+        decrypted_data = decryptor.fetch_and_decrypt(args.month)
+        print(time.time() - t0)
 
         print("\n✓ Decrypted user data:")
         print(json.dumps(decrypted_data, indent=2))
