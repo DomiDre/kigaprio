@@ -239,6 +239,11 @@ async def login_user(
 
             auth_data = DatabaseLoginResponse(**response.json())
 
+            if auth_data.record.role == "service":
+                raise HTTPException(
+                    status_code=403, detail="Login als Service Account verboten"
+                )
+
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
             redis_client.delete(identity_rate_limit_key)
