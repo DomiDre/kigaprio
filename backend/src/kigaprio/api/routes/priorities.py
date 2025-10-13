@@ -1,6 +1,6 @@
 import httpx
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from kigaprio.models.auth import DEKData, TokenVerificationData
 from kigaprio.models.pocketbase_schemas import PriorityRecord
@@ -19,7 +19,6 @@ router = APIRouter()
 
 @router.get("", response_model=list[PriorityResponse])
 async def get_user_priorities(
-    month: str | None = Query(None, description="Filter by month (YYYY-MM)"),
     auth_data: TokenVerificationData = Depends(verify_token),
     dek_data: DEKData = Depends(get_dek_from_request),
 ):
@@ -28,19 +27,13 @@ async def get_user_priorities(
     user_id = auth_data.user.id
     token = auth_data.token
 
-    # Build filter
-    filter_parts = [f'userId = "{user_id}"']
-    if month:
-        filter_parts.append(f'month = "{month}"')
-    filter_str = " && ".join(filter_parts)
-
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": filter_str,
+                    "filter": f'userId = "{user_id}"',
                     "sort": "-month",
                     "perPage": 100,  # Get all records
                 },
@@ -68,12 +61,8 @@ async def get_user_priorities(
 
                 decrypted_items.append(
                     PriorityResponse(
-                        id=encrypted_record.id,
-                        userId=encrypted_record.userId,
                         month=encrypted_record.month,
                         weeks=decrypted_weeks["weeks"],
-                        created=encrypted_record.created,
-                        updated=encrypted_record.updated,
                     )
                 )
 
@@ -86,9 +75,9 @@ async def get_user_priorities(
         ) from e
 
 
-@router.get("/{priority_id}", response_model=PriorityResponse)
+@router.get("/{month}", response_model=PriorityResponse)
 async def get_priority(
-    priority_id: str,
+    month: str,
     auth_data: TokenVerificationData = Depends(verify_token),
     dek_data: DEKData = Depends(get_dek_from_request),
 ):
@@ -100,8 +89,11 @@ async def get_priority(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+                f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                },
             )
 
             if response.status_code == 404:
@@ -116,7 +108,13 @@ async def get_priority(
                     detail="Fehler beim Abrufen der Priorität",
                 )
 
-            encrypted_record = PriorityRecord(**response.json())
+            items = response.json()["items"]
+            if len(items) == 0:
+                raise HTTPException(
+                    status_code=400, detail="Priorität gefunden aber leer"
+                )
+
+            encrypted_record = PriorityRecord(**items[0])
 
             # Verify ownership
             if encrypted_record.userId != user_id:
@@ -132,12 +130,8 @@ async def get_priority(
             )
 
             return PriorityResponse(
-                id=encrypted_record.id,
-                userId=encrypted_record.userId,
                 month=encrypted_record.month,
                 weeks=decrypted_weeks["weeks"],
-                created=encrypted_record.created,
-                updated=encrypted_record.updated,
             )
 
     except httpx.RequestError as e:
@@ -237,9 +231,9 @@ async def save_priority(
         redis_client.delete(rate_limit_key)
 
 
-@router.delete("/{priority_id}")
+@router.delete("/{month}")
 async def delete_priority(
-    priority_id: str,
+    month: str,
     auth_data: TokenVerificationData = Depends(verify_token),
 ):
     """Delete a priority record."""
@@ -249,10 +243,13 @@ async def delete_priority(
 
     try:
         async with httpx.AsyncClient() as client:
-            # Verify ownership
+            # Find record in database
             check_response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+                f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                },
             )
 
             if check_response.status_code == 404:
@@ -269,9 +266,17 @@ async def delete_priority(
                         detail="Keine Berechtigung für diese Priorität",
                     )
 
+            items = check_response.json()["items"]
+            if len(items) == 0:
+                raise HTTPException(
+                    status_code=400, detail="Priorität gefunden aber leer"
+                )
+
+            record_id = items[0]["id"]
+
             # Delete the record
             response = await client.delete(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+                f"{POCKETBASE_URL}/api/collections/priorities/records/{record_id}",
                 headers={"Authorization": f"Bearer {token}"},
             )
 

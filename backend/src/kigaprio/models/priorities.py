@@ -14,15 +14,6 @@ class WeekPriority(BaseModel):
     friday: int | None = Field(ge=1, le=5, default=None)
 
 
-class PriorityRecordCore(BaseModel):
-    month: str
-    weeks: list[WeekPriority]
-
-
 class PriorityResponse(BaseModel):
-    id: str
-    userId: str
     month: str
     weeks: list[WeekPriority]
-    created: str
-    updated: str
