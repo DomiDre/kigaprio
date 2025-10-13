@@ -109,21 +109,6 @@ export class ApiService {
 		authStore.clearAuth();
 	}
 
-	async refreshToken() {
-		const token = authStore.getToken();
-		if (!token) {
-			throw new Error('Kein Token verfügbar');
-		}
-
-		const response = await this.requestJson('/refresh', {
-			method: 'POST',
-			body: JSON.stringify({ token })
-		});
-
-		authStore.setAuth(response.token);
-		return response;
-	}
-
 	async verifyMagicWord(magicWord: string) {
 		return this.requestJson('/verify-magic-word', {
 			method: 'POST',
