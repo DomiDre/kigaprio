@@ -7,6 +7,7 @@ from kigaprio.models.pocketbase_schemas import PriorityRecord
 from kigaprio.models.priorities import (
     PriorityResponse,
     WeekPriority,
+    validate_month_format_and_range,
 )
 from kigaprio.models.request import SuccessResponse
 from kigaprio.services.encryption import EncryptionManager
@@ -153,6 +154,12 @@ async def save_priority(
 
     user_id = auth_data.user.id
     token = auth_data.token
+
+    # Validate month
+    try:
+        validate_month_format_and_range(month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     # Check for duplicate month
     rate_limit_key = f"priority_check:{user_id}:{month}"
