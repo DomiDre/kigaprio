@@ -265,21 +265,26 @@ async def delete_priority(
                     detail="Priorität nicht gefunden",
                 )
 
-            if check_response.status_code == 200:
-                existing_data = check_response.json()
-                if existing_data["userId"] != user_id:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Keine Berechtigung für diese Priorität",
-                    )
+            if check_response.status_code != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Fehler bei dem Versuch die Priorität zu löschen.",
+                )
 
+            existing_data = check_response.json()
             items = check_response.json()["items"]
             if len(items) == 0:
                 raise HTTPException(
                     status_code=400, detail="Priorität gefunden aber leer"
                 )
+            record = items[0]
+            if record["userId"] != user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Keine Berechtigung für diese Priorität",
+                )
 
-            record_id = items[0]["id"]
+            record_id = record["id"]
 
             # Delete the record
             response = await client.delete(

@@ -35,7 +35,7 @@ class DatabaseLoginResponse(BaseModel):
 class LoginRequest(BaseModel):
     identity: str = Field(..., min_length=1, description="Username")
     password: str = Field(..., min_length=1)
-    security_tier: Literal["high", "balanced", "convenience"] | None = None
+    security_tier: Literal["balanced", "high", "convenience"] | None = None
 
 
 class LoginResponse(BaseModel):
