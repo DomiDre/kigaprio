@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { authStore } from '$lib/stores/auth';
+	import { authStore, isAuthenticated } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
+	import { isSessionValid } from '$lib/utils/sessionUtils';
+	import ReAuthModal from '$lib/components/ReAuthModal.svelte';
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
+
+	let showReAuthModal = $state(false);
 
 	// Global session observer
 	onMount(() => {
@@ -43,13 +47,29 @@
 			return response;
 		};
 
+		// Session validity checker for balanced mode
+		const checkSession = () => {
+			if ($isAuthenticated && !isSessionValid()) {
+				// Session expired, show re-auth modal
+				showReAuthModal = true;
+			}
+		};
+
+		// Check session every 30 seconds
+		const sessionCheckInterval = setInterval(checkSession, 30000);
+
 		window.addEventListener('storage', handleStorageChange);
 
 		return () => {
 			window.removeEventListener('storage', handleStorageChange);
 			window.fetch = originalFetch;
+			clearInterval(sessionCheckInterval);
 		};
 	});
+
+	function handleReAuthSuccess() {
+		showReAuthModal = false;
+	}
 </script>
 
 <svelte:head>
@@ -57,3 +77,7 @@
 </svelte:head>
 
 {@render children?.()}
+
+<!-- Re-Authentication Modal -->
+<ReAuthModal isOpen={showReAuthModal} onClose={handleReAuthSuccess} />
+

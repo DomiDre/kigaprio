@@ -1,17 +1,17 @@
 <script lang="ts">
-	import type { WeekData, Priority, DayPriorities } from '$lib/types/priorities';
-	import { dayNames } from '$lib/config/priorities';
+	import type { WeekData, Priority, DayName } from '$lib/types/priorities';
+	import { dayNames, dayKeys } from '$lib/config/priorities';
 	import { scale } from 'svelte/transition';
 	import { isWeekComplete } from '$lib/utils/dateHelpers';
+
 	type Props = {
 		week: WeekData;
 		weekIndex: number;
-		selectPriority: (weekIndex: number, day: keyof DayPriorities, priority: Priority) => void;
+		selectPriority: (weekIndex: number, day: DayName, priority: Priority) => void;
 		saveWeek: (weekIndex: number) => Promise<void>;
 		getDayDates: (weekData: WeekData) => string[];
 	};
 
-	// Destructure with defaults as needed
 	let { week, weekIndex, selectPriority, saveWeek, getDayDates }: Props = $props();
 
 	let saving = $state(false);
@@ -20,26 +20,20 @@
 
 	let weekCompleted = $derived(isWeekComplete(week));
 
-	async function handlePrioritySelect(dayKey: string, priority: Priority) {
+	async function handlePrioritySelect(dayKey: DayName, priority: Priority) {
 		if (saving) return;
 
-		const oldPriority = week.priorities[dayKey as keyof DayPriorities];
+		const oldPriority = week[dayKey];
 
 		// Check if this priority is already used elsewhere
-		const dayUsingPriority = Object.entries(week.priorities).find(
-			([day, p]) => day !== dayKey && p === priority
-		);
+		const dayUsingPriority = dayKeys.find((day) => day !== dayKey && week[day] === priority);
 
 		// Update the priority for the selected day
-		selectPriority(weekIndex, dayKey as keyof DayPriorities, priority);
+		selectPriority(weekIndex, dayKey, priority);
 
 		// If this priority was used elsewhere, swap the priorities
-		if (dayUsingPriority) {
-			const [otherDay] = dayUsingPriority;
-			// Give the other day the old priority of the current day (swap)
-			if (oldPriority) {
-				selectPriority(weekIndex, otherDay as keyof DayPriorities, oldPriority);
-			}
+		if (dayUsingPriority && oldPriority) {
+			selectPriority(weekIndex, dayUsingPriority, oldPriority);
 		}
 
 		// Auto-save with debouncing
@@ -85,7 +79,7 @@
 	}
 
 	function getCompletedDaysCount() {
-		return Object.values(week.priorities).filter((p) => p !== null && p !== undefined).length;
+		return dayKeys.filter((day) => week[day] !== null && week[day] !== undefined).length;
 	}
 </script>
 
@@ -156,7 +150,7 @@
 				{weekCompleted
 					? '✓ Fertig'
 					: getCompletedDaysCount() > 0
-						? `${getCompletedDaysCount()}/${Object.keys(week.priorities).length}`
+						? `${getCompletedDaysCount()}/5`
 						: 'Offen'}
 			</span>
 		</div>
@@ -168,7 +162,7 @@
 			<div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 				<div
 					class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-300"
-					style="width: {(getCompletedDaysCount() / Object.keys(week.priorities).length) * 100}%"
+					style="width: {(getCompletedDaysCount() / 5) * 100}%"
 				></div>
 			</div>
 		</div>
@@ -182,12 +176,13 @@
 
 	<!-- Days List -->
 	<div class="space-y-3">
-		{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex (dayKey)}
+		{#each dayKeys as dayKey, dayIndex (dayKey)}
 			{@const dayDates = getDayDates(week)}
 			{@const monthName = new Date(
 				week.startDate.split('.').reverse().join('-')
 			).toLocaleDateString('de-DE', { month: 'short' })}
-			{@const currentPriority = week.priorities[dayKey as keyof DayPriorities]}
+			{@const currentPriority = week[dayKey]}
+			{@const dayName = dayNames[dayKey]}
 
 			<div
 				class="rounded-lg p-3 transition-all
@@ -216,11 +211,11 @@
 						{@const typedPriority = priority as Priority}
 						{@const isSelected = currentPriority === priority}
 						{@const isUsedElsewhere =
-							!isSelected && Object.values(week.priorities).includes(typedPriority)}
+							!isSelected && dayKeys.some((day) => day !== dayKey && week[day] === typedPriority)}
 						{@const usedByDay = isUsedElsewhere
-							? Object.entries(week.priorities).find(([, p]) => p === priority)?.[0]
+							? dayKeys.find((day) => week[day] === priority)
 							: null}
-						{@const usedByDayName = usedByDay ? dayNames[usedByDay as keyof typeof dayNames] : null}
+						{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
 
 						<button
 							class="relative h-10 w-10 transform rounded-full text-sm font-bold shadow transition-all
@@ -248,3 +243,4 @@
 		{/each}
 	</div>
 </div>
+

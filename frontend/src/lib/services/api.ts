@@ -1,7 +1,7 @@
 import { authStore, type SecurityTier } from '$lib/stores/auth';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
-import type { WeekData } from '$lib/types/priorities';
+import type { PriorityResponse, WeekData } from '$lib/types/priorities';
 
 export class ApiService {
 	public baseUrl: string;
@@ -197,7 +197,7 @@ export class ApiService {
 
 	// ==================== Priorities ====================
 
-	async getPriorities(month?: string) {
+	async getPriorities(month?: string): Promise<PriorityResponse> {
 		const dek = this.getDEKForRequest();
 		if (!dek) {
 			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
@@ -213,7 +213,7 @@ export class ApiService {
 
 	async updatePriority(
 		month: string,
-		priorityData: Array<WeekData>) {
+		priorityData: WeekData[]) {
 		const dek = this.getDEKForRequest();
 		if (!dek) {
 			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
