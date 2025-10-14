@@ -1,19 +1,10 @@
 export type Priority = 1 | 2 | 3 | 4 | 5 | null;
 
-export type DayPriorities = {
+export type WeekData = {
+	weekNumber: number;
 	monday: Priority;
 	tuesday: Priority;
 	wednesday: Priority;
 	thursday: Priority;
 	friday: Priority;
-};
-
-export type WeekData = {
-	weekNumber: number;
-	startDate: string;
-	endDate: string;
-	priorities: DayPriorities;
-	status: 'completed' | 'pending' | 'empty';
-	userId?: string;
-	id?: string;
 };

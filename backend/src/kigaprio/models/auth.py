@@ -23,6 +23,7 @@ class RegisterRequest(BaseModel):
     passwordConfirm: str
     name: str = Field(..., min_length=1)
     registration_token: str
+    security_tier: Literal["balanced", "high", "convenience"] = "balanced"
 
 
 class DatabaseLoginResponse(BaseModel):

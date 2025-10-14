@@ -32,6 +32,7 @@ services:
       - admin_public_key
       - pb_service_id
       - pb_service_password
+      - server_cache_key
 
   frontend:
     build:
@@ -102,4 +103,6 @@ secrets:
     file: ./.secrets/pb_service_id
   pb_service_password:
     file: ./.secrets/pb_service_password
+  server_cache_key:
+    file: ./.secrets/server_cache_key
   

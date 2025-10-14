@@ -63,7 +63,7 @@ app.add_middleware(TokenRefreshMiddleware)
 # API routes
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(priorities.router, prefix="/api/v1/priorities", tags=["Prioliste"])
-app.include_router(auth.router, prefix="/api/v1", tags=["Pocketbase"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Pocketbase"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 # Serve static files (compiled Svelte frontend)

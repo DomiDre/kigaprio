@@ -145,7 +145,7 @@ async def register_user(
                     "user_wrapped_dek": encryption_data["user_wrapped_dek"],
                     "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
                     "encrypted_fields": encrypted_fields,
-                    "security_tier": "balanced",
+                    "security_tier": request.security_tier,
                 },
             )
 
@@ -283,6 +283,7 @@ async def login_user(
                     encrypted_server_part = EncryptionManager.encrypt_dek_part(
                         server_part
                     )
+                    print(encrypted_server_part)
 
                     # Store encrypted server part in Redis with 30-minute TTL
                     dek_cache_key = f"dek:{user_record.id}:{token}"
@@ -390,3 +391,10 @@ async def logout_user(
     redis_client.delete(session_key)
 
     return {"success": True, "message": "Erfolgreich abgemeldet"}
+
+
+@router.post("/change-password")
+async def change_password(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    return {"message": "Not implemented yet"}

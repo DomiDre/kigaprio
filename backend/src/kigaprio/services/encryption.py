@@ -35,7 +35,7 @@ class EncryptionManager:
             # Try to load from environment or secrets
             cache_key_path = Path("/run/secrets/server_cache_key")
             if cache_key_path.exists():
-                cls._SERVER_CACHE_KEY = cache_key_path.read_bytes()
+                cls._SERVER_CACHE_KEY = cache_key_path.read_bytes().strip()
             else:
                 # Fallback: generate ephemeral key (lost on restart - acceptable for cache)
                 cls._SERVER_CACHE_KEY = AESGCM.generate_key(bit_length=256)

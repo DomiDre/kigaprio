@@ -118,9 +118,8 @@ async def get_priority(
 
             items = response.json()["items"]
             if len(items) == 0:
-                raise HTTPException(
-                    status_code=400, detail="Priorität gefunden aber leer"
-                )
+                # no records found
+                return PriorityResponse(month=month, weeks=[])
 
             encrypted_record = PriorityRecord(**items[0])
 

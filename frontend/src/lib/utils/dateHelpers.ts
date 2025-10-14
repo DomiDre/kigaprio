@@ -100,6 +100,25 @@ export function parseMonthString(monthStr: string): { year: number; month: numbe
 	};
 }
 
+/**
+ * Converts display format "Oktober 2025" to API format "2025-10"
+ */
+export function formatMonthForAPI(displayMonth: string): string {
+	const { year, month } = parseMonthString(displayMonth);
+	// month is 0-indexed (0 = January), so we add 1 for the API format
+	const monthStr = (month + 1).toString().padStart(2, '0');
+	return `${year}-${monthStr}`;
+}
+
+/**
+ * Converts API format "2025-10" to display format "Oktober 2025"
+ */
+export function formatMonthForDisplay(apiMonth: string): string {
+	const [year, monthStr] = apiMonth.split('-');
+	const monthIndex = parseInt(monthStr) - 1; // Convert to 0-indexed
+	return `${monthNames[monthIndex]} ${year}`;
+}
+
 export function getDayDates(weekData: WeekData): string[] {
 	const [day, month, year] = weekData.startDate.split('.');
 	const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
