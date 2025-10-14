@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
+	import SecurityTierSelector from '$lib/components/SecurityTierSelector.svelte';
+	import type { SecurityTier } from '$lib/stores/auth';
 
 	let username = $state('');
 	let password = $state('');
@@ -13,6 +15,8 @@
 	let loading = $state(false);
 	let registrationToken = $state('');
 	let magicWordVerified = $state(false);
+	let selectedTier: SecurityTier = $state('balanced');
+	let showTierSelector = $state(false);
 
 	$effect(() => {
 		if ($isAuthenticated) {
@@ -26,7 +30,7 @@
 		loading = true;
 
 		try {
-			const response = await fetch(`${apiService.baseUrl}/verify-magic-word`, {
+			const response = await fetch(`${apiService.baseUrl}/auth/verify-magic-word`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -69,24 +73,14 @@
 		}
 
 		try {
-			const response = await fetch(`${apiService.baseUrl}/register`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					identity: username,
-					password,
-					passwordConfirm: password,
-					name: fullName,
-					registration_token: registrationToken
-				})
+			await apiService.register({
+				identity: username,
+				password,
+				passwordConfirm: password,
+				name: fullName,
+				registration_token: registrationToken,
+				security_tier: selectedTier
 			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.detail || 'Registration failed');
-			}
 			goto('/');
 		} catch (err) {
 			error = (err as Error).message;
@@ -110,6 +104,16 @@
 		registrationToken = '';
 		magicWord = '';
 		error = '';
+	}
+
+	function handleTierChange(tier: SecurityTier) {
+		selectedTier = tier;
+	}
+
+	function getTierLabel(tier: SecurityTier): string {
+		if (tier === 'high') return 'Hoch';
+		if (tier === 'convenience') return 'Bequem';
+		return 'Standard';
 	}
 </script>
 
@@ -280,6 +284,24 @@
 						</div>
 					{/if}
 
+					<!-- Security Tier - Compact -->
+					<div class="border-t border-gray-200 pt-4 dark:border-gray-700">
+						<button
+							type="button"
+							onclick={() => (showTierSelector = !showTierSelector)}
+							class="flex w-full items-center justify-between text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+						>
+							<span>Sicherheit: {getTierLabel(selectedTier)}</span>
+							<span class="text-xs">{showTierSelector ? '▲' : '▼'}</span>
+						</button>
+
+						{#if showTierSelector}
+							<div class="mt-3">
+								<SecurityTierSelector {selectedTier} onChange={handleTierChange} />
+							</div>
+						{/if}
+					</div>
+
 					<button
 						type="submit"
 						disabled={loading}
@@ -316,3 +338,4 @@
 		</div>
 	</div>
 </div>
+
