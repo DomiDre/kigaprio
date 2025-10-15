@@ -72,7 +72,7 @@
 
 		try {
 			const accountInfo = await apiService.getAccountInfo();
-			username = accountInfo.username;
+			username = accountInfo.username || '';
 			accountCreated = accountInfo.createdAt
 				? new Date(accountInfo.createdAt).toLocaleDateString('de-DE')
 				: '';
@@ -351,27 +351,21 @@
 				</h2>
 				<div class="grid gap-4 md:grid-cols-2">
 					<div>
-						<label class="text-sm font-medium text-gray-600 dark:text-gray-400">Username</label>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">Username</div>
 						<p class="mt-1 text-gray-800 dark:text-gray-200">{username || 'Nicht verfügbar'}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium text-gray-600 dark:text-gray-400"
-							>Account erstellt</label
-						>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">Account erstellt</div>
 						<p class="mt-1 text-gray-800 dark:text-gray-200">
 							{accountCreated || 'Nicht verfügbar'}
 						</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium text-gray-600 dark:text-gray-400"
-							>Letzte Anmeldung</label
-						>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">Letzte Anmeldung</div>
 						<p class="mt-1 text-gray-800 dark:text-gray-200">{lastLogin || 'Nicht verfügbar'}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium text-gray-600 dark:text-gray-400"
-							>Account-Status</label
-						>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">Account-Status</div>
 						<p class="mt-1">
 							<span
 								class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
@@ -488,7 +482,7 @@
 					</div>
 
 					<button
-						on:click={changePassword}
+						onclick={changePassword}
 						disabled={changingPassword}
 						class="w-full rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50 md:w-auto"
 					>
@@ -509,7 +503,7 @@
 
 				<div class="flex flex-wrap gap-3">
 					<button
-						on:click={requestUserData}
+						onclick={requestUserData}
 						disabled={loadingUserData}
 						class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
 					>
@@ -537,7 +531,7 @@
 					</button>
 
 					<button
-						on:click={exportUserData}
+						onclick={exportUserData}
 						class="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
 					>
 						<svg
@@ -568,7 +562,7 @@
 					Das Löschen Ihres Accounts ist unwiderruflich. Alle Ihre Daten werden permanent gelöscht.
 				</p>
 				<button
-					on:click={() => (showDeleteModal = true)}
+					onclick={() => (showDeleteModal = true)}
 					class="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
 				>
 					<svg
@@ -601,7 +595,8 @@
 							Ihre gespeicherten Daten
 						</h3>
 						<button
-							on:click={() => (showDataModal = false)}
+							onclick={() => (showDataModal = false)}
+							aria-label="Schließen"
 							class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
 						>
 							<svg
@@ -639,13 +634,13 @@
 
 					<div class="mt-4 flex justify-end gap-3">
 						<button
-							on:click={exportUserData}
+							onclick={exportUserData}
 							class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
 						>
 							Als JSON exportieren
 						</button>
 						<button
-							on:click={() => (showDataModal = false)}
+							onclick={() => (showDataModal = false)}
 							class="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
 						>
 							Schließen
@@ -700,7 +695,7 @@
 
 					<div class="flex gap-3">
 						<button
-							on:click={deleteAccount}
+							onclick={deleteAccount}
 							disabled={deletionInProgress || deleteConfirmation !== 'LÖSCHEN'}
 							class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
 						>
@@ -711,7 +706,7 @@
 							{/if}
 						</button>
 						<button
-							on:click={() => {
+							onclick={() => {
 								showDeleteModal = false;
 								deleteConfirmation = '';
 							}}
