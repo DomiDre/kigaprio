@@ -43,13 +43,11 @@ export function getWeeksForMonth(year: number, month: number): WeekData[] {
 				weekNumber,
 				startDate: formatDate(startDate),
 				endDate: formatDate(endDate),
-				priorities: {
-					monday: null,
-					tuesday: null,
-					wednesday: null,
-					thursday: null,
-					friday: null
-				},
+				monday: null,
+				tuesday: null,
+				wednesday: null,
+				thursday: null,
+				friday: null,
 				status: 'pending'
 			});
 
@@ -100,7 +98,29 @@ export function parseMonthString(monthStr: string): { year: number; month: numbe
 	};
 }
 
+/**
+ * Converts display format "Oktober 2025" to API format "2025-10"
+ */
+export function formatMonthForAPI(displayMonth: string): string {
+	const { year, month } = parseMonthString(displayMonth);
+	// month is 0-indexed (0 = January), so we add 1 for the API format
+	const monthStr = (month + 1).toString().padStart(2, '0');
+	return `${year}-${monthStr}`;
+}
+
+/**
+ * Converts API format "2025-10" to display format "Oktober 2025"
+ */
+export function formatMonthForDisplay(apiMonth: string): string {
+	const [year, monthStr] = apiMonth.split('-');
+	const monthIndex = parseInt(monthStr) - 1; // Convert to 0-indexed
+	return `${monthNames[monthIndex]} ${year}`;
+}
+
 export function getDayDates(weekData: WeekData): string[] {
+	if (!weekData.startDate) {
+		throw new Error('Tried to get day dates for a week where the start date was not set yet');
+	}
 	const [day, month, year] = weekData.startDate.split('.');
 	const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 
@@ -111,23 +131,22 @@ export function getDayDates(weekData: WeekData): string[] {
 	});
 }
 
+/**
+ * Checks if a week is complete (all 5 days have unique priorities 1-5)
+ */
 export function isWeekComplete(week: WeekData): boolean {
-	const totalDaysInWeek = Object.keys(week.priorities).length;
-	const validPriorities = Object.values(week.priorities).filter(
-		(p) => p !== null && p !== undefined
-	);
+	// Only check the 5 weekday priorities, not other properties
+	const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+	const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
 
-	return (
-		totalDaysInWeek > 0 &&
-		validPriorities.length === totalDaysInWeek &&
-		new Set(validPriorities).size === totalDaysInWeek
-	);
+	// Must have all 5 days filled with unique values
+	return validPriorities.length === 5 && new Set(validPriorities).size === 5;
 }
 
 export function getWeekStatus(week: WeekData): 'completed' | 'pending' | 'empty' {
-	const validCount = Object.values(week.priorities).filter(
-		(p) => p !== null && p !== undefined
-	).length;
+	// Only check the 5 weekday priorities
+	const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+	const validCount = priorities.filter((p) => p !== null && p !== undefined).length;
 
 	if (isWeekComplete(week)) {
 		return 'completed';

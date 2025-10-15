@@ -1,47 +1,33 @@
 <script lang="ts">
-	import type { WeekData, Priority, DayPriorities } from '$lib/types/priorities';
-	import { dayNames } from '$lib/config/priorities';
+	import type { WeekData, Priority, DayName } from '$lib/types/priorities';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { isWeekComplete } from '$lib/utils/dateHelpers';
+	import { dayKeys, dayNames } from '$lib/config/priorities';
 
 	type Props = {
 		editingWeek: WeekData;
 		activeWeekIndex: number;
 		closeEditModal: () => void;
 		saveWeek: (weekIndex: number) => Promise<void>;
-		weeks: WeekData[];
 		getDayDates: (weekData: WeekData) => string[];
+		onWeekChange: (dayKey: DayName, priority: Priority) => void;
 	};
-	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, weeks, getDayDates }: Props =
+	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, getDayDates, onWeekChange }: Props =
 		$props();
 
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
 	let pendingSavePromise: Promise<void> | null = null;
 
-	async function selectEditPriority(dayKey: string, priority: Priority) {
-		if (!editingWeek) return; // Remove the saving check
+	// Helper function to check if week is complete
+	function isWeekComplete(week: WeekData): boolean {
+		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
+		return validPriorities.length === 5 && new Set(validPriorities).size === 5;
+	}
 
-		// Optimistically update the UI
-		const oldPriority = editingWeek.priorities[dayKey as keyof DayPriorities];
-
-		// Check if this priority is already used elsewhere
-		const dayUsingPriority = Object.entries(editingWeek.priorities).find(
-			([day, p]) => day !== dayKey && p === priority
-		);
-
-		// Set the priority for the selected day
-		editingWeek.priorities[dayKey as keyof DayPriorities] = priority;
-
-		// If this priority was used elsewhere, swap the priorities
-		if (dayUsingPriority) {
-			const [otherDay] = dayUsingPriority;
-			editingWeek.priorities[otherDay as keyof DayPriorities] = oldPriority;
-		}
-
-		// Update the main weeks array
-		weeks[activeWeekIndex] = { ...editingWeek };
+	async function selectEditPriority(dayKey: DayName, priority: Priority) {
+		onWeekChange(dayKey, priority);
 
 		// Auto-save with debouncing
 		autoSave();
@@ -114,6 +100,11 @@
 	function handleStopPropagation(event: Event) {
 		event.stopPropagation();
 	}
+
+	// Count how many days have priorities assigned
+	function getAssignedDaysCount(week: WeekData): number {
+		return dayKeys.filter((day) => week[day] !== null && week[day] !== undefined).length;
+	}
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -146,9 +137,11 @@
 					<h3 class="text-xl font-bold text-gray-800 dark:text-white">
 						Woche {editingWeek.weekNumber} bearbeiten
 					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400">
-						{editingWeek.startDate} - {editingWeek.endDate}
-					</p>
+					{#if editingWeek.startDate && editingWeek.endDate}
+						<p class="text-sm text-gray-500 dark:text-gray-400">
+							{editingWeek.startDate} - {editingWeek.endDate}
+						</p>
+					{/if}
 				</div>
 
 				<!-- Save Status Indicator -->
@@ -244,16 +237,12 @@
 			<div class="mb-4">
 				<div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
 					<span>Fortschritt</span>
-					<span
-						>{Object.values(editingWeek.priorities).filter((p) => p !== null).length} / 5 Tage</span
-					>
+					<span>{getAssignedDaysCount(editingWeek)} / 5 Tage</span>
 				</div>
 				<div class="mt-1 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 					<div
 						class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-300"
-						style="width: {(Object.values(editingWeek.priorities).filter((p) => p !== null).length /
-							5) *
-							100}%"
+						style="width: {(getAssignedDaysCount(editingWeek) / 5) * 100}%"
 					></div>
 				</div>
 			</div>
@@ -261,12 +250,16 @@
 
 		<!-- Days List -->
 		<div class="space-y-3">
-			{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex (dayKey)}
+			{#each dayKeys as dayKey, dayIndex (dayKey)}
 				{@const dayDates = getDayDates(editingWeek)}
-				{@const monthName = new Date(
-					editingWeek.startDate.split('.').reverse().join('-')
-				).toLocaleDateString('de-DE', { month: 'short' })}
-				{@const currentPriority = editingWeek.priorities[dayKey as keyof DayPriorities]}
+				{@const monthName = editingWeek.startDate
+					? new Date(editingWeek.startDate.split('.').reverse().join('-')).toLocaleDateString(
+							'de-DE',
+							{ month: 'short' }
+						)
+					: ''}
+				{@const currentPriority = editingWeek[dayKey]}
+				{@const dayName = dayNames[dayKey]}
 
 				<div
 					class="group rounded-lg border-2 p-4 transition-all
@@ -279,9 +272,11 @@
 							<span class="text-lg font-semibold text-gray-700 dark:text-gray-200">
 								{dayName}
 							</span>
-							<span class="text-sm text-gray-500 dark:text-gray-400">
-								{dayDates[dayIndex]}. {monthName}
-							</span>
+							{#if dayDates && dayDates[dayIndex]}
+								<span class="text-sm text-gray-500 dark:text-gray-400">
+									{dayDates[dayIndex]}. {monthName}
+								</span>
+							{/if}
 						</div>
 						{#if currentPriority}
 							<div
@@ -297,13 +292,12 @@
 							{@const typedPriority = priority as Priority}
 							{@const isSelected = currentPriority === priority}
 							{@const isUsedElsewhere =
-								!isSelected && Object.values(editingWeek.priorities).includes(typedPriority)}
+								!isSelected &&
+								dayKeys.some((day) => day !== dayKey && editingWeek[day] === typedPriority)}
 							{@const usedByDay = isUsedElsewhere
-								? Object.entries(editingWeek.priorities).find(([, p]) => p === priority)?.[0]
+								? dayKeys.find((day) => editingWeek[day] === priority)
 								: null}
-							{@const usedByDayName = usedByDay
-								? dayNames[usedByDay as keyof typeof dayNames]
-								: null}
+							{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
 
 							<button
 								class="relative h-12 w-12 transform rounded-full font-bold shadow-md transition-all duration-200 sm:h-14 sm:w-14

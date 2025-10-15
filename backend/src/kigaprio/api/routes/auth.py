@@ -1,10 +1,12 @@
+import base64
 import json
 import secrets
 from datetime import datetime
+from typing import Any, Literal
 
 import httpx
 import redis
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.models.auth import (
@@ -15,6 +17,7 @@ from kigaprio.models.auth import (
     MagicWordResponse,
     RegisterRequest,
 )
+from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.magic_word import (
     get_magic_word_from_cache_or_db,
 )
@@ -26,53 +29,6 @@ from kigaprio.utils import extract_session_info_from_record, get_client_ip
 
 router = APIRouter()
 security = HTTPBearer()
-
-
-async def get_current_user(
-    authorization: str = Header(None),
-    redis_client: redis.Redis = Depends(get_redis),
-):
-    """Extract user info from token, including admin status"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.replace("Bearer ", "")
-    session_key = f"session:{token}"
-
-    user_data = redis_client.get(session_key)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Session expired or invalid")
-
-    return json.loads(str(user_data))
-
-
-async def require_admin(current_user: dict = Depends(get_current_user)):
-    """Ensure the current user is an admin"""
-    if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return current_user
-
-
-async def try_user_auth(
-    client: httpx.AsyncClient, identity: str, password: str
-) -> DatabaseLoginResponse | None:
-    """
-    Attempt regular user authentication against PocketBase.
-    Returns auth data if successful, None otherwise.
-    """
-    try:
-        response = await client.post(
-            f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
-            json={
-                "identity": identity,
-                "password": password,
-            },
-        )
-        if response.status_code == 200:
-            return DatabaseLoginResponse(**response.json())
-        return None
-    except Exception:
-        return None
 
 
 @router.post("/verify-magic-word")
@@ -163,6 +119,19 @@ async def register_user(
     redis_client.setex(identity_key, 300, "registering")
 
     try:
+        # Create data encryption key
+        encryption_data = EncryptionManager.create_user_encryption_data(
+            request.password
+        )
+        dek = EncryptionManager.get_user_dek(
+            request.password,
+            encryption_data["salt"],
+            encryption_data["user_wrapped_dek"],
+        )
+
+        # encrypt sensitive data
+        encrypted_fields = EncryptionManager.encrypt_fields({"name": request.name}, dek)
+
         # Proxy registration to PocketBase
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -171,8 +140,12 @@ async def register_user(
                     "username": request.identity,
                     "password": request.password,
                     "passwordConfirm": request.passwordConfirm,
-                    "name": request.name,
                     "role": "user",
+                    "salt": encryption_data["salt"],
+                    "user_wrapped_dek": encryption_data["user_wrapped_dek"],
+                    "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
+                    "encrypted_fields": encrypted_fields,
+                    "security_tier": request.security_tier,
                 },
             )
 
@@ -212,10 +185,12 @@ async def login_user(
     req: Request,
     redis_client: redis.Redis = Depends(get_redis),
 ) -> LoginResponse:
-    """Authenticate a user and return auth token from PocketBase.
+    """Authenticate a user and return auth token with DEK based on security tier.
 
-    This endpoint intelligently determines whether the user is likely an admin
-    and authenticates against the appropriate collection.
+    Security tier handling:
+    - High: DEK returned directly to client (sessionStorage only)
+    - Balanced: DEK split into server part (Redis cache) and client part (sessionStorage)
+    - Convenience: DEK returned directly to client (localStorage)
     """
 
     # Rate limiting by IP
@@ -248,38 +223,121 @@ async def login_user(
 
     try:
         async with httpx.AsyncClient() as client:
-            auth_data = None
-
-            auth_data = await try_user_auth(client, request.identity, request.password)
-
-            if not auth_data:
-                # Both authentication attempts failed
+            # Authenticate with PocketBase
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": request.identity,
+                    "password": request.password,
+                },
+            )
+            if response.status_code != 200:
                 raise HTTPException(
                     status_code=401,
                     detail="Ungültige Anmeldedaten",
+                )
+
+            auth_data = DatabaseLoginResponse(**response.json())
+
+            if auth_data.record.role == "service":
+                raise HTTPException(
+                    status_code=403, detail="Login als Service Account verboten"
                 )
 
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
             redis_client.delete(identity_rate_limit_key)
 
-            # Store session
-            session_key = f"session:{auth_data.token}"
-            session_info = extract_session_info_from_record(auth_data.record)
+            # Extract user information
+            user_record = auth_data.record
+            token = auth_data.token
+
+            # Determine security tier (from request or user's stored preference)
+            security_tier: Literal["high", "balanced", "convenience"] = (
+                request.security_tier
+                if hasattr(request, "security_tier") and request.security_tier
+                else user_record.security_tier
+            )
+
+            # Unwrap user's DEK using their password
+            dek = EncryptionManager.get_user_dek(
+                request.password,
+                user_record.salt,
+                user_record.user_wrapped_dek,
+            )
+
+            # Store session info
+            session_key = f"session:{token}"
+            session_info = extract_session_info_from_record(user_record)
             is_admin: bool = session_info.is_admin
 
-            # Different TTL for admin vs regular users
-            ttl = (
-                900 if is_admin else (14 * 24 * 3600)
-            )  # 15 min for admin, 14 days for users
+            # Handle DEK based on security tier
+            dek_data: dict[str, Any] = {}
+
+            match security_tier:
+                case "balanced":
+                    # Split-key system: divide DEK into server and client parts
+                    server_part, client_part = EncryptionManager.split_dek(dek)
+
+                    # Encrypt server part before caching
+                    encrypted_server_part = EncryptionManager.encrypt_dek_part(
+                        server_part
+                    )
+                    print(encrypted_server_part)
+
+                    # Store encrypted server part in Redis with 30-minute TTL
+                    dek_cache_key = f"dek:{user_record.id}:{token}"
+                    dek_cache_data = {
+                        "encrypted_server_part": encrypted_server_part,
+                        "created_at": datetime.now().isoformat(),
+                        "last_accessed": datetime.now().isoformat(),
+                    }
+                    redis_client.setex(
+                        dek_cache_key,
+                        1800,  # 30 minutes
+                        json.dumps(dek_cache_data),
+                    )
+
+                    dek_data = {
+                        "client_key_part": client_part,
+                    }
+
+                    # Session TTL: 8 hours max for balanced mode
+                    session_ttl = 8 * 3600
+
+                case "high":
+                    # High security: full DEK to client, nothing cached on server
+                    dek_data = {
+                        "dek": base64.b64encode(dek).decode("utf-8"),
+                    }
+
+                    # Session TTL: tab lifetime (client manages this)
+                    session_ttl = 8 * 3600  # Max duration for session record, 8h
+
+                case "convenience":
+                    # Convenience: full DEK to client, persistent storage
+                    dek_data = {
+                        "dek": base64.b64encode(dek).decode("utf-8"),
+                    }
+
+                    # Session TTL: until explicit logout
+                    session_ttl = 30 * 24 * 3600  # 30 days
+
+            # Admin sessions always have shorter TTL
+            if is_admin:
+                session_ttl = 900  # 15 minutes for admins
+
+            # Store session metadata
             redis_client.setex(
                 session_key,
-                ttl,
+                session_ttl,
                 session_info.model_dump_json(),
             )
 
             return LoginResponse(
-                token=auth_data.token,
+                token=token,
+                security_tier=security_tier,
+                **dek_data,
                 message="Erfolgreich als Administrator angemeldet"
                 if is_admin
                 else "Erfolgreich angemeldet",
@@ -295,70 +353,6 @@ async def login_user(
         ) from e
 
 
-@router.post("/refresh")
-async def refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    redis_client: redis.Redis = Depends(get_redis),
-):
-    """Refresh an authentication token.
-
-    This endpoint proxies to PocketBase's auth-refresh endpoint.
-    """
-
-    token = credentials.credentials
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/users/auth-refresh",
-                headers={"Authorization": f"Bearer {token}"},
-            )
-
-            if response.status_code != 200:
-                error_data = response.json()
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=error_data.get(
-                        "message", "Token-Aktualisierung fehlgeschlagen"
-                    ),
-                )
-
-            # Parse successful response
-            auth_data = response.json()
-
-            # Update session in Redis with new token
-            old_session_key = f"session:{token}"
-            new_session_key = f"session:{auth_data['token']}"
-
-            # Copy session data to new key if it exists
-            session_data = redis_client.get(old_session_key)
-            user_info = {
-                "id": auth_data["record"]["id"],
-                "email": auth_data["record"]["email"],
-                "name": auth_data["record"]["name"],
-            }
-            if session_data:
-                redis_client.delete(old_session_key)
-
-            redis_client.setex(
-                new_session_key,
-                14 * 24 * 3600,  # 14 days
-                json.dumps(user_info),
-            )
-            return {
-                "token": auth_data["token"],
-                "record": user_info,
-                "message": "Token erfolgreich aktualisiert",
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail="Ein unerwarteter Fehler ist aufgetreten",
-        ) from e
-
-
 @router.post("/logout")
 async def logout_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -366,21 +360,41 @@ async def logout_user(
 ):
     """Logout a user by invalidating their session.
 
-    Note: This only removes the session from Redis cache.
-    The PocketBase token will still be valid until it expires.
-    For complete logout, the client should also delete the token.
+    For balanced security mode, also removes cached DEK parts.
+    Note: The PocketBase token will still be valid until it expires.
+    For complete logout, the client should also delete the token and DEK.
     """
     token = credentials.credentials
     session_key = f"session:{token}"
 
     # Check if session exists
-    if not redis_client.exists(session_key):
+    session_data = redis_client.get(session_key)
+    if not session_data:
         raise HTTPException(
             status_code=404,
             detail="Sitzung nicht gefunden oder bereits abgelaufen",
         )
 
+    # Extract user ID from session to clean up DEK cache
+    try:
+        session_info = json.loads(str(session_data))
+        user_id = session_info.get("id")
+
+        # Remove DEK cache for balanced mode
+        if user_id:
+            dek_cache_key = f"dek:{user_id}:{token}"
+            redis_client.delete(dek_cache_key)
+    except (json.JSONDecodeError, KeyError):
+        pass  # Continue with logout even if cleanup fails
+
     # Delete session from Redis
     redis_client.delete(session_key)
 
     return {"success": True, "message": "Erfolgreich abgemeldet"}
+
+
+@router.post("/change-password")
+async def change_password(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    return {"message": "Not implemented yet"}

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { isAuthenticated } from '$lib/stores/auth';
-	import type { Priority, DayPriorities, WeekData } from '$lib/types/priorities';
+	import { goto } from '$app/navigation';
+	import { isAuthenticated, authStore } from '$lib/stores/auth';
+	import { isDEKAvailable } from '$lib/utils/sessionUtils';
+	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/types/priorities';
 
 	// Import components
 	import Legend from '$lib/components/Legend.svelte';
@@ -18,11 +20,12 @@
 		getWeeksForMonth,
 		getMonthOptions,
 		parseMonthString,
-		getDayDates
+		getDayDates,
+		formatMonthForAPI
 	} from '$lib/utils/dateHelpers';
-	import { validateWeekPriorities } from '$lib/utils/priorityHelpers';
 	import { apiService } from '$lib/services/api';
 	import Loading from '$lib/components/Loading.svelte';
+	import { dayKeys } from '$lib/config/priorities';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -35,26 +38,21 @@
 	let saveError = $state('');
 	let saveSuccess = $state('');
 	let weeks = $state<WeekData[]>([]);
+	let isLoading = $state(true);
+	let dekMissing = $state(false);
 
 	// Helper function to check if a week is complete
 	function isWeekComplete(week: WeekData): boolean {
-		const totalDaysInWeek = Object.keys(week.priorities).length;
-		const validPriorities = Object.values(week.priorities).filter(
-			(p) => p !== null && p !== undefined
-		);
+		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
 
-		return (
-			totalDaysInWeek > 0 &&
-			validPriorities.length === totalDaysInWeek &&
-			new Set(validPriorities).size === totalDaysInWeek
-		);
+		return validPriorities.length === 5 && new Set(validPriorities).size === 5;
 	}
 
 	// Helper function to calculate week status
-	function calculateWeekStatus(week: WeekData): 'completed' | 'pending' | 'empty' {
-		const validCount = Object.values(week.priorities).filter(
-			(p) => p !== null && p !== undefined
-		).length;
+	function calculateWeekStatus(week: WeekData): WeekStatus {
+		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+		const validCount = priorities.filter((p) => p !== null && p !== undefined).length;
 
 		if (isWeekComplete(week)) {
 			return 'completed';
@@ -65,22 +63,46 @@
 		}
 	}
 
-	// Derived state - now using the helper function
+	// Derived state
 	let completedWeeks = $derived(weeks.filter((w) => calculateWeekStatus(w) === 'completed').length);
 	let progressPercentage = $derived(weeks.length > 0 ? (completedWeeks / weeks.length) * 100 : 0);
 
-	// Update weeks when month changes
-	$effect(() => {
-		const { year, month } = parseMonthString(selectedMonth);
-		weeks = getWeeksForMonth(year, month);
-		loadUserData();
-	});
-
-	// Check for mobile on mount
+	// Check authentication and DEK availability on mount
 	onMount(() => {
+		if (!$isAuthenticated) {
+			goto('/login');
+			return;
+		}
+
+		// Check if DEK is available
+		if (!isDEKAvailable()) {
+			dekMissing = true;
+			isLoading = false;
+			// Redirect to login after a short delay
+			setTimeout(() => {
+				authStore.clearAuth();
+				goto('/login');
+			}, 2000);
+			return;
+		}
+
 		checkMobile();
 		window.addEventListener('resize', checkMobile);
+
+		isLoading = false;
+
 		return () => window.removeEventListener('resize', checkMobile);
+	});
+
+	// Update weeks when month changes
+	$effect(() => {
+		console.log('Updating...');
+		const { year, month } = parseMonthString(selectedMonth);
+		weeks = getWeeksForMonth(year, month);
+		if (!dekMissing && $isAuthenticated && isDEKAvailable()) {
+			console.log('Getting that week data');
+			loadUserData();
+		}
 	});
 
 	function checkMobile() {
@@ -89,42 +111,61 @@
 
 	async function loadUserData() {
 		if (!$isAuthenticated) return;
+		if (!isDEKAvailable()) {
+			dekMissing = true;
+			saveError = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
+			setTimeout(() => {
+				authStore.clearAuth();
+				goto('/login');
+			}, 2000);
+			return;
+		}
 
 		try {
-			const records = await apiService.getPriorities(selectedMonth);
+			const apiMonth = formatMonthForAPI(selectedMonth);
+			const records = await apiService.getPriorities(apiMonth);
 
-			records.forEach((record: any) => {
+			// Update local weeks with data from backend
+			records.weeks.forEach((record) => {
 				const weekIndex = weeks.findIndex((w) => w.weekNumber === record.weekNumber);
 				if (weekIndex !== -1) {
-					weeks[weekIndex] = {
-						...weeks[weekIndex],
-						priorities: record.priorities,
-						id: record.id
-					};
-					// Calculate status based on actual priorities
+					weeks[weekIndex].monday = record.monday;
+					weeks[weekIndex].tuesday = record.tuesday;
+					weeks[weekIndex].wednesday = record.wednesday;
+					weeks[weekIndex].thursday = record.thursday;
+					weeks[weekIndex].friday = record.friday;
 					weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
 				}
 			});
-		} catch (error) {
+			weeks = [...weeks];
+		} catch (error: any) {
 			console.error('Error loading priorities:', error);
-			saveError = 'Fehler beim Laden der Prioritäten';
-			setTimeout(() => (saveError = ''), 3000);
+
+			// Check if it's a DEK-related error
+			if (error.message?.includes('Verschlüsselungsschlüssel')) {
+				dekMissing = true;
+				saveError = 'Sitzung abgelaufen. Sie werden zur Anmeldung weitergeleitet...';
+				setTimeout(() => {
+					authStore.clearAuth();
+					goto('/login');
+				}, 2000);
+			} else {
+				saveError = 'Fehler beim Laden der Prioritäten';
+				setTimeout(() => (saveError = ''), 3000);
+			}
 		}
 	}
 
-	function selectPriority(weekIndex: number, day: keyof DayPriorities, priority: Priority) {
+	function selectPriority(weekIndex: number, day: DayName, priority: Priority) {
 		const currentWeek = weeks[weekIndex];
-		const dayEntries = Object.entries(currentWeek.priorities) as [keyof DayPriorities, Priority][];
 
-		dayEntries.forEach(([d, p]) => {
-			if (p === priority && d !== day) {
-				weeks[weekIndex].priorities[d] = null;
+		dayKeys.forEach((d) => {
+			if (currentWeek[d] === priority && d !== day) {
+				weeks[weekIndex][d] = null;
 			}
 		});
 
-		weeks[weekIndex].priorities[day] = priority;
-
-		// Update status after changing priorities
+		weeks[weekIndex][day] = priority;
 		weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
 	}
 
@@ -139,85 +180,49 @@
 		editingWeek = null;
 	}
 
-	async function saveWeekData(weekIndex: number, shouldCloseModal = false) {
-		const week = weeks[weekIndex];
-		const validation = validateWeekPriorities(week.priorities);
-
-		if (!validation.isValid) {
-			saveError = validation.message;
-			setTimeout(() => (saveError = ''), 3000);
-			throw new Error(validation.message);
-		}
+	async function saveMonthData() {
 		if (!$isAuthenticated) {
 			saveError = 'No user id is set currently';
 			setTimeout(() => (saveError = ''), 3000);
 			throw new Error('No user id is set currently');
 		}
 
+		// Check DEK availability before saving
+		if (!isDEKAvailable()) {
+			saveError = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
+			setTimeout(() => {
+				authStore.clearAuth();
+				goto('/login');
+			}, 2000);
+			throw new Error('DEK not available');
+		}
+
 		try {
-			const data = {
-				month: selectedMonth,
+			// Convert display format to API format
+			const apiMonth = formatMonthForAPI(selectedMonth);
+
+			// Prepare all weeks data for the month
+			// Filter out weeks that have at least some data
+			const weeksData = weeks.map((week) => ({
 				weekNumber: week.weekNumber,
-				priorities: week.priorities,
-				startDate: week.startDate,
-				endDate: week.endDate
-			};
+				monday: week.monday,
+				tuesday: week.tuesday,
+				wednesday: week.wednesday,
+				thursday: week.thursday,
+				friday: week.friday
+			}));
 
-			let record;
+			// Send all weeks for the month
+			await apiService.updatePriority(apiMonth, weeksData);
 
-			// If we have an ID, try to update first
-			if (week.id) {
-				try {
-					record = await apiService.updatePriority(week.id, data);
-				} catch (updateError: any) {
-					// If update fails because record doesn't exist, try to create
-					if (
-						updateError.message?.includes('nicht gefunden') ||
-						updateError.message?.includes('not found')
-					) {
-						console.log('Record not found, creating new one');
-						record = await apiService.createPriority(data);
-						weeks[weekIndex].id = record.id;
-					} else {
-						throw updateError;
-					}
-				}
-			} else {
-				// No ID, try to create
-				try {
-					record = await apiService.createPriority(data);
-					weeks[weekIndex].id = record.id;
-				} catch (createError: any) {
-					// If create fails because record exists, fetch it and then update
-					if (
-						createError.message?.includes('existiert bereits') ||
-						createError.message?.includes('already exists')
-					) {
-						console.log('Record already exists, fetching and updating');
-						// Reload user data to get the correct ID
-						await loadUserData();
-						// Try updating with the newly fetched ID
-						const updatedWeek = weeks[weekIndex];
-						if (updatedWeek.id) {
-							record = await apiService.updatePriority(updatedWeek.id, data);
-						} else {
-							throw new Error('Konnte die bestehende Priorität nicht finden');
-						}
-					} else {
-						throw createError;
-					}
-				}
-			}
+			// Update local state with response if needed
+			weeks = weeks.map((week) => ({
+				...week,
+				status: calculateWeekStatus(week)
+			}));
 
-			// Calculate the correct status based on priorities
-			weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
-
-			// Force reactivity update
-			weeks = [...weeks];
-
-			if (shouldCloseModal) {
-				closeEditModal();
-			}
+			saveSuccess = 'Prioritäten erfolgreich gespeichert';
+			setTimeout(() => (saveSuccess = ''), 3000);
 		} catch (error: any) {
 			saveError = error.message || 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
 			setTimeout(() => (saveError = ''), 3000);
@@ -226,24 +231,80 @@
 		}
 	}
 
-	// Save function for mobile view (should close modal)
+	async function saveWeekData(weekIndex: number, shouldCloseModal = false) {
+		const week = weeks[weekIndex];
+
+		// Validate that all 5 days have unique priorities (1-5)
+		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
+
+		if (validPriorities.length === 5) {
+			const uniquePriorities = new Set(validPriorities);
+			if (uniquePriorities.size !== 5) {
+				saveError = 'Jeder Wochentag muss eine eindeutige Priorität haben';
+				setTimeout(() => (saveError = ''), 3000);
+				throw new Error('Jeder Wochentag muss eine eindeutige Priorität haben');
+			}
+		}
+
+		// Save all weeks for the month (backend expects month-based updates)
+		await saveMonthData();
+
+		if (shouldCloseModal) {
+			closeEditModal();
+		}
+	}
+
 	async function saveWeek(weekIndex: number) {
 		await saveWeekData(weekIndex, true);
 	}
 
-	// Save function for edit modal (shouldn't close modal)
 	async function saveEditingWeek() {
 		if (!editingWeek) return;
-
-		// Update the week in the weeks array with the edited data
 		weeks[editingWeekIndex] = { ...editingWeek };
-
-		// Save the week without closing the modal
 		await saveWeekData(editingWeekIndex, false);
+	}
+
+	function handleWeekChange(dayKey: DayName, priority: Priority) {
+		if (!editingWeek) return;
+
+		// Get the old priority for this day
+		const oldPriority = editingWeek[dayKey];
+
+		// Check if this priority is already used elsewhere
+		const dayUsingPriority = dayKeys.find(
+			(day) => day !== dayKey && editingWeek![day] === priority
+		);
+
+		// Set the priority for the selected day
+		editingWeek[dayKey] = priority;
+
+		// If this priority was used elsewhere, swap the priorities
+		if (dayUsingPriority) {
+			editingWeek[dayUsingPriority] = oldPriority;
+		}
+
+		// Update the main weeks array
+		weeks[editingWeekIndex] = { ...editingWeek };
 	}
 </script>
 
-{#if $isAuthenticated}
+{#if isLoading}
+	<Loading message="Lade..." />
+{:else if dekMissing}
+	<div
+		class="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
+	>
+		<div class="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800">
+			<div class="mb-4 text-6xl">⚠️</div>
+			<h2 class="mb-4 text-2xl font-bold text-gray-800 dark:text-white">Sitzung abgelaufen</h2>
+			<p class="mb-4 text-gray-600 dark:text-gray-300">
+				Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...
+			</p>
+			<div class="animate-spin text-4xl">⟳</div>
+		</div>
+	</div>
+{:else if $isAuthenticated}
 	<div
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
@@ -272,35 +333,6 @@
 					</svg>
 					Dashboard
 				</a>
-
-				<!-- {#if $isAdmin} -->
-				<!-- 	<a -->
-				<!-- 		href="/admin" -->
-				<!-- 		class="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-200 hover:bg-purple-700" -->
-				<!-- 	> -->
-				<!-- 		<svg -->
-				<!-- 			xmlns="http://www.w3.org/2000/svg" -->
-				<!-- 			class="h-5 w-5" -->
-				<!-- 			fill="none" -->
-				<!-- 			viewBox="0 0 24 24" -->
-				<!-- 			stroke="currentColor" -->
-				<!-- 		> -->
-				<!-- 			<path -->
-				<!-- 				stroke-linecap="round" -->
-				<!-- 				stroke-linejoin="round" -->
-				<!-- 				stroke-width="2" -->
-				<!-- 				d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" -->
-				<!-- 			/> -->
-				<!-- 			<path -->
-				<!-- 				stroke-linecap="round" -->
-				<!-- 				stroke-linejoin="round" -->
-				<!-- 				stroke-width="2" -->
-				<!-- 				d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" -->
-				<!-- 			/> -->
-				<!-- 		</svg> -->
-				<!-- 		Admin Panel -->
-				<!-- 	</a> -->
-				<!-- {/if} -->
 			</div>
 
 			<Legend />
@@ -329,8 +361,8 @@
 				activeWeekIndex={editingWeekIndex}
 				{closeEditModal}
 				saveWeek={saveEditingWeek}
-				{weeks}
 				{getDayDates}
+				onWeekChange={handleWeekChange}
 			/>
 		{/if}
 	</div>

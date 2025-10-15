@@ -1,5 +1,7 @@
 """Pydantic models for auth routes"""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from kigaprio.models.pocketbase_schemas import UsersResponse
@@ -21,6 +23,7 @@ class RegisterRequest(BaseModel):
     passwordConfirm: str
     name: str = Field(..., min_length=1)
     registration_token: str
+    security_tier: Literal["balanced", "high", "convenience"] = "balanced"
 
 
 class DatabaseLoginResponse(BaseModel):
@@ -33,6 +36,7 @@ class DatabaseLoginResponse(BaseModel):
 class LoginRequest(BaseModel):
     identity: str = Field(..., min_length=1, description="Username")
     password: str = Field(..., min_length=1)
+    security_tier: Literal["balanced", "high", "convenience"] | None = None
 
 
 class LoginResponse(BaseModel):
@@ -40,12 +44,19 @@ class LoginResponse(BaseModel):
 
     token: str
     message: str
+    security_tier: Literal["high", "balanced", "convenience"]
+
+    # For high and convenience modes
+    dek: str | None = None
+
+    # For balanced mode
+    client_key_part: str | None = None
 
 
 class SessionInfo(BaseModel):
     id: str
     username: str
-    name: str
+    security_tier: Literal["high", "balanced", "convenience"]
     is_admin: bool
 
 
@@ -53,3 +64,9 @@ class TokenVerificationData(BaseModel):
     token: str
     new_token: str | None = None
     user: SessionInfo
+
+
+class DEKData(BaseModel):
+    dek: bytes
+    user_id: str
+    security_tier: str

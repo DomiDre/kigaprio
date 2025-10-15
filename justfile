@@ -166,6 +166,13 @@ dev-with-static:
 init-secrets:
     ./scripts/init-secrets.sh
 
+# Initialize the admin public / private key, where public key is needed for the server to run
+init-admin-key:
+    #!/usr/bin/env bash
+    docker run --rm -it -v ./backend:/app kigaprio-backend:dev uv run src/kigaprio/scripts/initialize_admin_keypair.py
+    mv ./backend/admin_public_key.pem ./.secrets/
+    mv ./backend/admin_private_key.pem ./
+
 # Initialize pocketbase directories for storage
 pocketbase-init: init-secrets
     ./pocketbase/init.sh

@@ -9,7 +9,6 @@ services:
       - ./backend/src:/app/src
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/uv.lock:/app/uv.lock:ro
-      - ./scripts/load-secrets.sh:/usr/local/bin/load-secrets.sh:ro
     environment:
       - ENV=development
       - DEBUG=true
@@ -18,7 +17,6 @@ services:
       - POCKETBASE_URL=http://pocketbase:8090
     ports:
       - "8000:8000"
-    entrypoint: /usr/local/bin/load-secrets.sh
     command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -31,9 +29,10 @@ services:
       redis:
         condition: service_healthy
     secrets:
-      - pb_admin_email
+      - admin_public_key
       - pb_service_id
       - pb_service_password
+      - server_cache_key
 
   frontend:
     build:
@@ -61,7 +60,7 @@ services:
       args:
         - USER_UID=1000
         - USER_GID=1000
-        - PB_VERSION=0.30.0
+        - PB_VERSION=0.30.2
     image: kigaprio-pocketbase
     restart: unless-stopped
     expose:
@@ -84,11 +83,9 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - ./redis:/data
-    command: redis-server --appendonly yes --appendfsync everysec
+    expose:
+      - 6379
+    command: redis-server --save "" --appendonly no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -96,6 +93,8 @@ services:
       retries: 5
 
 secrets:
+  admin_public_key:
+    file: ./.secrets/admin_public_key.pem
   pb_admin_email:
     file: ./.secrets/pb_admin_email
   pb_admin_password:
@@ -104,4 +103,6 @@ secrets:
     file: ./.secrets/pb_service_id
   pb_service_password:
     file: ./.secrets/pb_service_password
+  server_cache_key:
+    file: ./.secrets/server_cache_key
   

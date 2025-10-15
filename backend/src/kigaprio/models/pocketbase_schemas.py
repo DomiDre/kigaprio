@@ -12,9 +12,26 @@ class UsersResponse(BaseModel):
     email: str | None = None
     emailVisibility: bool
     verified: bool
-    name: str
     username: str
-    role: Literal["user"] | Literal["service"] | Literal["admin"] | Literal["generic"]
+    role: Literal["user", "service", "admin", "generic"]
+    admin_wrapped_dek: str
+    user_wrapped_dek: str
+    salt: str
+    encrypted_fields: str
+    security_tier: Literal["balanced", "high", "convenience"]
+    collectionId: str
+    collectionName: str
+    created: str
+    updated: str
+
+
+class PriorityRecord(BaseModel):
+    """Encrypted priority record (stored in database)."""
+
+    id: str
+    userId: str
+    month: str
+    encrypted_fields: str
     collectionId: str
     collectionName: str
     created: str

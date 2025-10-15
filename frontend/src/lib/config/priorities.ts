@@ -1,4 +1,4 @@
-import type { DayPriorities } from '$lib/types/priorities.ts';
+import type { DayName } from '$lib/types/priorities.ts';
 
 // Priority configuration with proper typing
 export const priorityColors: Record<1 | 2 | 3 | 4 | 5, string> = {
@@ -17,7 +17,9 @@ export const priorityLabels: Record<1 | 2 | 3 | 4 | 5, string> = {
 	1: 'Unwichtig'
 } as const;
 
-export const dayNames: Record<keyof DayPriorities, string> = {
+export const dayKeys: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+export const dayNames: Record<DayName, string> = {
 	monday: 'Montag',
 	tuesday: 'Dienstag',
 	wednesday: 'Mittwoch',

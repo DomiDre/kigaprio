@@ -1,45 +1,18 @@
 import json
-from pathlib import Path
+from typing import Annotated
 
 import httpx
 import redis
-from fastapi import Depends, HTTPException, Request, UploadFile
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from kigaprio.config import settings
-from kigaprio.models.auth import SessionInfo, TokenVerificationData
+from kigaprio.models.auth import DEKData, SessionInfo, TokenVerificationData
 from kigaprio.models.pocketbase_schemas import UsersResponse
+from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 
 security = HTTPBearer()
-
-
-async def validate_file(files: list[UploadFile]) -> list[UploadFile]:
-    """Validate uploaded files."""
-
-    for file in files:
-        if file.size is None:
-            raise HTTPException(status_code=400, detail="File size is zero")
-        if file.filename is None:
-            raise HTTPException(status_code=400, detail="Received file without name")
-        # Check file size
-        if file.size > settings.MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File {file.filename} is too large. Max size: {settings.MAX_FILE_SIZE} bytes",
-            )
-
-        # Check file extension
-        file_ext = Path(file.filename).suffix.lower()
-
-        if file_ext not in settings.ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=415,
-                detail=f"File type {file_ext} not supported. Allowed: {settings.ALLOWED_EXTENSIONS}",
-            )
-
-    return files
 
 
 async def verify_token(
@@ -107,7 +80,7 @@ def extract_session_info_from_record(record: UsersResponse) -> SessionInfo:
     return SessionInfo(
         id=record.id,
         username=record.username,
-        name=record.name,
+        security_tier=record.security_tier,
         is_admin=is_admin,
     )
 
@@ -126,3 +99,42 @@ def get_client_ip(request: Request) -> str:
 
     # Fall back to direct connection
     return request.client.host if request.client else "127.0.0.1"
+
+
+async def get_dek_from_request(
+    x_dek: Annotated[str, Header(description="DEK or client key part")],
+    auth_data: TokenVerificationData = Depends(verify_token),
+    redis_client: redis.Redis = Depends(get_redis),
+) -> DEKData:
+    """Extract and reconstruct DEK from request headers.
+
+    Client should send either:
+    - Full DEK (base64) for high/convenience modes
+    - Client key part (base64) for balanced mode
+
+    Header: X-DEK: <base64_encoded_dek_or_part>
+    """
+    try:
+        dek = EncryptionManager.get_dek_from_request(
+            dek_or_client_part=x_dek,
+            user_id=auth_data.user.id,
+            token=auth_data.token,
+            security_tier=auth_data.user.security_tier,
+            redis_client=redis_client,
+        )
+
+        return DEKData(
+            dek=dek,
+            user_id=auth_data.user.id,
+            security_tier=auth_data.user.security_tier,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Fehler bei der Schlüsselverarbeitung",
+        ) from e

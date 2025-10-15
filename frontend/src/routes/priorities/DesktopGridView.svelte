@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WeekData, DayPriorities } from '$lib/types/priorities';
+	import type { WeekData, WeekPriority } from '$lib/types/priorities';
 	import { dayNames, priorityColors } from '$lib/config/priorities';
 
 	export let weeks: WeekData[];
@@ -38,7 +38,7 @@
 
 			<div class="space-y-2">
 				{#each Object.entries(dayNames) as [dayKey, dayName] (dayKey)}
-					{@const priority = week.priorities[dayKey as keyof DayPriorities]}
+					{@const priority = week[dayKey as keyof WeekPriority]}
 					<div
 						class="flex items-center justify-between rounded p-2
 						{week.status === 'pending'

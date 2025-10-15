@@ -1,6 +1,7 @@
-import { authStore } from '$lib/stores/auth';
+import { authStore, type SecurityTier } from '$lib/stores/auth';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
+import type { PriorityResponse, WeekData } from '$lib/types/priorities';
 
 export class ApiService {
 	public baseUrl: string;
@@ -18,7 +19,6 @@ export class ApiService {
 				method: 'GET',
 				signal: AbortSignal.timeout(5000)
 			});
-
 			return response.ok;
 		} catch {
 			return false;
@@ -43,6 +43,10 @@ export class ApiService {
 				Authorization: `Bearer ${token}`
 			};
 		}
+
+		// Update activity for balanced mode
+		authStore.updateActivity();
+
 		const response = await fetch(`${this.baseUrl}${endpoint}`, config);
 
 		// Check for refreshed token in response header
@@ -85,21 +89,43 @@ export class ApiService {
 		return response.json();
 	}
 
-	async login(identity: string, password: string) {
-		const response = await this.requestJson('/login', {
+	// Helper to get DEK based on current security tier
+	private getDEKForRequest(): string | null {
+		const tier = authStore.getSecurityTier();
+		if (!tier) return null;
+		return authStore.getDEK(tier);
+	}
+
+	// ==================== Authentication ====================
+
+	async login(identity: string, password: string, securityTier: SecurityTier) {
+		const response = await this.requestJson('/auth/login', {
 			method: 'POST',
-			body: JSON.stringify({ identity, password })
+			body: JSON.stringify({
+				identity,
+				password,
+				security_tier: securityTier
+			})
 		});
 
 		// Store auth data
-		authStore.setAuth(response.token);
+		authStore.setAuth(response.token, securityTier);
+
+		// Store DEK based on security tier
+		if (securityTier === 'balanced') {
+			// For balanced mode, we get client_key_part
+			authStore.storeDEK(response.client_key_part, securityTier);
+		} else {
+			// For high/convenience, we get the full DEK
+			authStore.storeDEK(response.dek, securityTier);
+		}
 
 		return response;
 	}
 
 	async logout() {
 		try {
-			await this.requestJson('/logout', {
+			await this.requestJson('/auth/logout', {
 				method: 'POST'
 			});
 		} catch (error) {
@@ -109,80 +135,112 @@ export class ApiService {
 		authStore.clearAuth();
 	}
 
-	async refreshToken() {
-		const token = authStore.getToken();
-		if (!token) {
-			throw new Error('Kein Token verfügbar');
-		}
-
-		const response = await this.requestJson('/refresh', {
-			method: 'POST',
-			body: JSON.stringify({ token })
-		});
-
-		authStore.setAuth(response.token);
-		return response;
-	}
-
-	async verifyMagicWord(magicWord: string) {
-		return this.requestJson('/verify-magic-word', {
-			method: 'POST',
-			body: JSON.stringify({ magic_word: magicWord })
-		});
-	}
-
 	async register(data: {
 		identity: string;
 		password: string;
 		passwordConfirm: string;
 		name: string;
 		registration_token: string;
+		security_tier: SecurityTier;
 	}) {
-		return this.requestJson('/register', {
+		const response = await this.requestJson('/auth/register', {
 			method: 'POST',
 			body: JSON.stringify(data)
 		});
+
+		// After registration, user is logged in
+		authStore.setAuth(response.token, data.security_tier);
+
+		if (data.security_tier === 'balanced') {
+			authStore.storeDEK(response.client_key_part, data.security_tier);
+		} else {
+			authStore.storeDEK(response.dek, data.security_tier);
+		}
+
+		return response;
 	}
 
-	async getPriorities(month?: string) {
-		const params = new URLSearchParams();
-		if (month) {
-			params.append('month', month);
+	async changePassword(currentPassword: string, newPassword: string) {
+		const dek = this.getDEKForRequest();
+		if (!dek) {
+			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
 		}
-		const queryString = params.toString();
-		const endpoint = queryString ? `/priorities?${queryString}` : '/priolist/priorities';
+
+		const response = await this.requestJson('/auth/change-password', {
+			method: 'POST',
+			body: JSON.stringify({
+				current_password: currentPassword,
+				new_password: newPassword,
+				dek // Server needs this to rewrap
+			})
+		});
+
+		// Password change invalidates all sessions
+		// User needs to log in again
+		authStore.clearAuth();
+		if (browser) {
+			goto('/login');
+		}
+
+		return response;
+	}
+
+	// Re-authenticate for expired balanced mode sessions
+	async reAuthenticate(password: string) {
+		const tier = authStore.getSecurityTier();
+		if (!tier) {
+			throw new Error('Keine Sicherheitsstufe gesetzt');
+		}
+
+		return this.login('', password, tier); // Identity can be retrieved from token
+	}
+
+	// ==================== Account & GDPR funcs ====================
+
+	async getAccountInfo() {
+		// TODO: implement this
+		return { username: 'John Doe', createdAt: '2025-01-01', lastLogin: '2025-01-01' };
+	}
+
+	async getUserData() {
+		// TODO: implement this
+		return { message: 'Getting user data not implemented yet.' };
+	}
+
+	async deleteAllUserData() {
+		// TODO: implement this
+		return {
+			message: 'Getting user data not implemented yet.',
+			deletedItems: 'None'
+		};
+	}
+
+	// ==================== Priorities ====================
+
+	async getPriorities(month?: string): Promise<PriorityResponse> {
+		const dek = this.getDEKForRequest();
+		if (!dek) {
+			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
+		}
+
+		const endpoint = month ? `/priorities/${month}` : '/priorities';
 
 		return this.requestJson(endpoint, {
-			method: 'GET'
+			method: 'GET',
+			headers: { 'x-dek': dek }
 		});
 	}
 
-	async createPriority(data: {
-		month: string;
-		weekNumber: number;
-		priorities: any;
-		startDate: string;
-		endDate: string;
-	}) {
-		return this.requestJson('/priorities', {
-			method: 'POST',
-			body: JSON.stringify(data)
-		});
-	}
-
-	async updatePriority(
-		id: string,
-		data: {
-			month: string;
-			weekNumber: number;
-			priorities: any;
-			startDate: string;
-			endDate: string;
+	async updatePriority(month: string, priorityData: WeekData[]) {
+		const dek = this.getDEKForRequest();
+		if (!dek) {
+			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
 		}
-	) {
-		return this.requestJson(`/priorities/${id}`, {
-			method: 'PATCH',
-			body: JSON.stringify(data)
+
+		return this.requestJson(`/priorities/${month}`, {
+			method: 'PUT',
+			body: JSON.stringify(priorityData),
+			headers: { 'x-dek': dek }
 		});
 	}
 
@@ -201,48 +259,15 @@ export class ApiService {
 		});
 	}
 
-	async getMonthStats(month: string) {
-		return this.requestJson(`/admin/stats/${month}`, {
-			method: 'GET'
-		});
-	}
-
 	async getUserSubmissions(month: string) {
+		// Admin needs their DEK to decrypt user data
+		const dek = this.getDEKForRequest();
+		if (!dek) {
+			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
+		}
+
 		return this.requestJson(`/admin/users/${month}`, {
 			method: 'GET'
-		});
-	}
-
-	async exportMonthData(month: string): Promise<Blob> {
-		const response = await this.request(`/admin/export/${month}`, {
-			method: 'GET'
-		});
-
-		// Return as Blob directly
-		return await response.blob();
-	}
-
-	async sendReminders(
-		userIds: string[],
-		message: string,
-		month?: string
-	): Promise<{
-		sent: number;
-		failed: number;
-		details: Array<{
-			userId: string;
-			email: string;
-			status: 'sent' | 'failed';
-			error?: string;
-		}>;
-	}> {
-		return this.requestJson('/admin/reminders', {
-			method: 'POST',
-			body: JSON.stringify({
-				userIds,
-				message,
-				month
-			})
 		});
 	}
 }

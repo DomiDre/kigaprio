@@ -1,25 +1,17 @@
 import base64
 import json
-from datetime import datetime
-from io import BytesIO
-from typing import Any, cast
+from typing import Any
 
 import httpx
-import pandas as pd
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pandas.core.generic import WriteExcelBuffer
 
 from kigaprio.models.admin import (
-    MonthStatsResponse,
-    ReminderRequest,
-    ReminderResponse,
     UpdateMagicWordRequest,
-    UserSubmissionResponse,
+    UserPriorityRecordForAdmin,
 )
-from kigaprio.models.pocketbase_schemas import UsersResponse
-from kigaprio.models.priorities import PriorityResponse
+from kigaprio.models.pocketbase_schemas import PriorityRecord, UsersResponse
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
@@ -56,8 +48,7 @@ async def get_current_admin(
             "token": token,
             "user": {
                 "id": user_data["id"],
-                "email": user_data["email"],
-                "name": user_data["name"],
+                "username": user_data["username"],
             },
         }
 
@@ -123,8 +114,7 @@ async def get_current_admin(
                 # Admin user - safe to recreate session in cache
                 session_info = {
                     "id": user_record["id"],
-                    "email": user_record["email"],
-                    "name": user_record["name"],
+                    "username": user_record["username"],
                     "is_admin": True,
                     "type": "superuser",
                 }
@@ -140,8 +130,7 @@ async def get_current_admin(
                     "token": token,
                     "user": {
                         "id": user_record["id"],
-                        "email": user_record["email"],
-                        "name": user_record["name"],
+                        "username": user_record["username"],
                     },
                 }
 
@@ -196,7 +185,6 @@ async def get_magic_word_info(
             "current_magic_word": magic_word,
             "last_updated": last_updated,
             "last_updated_by": last_updated_by,
-            "admin_email": admin["user"]["email"],
         }
 
     except Exception as e:
@@ -212,11 +200,11 @@ async def update_magic_word(
 ):
     """Admin endpoint to update the magic word"""
 
-    admin_email = admin["user"]["email"]
+    admin_id = admin["user"]["username"]
     admin_token = credentials.credentials
 
     success = await create_or_update_magic_word(
-        request.new_magic_word, admin_token, redis_client, admin_email
+        request.new_magic_word, admin_token, redis_client, admin_id
     )
 
     if not success:
@@ -225,76 +213,19 @@ async def update_magic_word(
     return {
         "success": True,
         "message": "Magic word updated successfully",
-        "updated_by": admin_email,
+        "updated_by": admin_id,
     }
-
-
-@router.get("/stats/{month}")
-async def get_month_stats(
-    month: str,  # Format: YYYY-MM
-    admin: dict[str, Any] = Depends(get_current_admin),
-) -> MonthStatsResponse:
-    """Get statistics for a specific month."""
-
-    token = admin["token"]
-    async with httpx.AsyncClient() as client:
-        # Fetch all priority records for the month
-        response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={"filter": f"month='{month}'", "perPage": 500},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Daten")
-
-        data = response.json()
-        records = data.get("items", [])
-
-        # Calculate statistics (same logic as before)
-        unique_users = set()
-        weekly_stats = {}
-        completed_weeks = 0
-        pending_weeks = 0
-
-        for record in records:
-            unique_users.add(record["userId"])
-            week_num = record["weekNumber"]
-
-            if week_num not in weekly_stats:
-                weekly_stats[week_num] = {"completed": 0, "total": 0}
-
-            weekly_stats[week_num]["total"] += 1
-
-            priorities = record.get("priorities", {})
-            valid_priorities = [p for p in priorities.values() if p is not None]
-
-            if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
-                weekly_stats[week_num]["completed"] += 1
-                completed_weeks += 1
-            else:
-                pending_weeks += 1
-
-        weekly_completion = [
-            {"week": week, "completed": stats["completed"], "total": stats["total"]}
-            for week, stats in sorted(weekly_stats.items())
-        ]
-
-        return MonthStatsResponse(
-            totalSubmissions=len(records),
-            completedWeeks=completed_weeks,
-            pendingWeeks=pending_weeks,
-            uniqueUsers=len(unique_users),
-            weeklyCompletion=weekly_completion,
-        )
 
 
 @router.get("/users/{month}")
 async def get_user_submissions(
     month: str,
     admin: dict[str, Any] = Depends(get_current_admin),
-) -> list[UserSubmissionResponse]:
-    """Get all user submissions for a specific month."""
+) -> list[UserPriorityRecordForAdmin]:
+    """Get all user submissions for a specific month, data is still
+    encrypted and needs to be decrypted locally using admin private key
+    and respective admin_wrapped_deks
+    """
 
     token = admin["token"]
     async with httpx.AsyncClient() as client:
@@ -314,7 +245,7 @@ async def get_user_submissions(
             UsersResponse(**x) for x in users_response.json().get("items", [])
         ]
 
-        # Fetch priorities for the month
+        # Fetch priorities for the month (of all users)
         priorities_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={"filter": f"month='{month}'", "perPage": 500},
@@ -326,227 +257,83 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Prioritäten"
             )
 
-        priorities: list[PriorityResponse] = [
-            PriorityResponse(**x) for x in priorities_response.json().get("items", [])
+        priorities: list[PriorityRecord] = [
+            PriorityRecord(**x) for x in priorities_response.json().get("items", [])
         ]
 
-        # Group priorities by user
-        user_priorities: dict[str, list[PriorityResponse]] = {}
+        # Make priorities be lookupable by user
+        user_priorities: dict[str, PriorityRecord] = {}
         for priority in priorities:
             user_id = priority.userId
-            if user_id not in user_priorities:
-                user_priorities[user_id] = []
-            user_priorities[user_id].append(priority)
+            if user_id in user_priorities:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Ein Nutzer hat mehrere Prio Eintragungen für den Monat {month}. Dies sollte nicht passieren. Bitte melden zur Prüfung",
+                )
+            user_priorities[user_id] = priority
 
         # Build user submission list
         user_submissions = []
         for user in users:
             user_id = user.id
-            user_records = user_priorities.get(user_id, [])
+            if user_id not in user_priorities:
+                # user did not submit anything to priorities
+                continue
 
-            completed_weeks = 0
-            last_activity = None
-
-            for record in user_records:
-                priorities_dict = record.priorities
-                valid_priorities = [
-                    p for p in priorities_dict.values() if p is not None
-                ]
-
-                if len(valid_priorities) == 5 and len(set(valid_priorities)) == 5:
-                    completed_weeks += 1
-
-                updated = record.updated
-                if updated and (not last_activity or updated > last_activity):
-                    last_activity = updated
-
-            # TODO: this is dependent on the month that is being looked at
-            total_weeks = 5  # Assuming 4 weeks per month
-
-            if completed_weeks == total_weeks:
-                status = "complete"
-            elif completed_weeks > 0:
-                status = "partial"
-            else:
-                status = "none"
+            priority = user_priorities[user_id]
 
             user_submissions.append(
-                UserSubmissionResponse(
-                    userId=user_id,
-                    userName=user.name,
-                    email=user.email,
-                    completedWeeks=completed_weeks,
-                    totalWeeks=total_weeks,
-                    lastActivity=last_activity or datetime.now().isoformat(),
-                    status=status,
+                UserPriorityRecordForAdmin(
+                    adminWrappedDek=user.admin_wrapped_dek,
+                    userName=user.username,
+                    month=priority.month,
+                    userEncryptedFields=user.encrypted_fields,
+                    prioritiesEncryptedFields=priority.encrypted_fields,
                 )
             )
 
         return user_submissions
 
 
-@router.get("/export/{month}")
-async def export_month_data(
-    month: str,
-    admin: dict[str, Any] = Depends(get_current_admin),
+@router.get("/users/info/{user_id}")
+async def get_user_for_admin(
+    user_id: str,
+    admin: dict[str, Any] = Depends(get_current_admin),  # Your auth dependency
 ):
-    """Export all priority data for a month as Excel file."""
-
+    """
+    Return encrypted user data.
+    Server CANNOT decrypt this - admin must decrypt client-side!
+    """
     token = admin["token"]
     async with httpx.AsyncClient() as client:
-        # Fetch all data with expanded user information
-        response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={"filter": f"month='{month}'", "expand": "userId", "perPage": 500},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Daten")
-
-        data = response.json()
-        records = data.get("items", [])
-
-        # Prepare data for Excel
-        rows = []
-        for record in records:
-            user = record.get("expand", {}).get("userId", {})
-            priorities = record.get("priorities", {})
-
-            row = {
-                "Benutzer": user.get("name", "Unknown"),
-                "E-Mail": user.get("email", ""),
-                "Woche": record.get("weekNumber", ""),
-                "Start": record.get("startDate", ""),
-                "Ende": record.get("endDate", ""),
-                "Montag": priorities.get("monday"),
-                "Dienstag": priorities.get("tuesday"),
-                "Mittwoch": priorities.get("wednesday"),
-                "Donnerstag": priorities.get("thursday"),
-                "Freitag": priorities.get("friday"),
-                "Status": "Vollständig"
-                if all(priorities.values())
-                else "Unvollständig",
-                "Zuletzt aktualisiert": record.get("updated", record.get("created")),
-            }
-            rows.append(row)
-
-        # Create Excel file
-        df = pd.DataFrame(rows)
-
-        buffer = BytesIO()
-        with pd.ExcelWriter(
-            cast(WriteExcelBuffer, buffer), engine="openpyxl"
-        ) as writer:
-            df.to_excel(writer, sheet_name=f"Prioritäten {month}", index=False)
-
-            # Add summary sheet
-            summary_df = pd.DataFrame(
-                [
-                    {"Metrik": "Gesamteinträge", "Wert": len(records)},
-                    {
-                        "Metrik": "Eindeutige Benutzer",
-                        "Wert": df["Benutzer"].nunique() if not df.empty else 0,
-                    },
-                    {
-                        "Metrik": "Vollständige Wochen",
-                        "Wert": (df["Status"] == "Vollständig").sum()
-                        if not df.empty
-                        else 0,
-                    },
-                    {
-                        "Metrik": "Unvollständige Wochen",
-                        "Wert": (df["Status"] == "Unvollständig").sum()
-                        if not df.empty
-                        else 0,
-                    },
-                ]
+        try:
+            # Fetch user details
+            user_response = await client.get(
+                f"{POCKETBASE_URL}/api/collections/users/records",
+                params={"filter": f"username='{user_id}'"},
+                headers={"Authorization": f"Bearer {token}"},
             )
-            summary_df.to_excel(writer, sheet_name="Zusammenfassung", index=False)
-
-        buffer.seek(0)
-
-        return Response(
-            content=buffer.getvalue(),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename=prioritaeten_{month}.xlsx"
-            },
-        )
-
-
-@router.post("/reminders")
-async def send_reminders(
-    request: ReminderRequest,
-    admin: dict[str, Any] = Depends(get_current_admin),
-    redis_client: redis.Redis = Depends(get_redis),
-) -> ReminderResponse:
-    """Send email reminders to selected users."""
-
-    token = admin["token"]
-    results = []
-    sent_count = 0
-    failed_count = 0
-
-    async with httpx.AsyncClient() as client:
-        for user_id in request.userIds:
-            try:
-                # Fetch user details
-                user_response = await client.get(
-                    f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
-                    headers={"Authorization": f"Bearer {token}"},
+            if user_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500, detail="Fehler beim Abrufen des Benutzer"
                 )
-
-                if user_response.status_code != 200:
-                    results.append(
-                        {
-                            "userId": user_id,
-                            "email": "unknown",
-                            "status": "failed",
-                            "error": "Benutzer nicht gefunden",
-                        }
-                    )
-                    failed_count += 1
-                    continue
-
-                user = user_response.json()
-
-                # Here you would queue the email sending
-                # For now, just log the action
-                results.append(
-                    {"userId": user_id, "email": user["email"], "status": "sent"}
+            response_data = user_response.json()
+            if "items" not in response_data or "totalItems" not in response_data:
+                raise HTTPException(
+                    status_code=500, detail="In Antwort fehlen erwartete Felder"
                 )
-                sent_count += 1
+            if response_data["totalItems"] != 1:
+                raise HTTPException(status_code=204, detail="User nicht gefunden")
 
-            except Exception as e:
-                results.append(
-                    {
-                        "userId": user_id,
-                        "email": "unknown",
-                        "status": "failed",
-                        "error": str(e),
-                    }
-                )
-                failed_count += 1
+            user_record = UsersResponse(**response_data["items"][0])
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail="Unbekannter Fehler beim abrufen des Benutzer"
+            ) from e
 
-    # Log admin action
-    log_key = f"admin_log:{admin.get('id')}:{datetime.now().isoformat()}"
-    redis_client.setex(
-        log_key,
-        30 * 24 * 3600,  # Keep logs for 30 days
-        json.dumps(
-            {
-                "action": "send_reminders",
-                "admin_email": admin.get("email"),
-                "timestamp": datetime.now().isoformat(),
-                "details": {
-                    "recipients": len(request.userIds),
-                    "sent": sent_count,
-                    "failed": failed_count,
-                    "month": request.month,
-                },
-            }
-        ),
-    )
-
-    return ReminderResponse(sent=sent_count, failed=failed_count, details=results)
+    return {
+        "username": user_record.username,
+        "admin_wrapped_dek": user_record.admin_wrapped_dek,  # RSA encrypted
+        "encrypted_fields": user_record.encrypted_fields,
+        "created": user_record.created,
+    }

@@ -1,5 +1,5 @@
 # Development stage - Using standard node image to avoid musl issues
-FROM node:20 AS development
+FROM node:24 AS development
 
 WORKDIR /app
 RUN chown -R node:node /app
@@ -23,7 +23,7 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 
 
 # Build stage
-FROM node:20 AS builder
+FROM node:24 AS builder
 
 WORKDIR /app
 RUN chown -R node:node /app
@@ -44,7 +44,7 @@ RUN npm run build
 
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init

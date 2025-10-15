@@ -1,34 +1,33 @@
 import httpx
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Query
+from cryptography.exceptions import InvalidTag
+from fastapi import APIRouter, Depends, HTTPException
 
-from kigaprio.models.auth import TokenVerificationData
+from kigaprio.models.auth import DEKData, TokenVerificationData
+from kigaprio.models.pocketbase_schemas import PriorityRecord
 from kigaprio.models.priorities import (
-    PriorityRecord,
     PriorityResponse,
+    WeekPriority,
+    validate_month_format_and_range,
 )
+from kigaprio.models.request import SuccessResponse
+from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import verify_token
+from kigaprio.utils import get_dek_from_request, verify_token
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[PriorityResponse])
 async def get_user_priorities(
-    month: str | None = Query(None, description="Filter by month (YYYY-MM)"),
     auth_data: TokenVerificationData = Depends(verify_token),
+    dek_data: DEKData = Depends(get_dek_from_request),
 ):
     """Get all priorities for the authenticated user, optionally filtered by month."""
 
     user_id = auth_data.user.id
     token = auth_data.token
-
-    # Build filter
-    filter_parts = [f'userId = "{user_id}"']
-    if month:
-        filter_parts.append(f'month = "{month}"')
-    filter_str = " && ".join(filter_parts)
 
     try:
         async with httpx.AsyncClient() as client:
@@ -36,8 +35,8 @@ async def get_user_priorities(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": filter_str,
-                    "sort": "weekNumber",
+                    "filter": f'userId = "{user_id}"',
+                    "sort": "-month",
                     "perPage": 100,  # Get all records
                 },
             )
@@ -49,7 +48,33 @@ async def get_user_priorities(
                 )
 
             data = response.json()
-            return data.get("items", [])
+            items = data.get("items", [])
+
+            # Decrypt each record
+            decrypted_items = []
+            for item in items:
+                encrypted_record = PriorityRecord(**item)
+
+                # Decrypt the weeks data
+                try:
+                    decrypted_weeks = EncryptionManager.decrypt_fields(
+                        encrypted_record.encrypted_fields,
+                        dek_data.dek,
+                    )
+                except InvalidTag as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Entschluesselung der Daten fehlgeschlagen",
+                    ) from e
+
+                decrypted_items.append(
+                    PriorityResponse(
+                        month=encrypted_record.month,
+                        weeks=decrypted_weeks["weeks"],
+                    )
+                )
+
+            return decrypted_items
 
     except httpx.RequestError as e:
         raise HTTPException(
@@ -58,10 +83,11 @@ async def get_user_priorities(
         ) from e
 
 
-@router.get("/{priority_id}", response_model=PriorityResponse)
+@router.get("/{month}", response_model=PriorityResponse)
 async def get_priority(
-    priority_id: str,
+    month: str,
     auth_data: TokenVerificationData = Depends(verify_token),
+    dek_data: DEKData = Depends(get_dek_from_request),
 ):
     """Get a specific priority record by ID."""
 
@@ -71,8 +97,11 @@ async def get_priority(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+                f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                },
             )
 
             if response.status_code == 404:
@@ -87,16 +116,36 @@ async def get_priority(
                     detail="Fehler beim Abrufen der Priorität",
                 )
 
-            data = response.json()
+            items = response.json()["items"]
+            if len(items) == 0:
+                # no records found
+                return PriorityResponse(month=month, weeks=[])
+
+            encrypted_record = PriorityRecord(**items[0])
 
             # Verify ownership
-            if data["userId"] != user_id:
+            if encrypted_record.userId != user_id:
                 raise HTTPException(
                     status_code=403,
                     detail="Keine Berechtigung für diese Priorität",
                 )
 
-            return data
+            # Decrypt weeks data
+            try:
+                decrypted_weeks = EncryptionManager.decrypt_fields(
+                    encrypted_record.encrypted_fields,
+                    dek_data.dek,
+                )
+            except InvalidTag as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Entschluesselung der Daten fehlgeschlagen",
+                ) from e
+
+            return PriorityResponse(
+                month=encrypted_record.month,
+                weeks=decrypted_weeks["weeks"],
+            )
 
     except httpx.RequestError as e:
         raise HTTPException(
@@ -105,69 +154,90 @@ async def get_priority(
         ) from e
 
 
-@router.post("", response_model=PriorityResponse)
-async def create_priority(
-    priority: PriorityRecord,
+@router.put("/{month}", response_model=SuccessResponse)
+async def save_priority(
+    month: str,
+    weeks: list[WeekPriority],
     auth_data: TokenVerificationData = Depends(verify_token),
+    dek_data: DEKData = Depends(get_dek_from_request),
     redis_client: redis.Redis = Depends(get_redis),
 ):
-    """Create a new priority record for the authenticated user."""
+    """Create or update a priority record for the authenticated user."""
 
     user_id = auth_data.user.id
     token = auth_data.token
 
-    # Ensure userId matches authenticated user
-    priority.userId = user_id
+    # Validate month
+    try:
+        validate_month_format_and_range(month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # Check for duplicate (same user, month, week)
-    duplicate_check_key = (
-        f"priority_check:{user_id}:{priority.month}:{priority.weekNumber}"
-    )
-    if redis_client.exists(duplicate_check_key):
+    # Check for duplicate month
+    rate_limit_key = f"priority_check:{user_id}:{month}"
+    if redis_client.exists(rate_limit_key):
         raise HTTPException(
             status_code=429,
-            detail="Eine Priorität für diese Woche wird bereits verarbeitet",
+            detail="Bitte warten Sie einen Moment",
         )
 
-    # Set temporary lock (5 seconds)
-    redis_client.setex(duplicate_check_key, 5, "creating")
+    redis_client.setex(rate_limit_key, 2, "saving")  # 2 sec lock
 
     try:
         async with httpx.AsyncClient() as client:
-            # First check if record already exists
+            # Check if record already exists for this month
             check_response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": f'userId = "{user_id}" && month = "{priority.month}" && weekNumber = {priority.weekNumber}',
+                    "filter": f'userId = "{user_id}" && month = "{month}"',
                 },
             )
 
-            if check_response.status_code == 200:
-                existing = check_response.json()
-                if existing.get("totalItems", 0) > 0:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Eine Priorität für diese Woche existiert bereits",
-                    )
+            existing = (
+                check_response.json() if check_response.status_code == 200 else None
+            )
+            existing_id = None
 
-            # Create new record
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/priorities/records",
-                headers={"Authorization": f"Bearer {token}"},
-                json=priority.model_dump(),
+            if existing and existing.get("totalItems", 0) > 0:
+                existing_id = existing["items"][0]["id"]
+
+            # Encrypt the weeks data
+            encrypted_data = EncryptionManager.encrypt_fields(
+                {"weeks": [week.model_dump() for week in weeks]},
+                dek_data.dek,
             )
 
-            if response.status_code != 200:
+            # Create encrypted record
+            encrypted_priority = {
+                "userId": user_id,
+                "month": month,
+                "encrypted_fields": encrypted_data,
+            }
+
+            if existing_id:
+                response = await client.patch(
+                    f"{POCKETBASE_URL}/api/collections/priorities/records/{existing_id}",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=encrypted_priority,
+                )
+                message = "Priorität gespeichert"
+            else:
+                response = await client.post(
+                    f"{POCKETBASE_URL}/api/collections/priorities/records",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=encrypted_priority,
+                )
+                message = "Priorität erstellt"
+
+            if response.status_code not in [200, 201]:
                 error_data = response.json()
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail=error_data.get(
-                        "message", "Fehler beim Erstellen der Priorität"
-                    ),
+                    detail=error_data.get("message", "Fehler beim Speichern"),
                 )
 
-            return response.json()
+            return SuccessResponse(message=message)
 
     except HTTPException:
         raise
@@ -177,29 +247,28 @@ async def create_priority(
             detail="Verbindungsfehler zum Datenbankserver",
         ) from e
     finally:
-        redis_client.delete(duplicate_check_key)
+        redis_client.delete(rate_limit_key)
 
 
-@router.patch("/{priority_id}", response_model=PriorityResponse)
-async def update_priority(
-    priority_id: str,
-    priority: PriorityRecord,
+@router.delete("/{month}")
+async def delete_priority(
+    month: str,
     auth_data: TokenVerificationData = Depends(verify_token),
 ):
-    """Update an existing priority record."""
+    """Delete a priority record."""
 
     user_id = auth_data.user.id
     token = auth_data.token
 
-    # Ensure userId matches authenticated user
-    priority.userId = user_id
-
     try:
-        # First, verify the record exists and belongs to the user
         async with httpx.AsyncClient() as client:
+            # Find record in database
             check_response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+                f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                },
             )
 
             if check_response.status_code == 404:
@@ -210,79 +279,27 @@ async def update_priority(
 
             if check_response.status_code != 200:
                 raise HTTPException(
-                    status_code=check_response.status_code,
-                    detail="Fehler beim Überprüfen der Priorität",
+                    status_code=400,
+                    detail="Fehler bei dem Versuch die Priorität zu löschen.",
                 )
 
-            existing_data = check_response.json()
-            if existing_data["userId"] != user_id:
+            items = check_response.json()["items"]
+            if len(items) == 0:
+                raise HTTPException(
+                    status_code=400, detail="Priorität gefunden aber leer"
+                )
+            record = items[0]
+            if record["userId"] != user_id:
                 raise HTTPException(
                     status_code=403,
                     detail="Keine Berechtigung für diese Priorität",
                 )
 
-            # Update the record
-            response = await client.patch(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
-                headers={"Authorization": f"Bearer {token}"},
-                json=priority.model_dump(),
-            )
-
-            if response.status_code != 200:
-                error_data = response.json()
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=error_data.get(
-                        "message", "Fehler beim Aktualisieren der Priorität"
-                    ),
-                )
-
-            return response.json()
-
-    except HTTPException:
-        raise
-    except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=500,
-            detail="Verbindungsfehler zum Datenbankserver",
-        ) from e
-
-
-@router.delete("/{priority_id}")
-async def delete_priority(
-    priority_id: str,
-    auth_data: TokenVerificationData = Depends(verify_token),
-):
-    """Delete a priority record."""
-
-    user_id = auth_data.user.id
-    token = auth_data.token
-
-    try:
-        async with httpx.AsyncClient() as client:
-            # First, verify ownership
-            check_response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
-                headers={"Authorization": f"Bearer {token}"},
-            )
-
-            if check_response.status_code == 404:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Priorität nicht gefunden",
-                )
-
-            if check_response.status_code == 200:
-                existing_data = check_response.json()
-                if existing_data["userId"] != user_id:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Keine Berechtigung für diese Priorität",
-                    )
+            record_id = record["id"]
 
             # Delete the record
             response = await client.delete(
-                f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+                f"{POCKETBASE_URL}/api/collections/priorities/records/{record_id}",
                 headers={"Authorization": f"Bearer {token}"},
             )
 
