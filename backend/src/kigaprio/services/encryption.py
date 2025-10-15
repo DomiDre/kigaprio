@@ -21,7 +21,7 @@ class EncryptionManager:
 
     admin_pub_key_file = Path("/run/secrets/admin_public_key")
     ADMIN_PUBLIC_KEY_PEM = (
-        admin_pub_key_file.read_bytes() if admin_pub_key_file.exists() else ""
+        admin_pub_key_file.read_bytes() if admin_pub_key_file.exists() else b""
     )
     if not admin_pub_key_file.exists():
         print("Missing admin public key!!! Please set as secret.")
