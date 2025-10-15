@@ -7,6 +7,7 @@
 	import { getMonthOptions, parseMonthString, formatMonthForAPI } from '$lib/utils/dateHelpers';
 	import { isDEKAvailable } from '$lib/utils/sessionUtils';
 	import type { WeekData } from '$lib/types/priorities';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	let loading = true;
 	let priorities: WeekData[] = [];
@@ -18,16 +19,6 @@
 	let allWeeksCompleted = false;
 	let error: string | null = null;
 	let dekMissing = false;
-
-	// GDPR Compliance States
-	let showDataModal = false;
-	let showDeleteModal = false;
-	let userData: any = null;
-	let loadingUserData = false;
-	let deletionInProgress = false;
-	let exportInProgress = false;
-	let gdprMessage = '';
-	let gdprError = '';
 
 	// Statistics
 	let totalPrioritiesSet = 0;
@@ -88,11 +79,11 @@
 		const { year, month } = parseMonthString(selectedMonth);
 
 		// Calculate total weeks in the month
-		const firstDay = new Date(year, month, 1);
-		const lastDay = new Date(year, month + 1, 0);
+		const firstDay = new SvelteDate(year, month, 1);
+		const lastDay = new SvelteDate(year, month + 1, 0);
 
 		totalWeeks = 0;
-		const tempDate = new Date(firstDay);
+		const tempDate = new SvelteDate(firstDay);
 
 		// Find first Monday
 		while (tempDate.getDay() !== 1) {
@@ -101,11 +92,11 @@
 
 		// Count weeks with weekdays in the month
 		while (tempDate <= lastDay) {
-			const weekEnd = new Date(tempDate);
+			const weekEnd = new SvelteDate(tempDate);
 			weekEnd.setDate(weekEnd.getDate() + 4);
 
 			let hasWeekdayInMonth = false;
-			for (let d = new Date(tempDate); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+			for (let d = new SvelteDate(tempDate); d <= weekEnd; d.setDate(d.getDate() + 1)) {
 				if (d.getMonth() === month && d.getFullYear() === year) {
 					hasWeekdayInMonth = true;
 					break;
@@ -190,35 +181,6 @@
 		return null;
 	}
 
-	async function exportUserData() {
-		try {
-			exportInProgress = true;
-			gdprError = '';
-
-			// Get user data if not already loaded
-			if (!userData) {
-				userData = await apiService.getUserData();
-			}
-
-			// Create JSON blob and download
-			const dataStr = JSON.stringify(userData, null, 2);
-			const blob = new Blob([dataStr], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `meine-daten-${new Date().toISOString().split('T')[0]}.json`;
-			a.click();
-			URL.revokeObjectURL(url);
-
-			gdprMessage = 'Daten erfolgreich exportiert';
-			setTimeout(() => (gdprMessage = ''), 3000);
-		} catch (err: any) {
-			gdprError = 'Fehler beim Exportieren: ' + err.message;
-		} finally {
-			exportInProgress = false;
-		}
-	}
-
 	onMount(() => {
 		if ($isAuthenticated) {
 			if (!isDEKAvailable()) {
@@ -235,7 +197,7 @@
 	});
 
 	// Reload priorities when month changes
-	$: if (selectedMonth && $isAuthenticated && !dekMissing) {
+	$: if (selectedMonth && $isAuthenticated) {
 		loadPriorities();
 	}
 </script>
@@ -465,4 +427,3 @@
 {:else}
 	<Loading message="Lade..." />
 {/if}
-

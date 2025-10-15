@@ -6,8 +6,20 @@ from fastapi import HTTPException
 
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 
-SERVICE_ACCOUNT_ID = Path("/run/secrets/pb_service_id").read_text().strip()
-SERVICE_ACCOUNT_PASSWORD = Path("/run/secrets/pb_service_password").read_text().strip()
+service_id_file = Path("/run/secrets/pb_service_id")
+service_password_file = Path("/run/secrets/pb_service_password")
+
+if not service_id_file.exists() or not service_password_file.exists():
+    print("Service ID/password are not set on backend as secret")
+
+SERVICE_ACCOUNT_ID = (
+    service_id_file.read_text().strip() if service_id_file.exists() else "pb_service"
+)
+SERVICE_ACCOUNT_PASSWORD = (
+    service_password_file.read_text().strip()
+    if service_password_file.exists()
+    else "password"
+)
 
 
 async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | None:

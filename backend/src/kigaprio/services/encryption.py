@@ -19,7 +19,12 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 class EncryptionManager:
     """Manages field-level encryption for sensitive user data."""
 
-    ADMIN_PUBLIC_KEY_PEM = Path("/run/secrets/admin_public_key").read_bytes()
+    admin_pub_key_file = Path("/run/secrets/admin_public_key")
+    ADMIN_PUBLIC_KEY_PEM = (
+        admin_pub_key_file.read_bytes() if admin_pub_key_file.exists() else ""
+    )
+    if not admin_pub_key_file.exists():
+        print("Missing admin public key!!! Please set as secret.")
 
     KDF_ITERATIONS = 600000
     KEY_SIZE = 32

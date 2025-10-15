@@ -199,22 +199,21 @@ export class ApiService {
 
 	async getAccountInfo() {
 		// TODO: implement this
-		return { "username": "John Doe", "createdAt": "2025-01-01", "lastLogin": "2025-01-01" }
+		return { username: 'John Doe', createdAt: '2025-01-01', lastLogin: '2025-01-01' };
 	}
 
 	async getUserData() {
 		// TODO: implement this
-		return { "message": "Getting user data not implemented yet." }
+		return { message: 'Getting user data not implemented yet.' };
 	}
 
 	async deleteAllUserData() {
 		// TODO: implement this
 		return {
-			"message": "Getting user data not implemented yet.",
-			"deletedItems": "None"
-		}
+			message: 'Getting user data not implemented yet.',
+			deletedItems: 'None'
+		};
 	}
-
 
 	// ==================== Priorities ====================
 
