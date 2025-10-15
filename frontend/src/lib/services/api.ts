@@ -195,6 +195,27 @@ export class ApiService {
 		return this.login('', password, tier); // Identity can be retrieved from token
 	}
 
+	// ==================== Account & GDPR funcs ====================
+
+	async getAccountInfo() {
+		// TODO: implement this
+		return { "username": "John Doe", "createdAt": "2025-01-01", "lastLogin": "2025-01-01" }
+	}
+
+	async getUserData() {
+		// TODO: implement this
+		return { "message": "Getting user data not implemented yet." }
+	}
+
+	async deleteAllUserData() {
+		// TODO: implement this
+		return {
+			"message": "Getting user data not implemented yet.",
+			"deletedItems": "None"
+		}
+	}
+
+
 	// ==================== Priorities ====================
 
 	async getPriorities(month?: string): Promise<PriorityResponse> {

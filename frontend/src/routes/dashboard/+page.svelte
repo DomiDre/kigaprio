@@ -1,52 +1,83 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { isAuthenticated, authStore } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 	import { goto } from '$app/navigation';
 	import Loading from '$lib/components/Loading.svelte';
-	import { getMonthOptions, parseMonthString } from '$lib/utils/dateHelpers';
-	import { SvelteDate } from 'svelte/reactivity';
+	import { getMonthOptions, parseMonthString, formatMonthForAPI } from '$lib/utils/dateHelpers';
+	import { isDEKAvailable } from '$lib/utils/sessionUtils';
+	import type { WeekData } from '$lib/types/priorities';
 
 	let loading = true;
-	let priorities: any[] = [];
+	let priorities: WeekData[] = [];
 	const monthOptions = getMonthOptions();
-	let selectedMonth = monthOptions[0]; // Format: "Januar 2025"
+	let selectedMonth = monthOptions[0];
 	let completedWeeks = 0;
 	let totalWeeks = 0;
 	let progressPercentage = 0;
 	let allWeeksCompleted = false;
 	let error: string | null = null;
+	let dekMissing = false;
 
-	// Helper function to check if a week is complete (matching main component logic)
-	function isWeekComplete(priority: any): boolean {
-		if (!priority || !priority.priorities) return false;
+	// GDPR Compliance States
+	let showDataModal = false;
+	let showDeleteModal = false;
+	let userData: any = null;
+	let loadingUserData = false;
+	let deletionInProgress = false;
+	let exportInProgress = false;
+	let gdprMessage = '';
+	let gdprError = '';
 
-		const p = priority.priorities;
-		const priorityValues = [p.monday, p.tuesday, p.wednesday, p.thursday, p.friday];
+	// Statistics
+	let totalPrioritiesSet = 0;
+	let currentStreak = 0;
+	let longestStreak = 0;
+	let completionRate = 0;
 
-		// Filter out null, undefined, and empty strings
-		const validPriorities = priorityValues.filter(
-			(val) => val !== null && val !== undefined && val !== ''
-		);
-
-		// Must have all 5 days filled AND all values must be unique (1-5)
+	// Helper function to check if a week is complete
+	function isWeekComplete(week: WeekData): boolean {
+		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
+		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
 		return validPriorities.length === 5 && new Set(validPriorities).size === 5;
 	}
 
 	async function loadPriorities() {
+		if (!isDEKAvailable()) {
+			dekMissing = true;
+			error = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
+			setTimeout(() => {
+				authStore.clearAuth();
+				goto('/login');
+			}, 2000);
+			return;
+		}
+
 		try {
 			loading = true;
 			error = null;
 
-			// Fetch priorities for selected month (using correct format like "Januar 2025")
-			const response = await apiService.getPriorities(selectedMonth);
-			priorities = response || [];
+			const apiMonth = formatMonthForAPI(selectedMonth);
+			const response = await apiService.getPriorities(apiMonth);
 
-			// Calculate progress
+			// Properly update priorities array
+			priorities = response.weeks || [];
+
+			// Calculate statistics
 			calculateProgress();
-		} catch (err) {
+			calculateStatistics();
+		} catch (err: any) {
 			console.error('Error loading priorities:', err);
-			error = 'Fehler beim Laden der Prioritäten';
+			if (err.message?.includes('Verschlüsselungsschlüssel')) {
+				dekMissing = true;
+				error = 'Sitzung abgelaufen. Sie werden zur Anmeldung weitergeleitet...';
+				setTimeout(() => {
+					authStore.clearAuth();
+					goto('/login');
+				}, 2000);
+			} else {
+				error = 'Fehler beim Laden der Prioritäten';
+			}
 			priorities = [];
 		} finally {
 			loading = false;
@@ -54,34 +85,28 @@
 	}
 
 	function calculateProgress() {
-		// Parse the selected month string (e.g., "Januar 2025")
 		const { year, month } = parseMonthString(selectedMonth);
-		const currentYear = year;
-		const currentMonthNum = month; // Already 0-indexed from parseMonthString
 
-		// Calculate total weeks in current month
-		const firstDay = new Date(currentYear, currentMonthNum, 1);
-		const lastDay = new Date(currentYear, currentMonthNum + 1, 0);
+		// Calculate total weeks in the month
+		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0);
 
-		// Count weeks that have at least one weekday (Mon-Fri) in the month
 		totalWeeks = 0;
-		const tempDate = new SvelteDate(firstDay);
+		const tempDate = new Date(firstDay);
 
-		// Find the first Monday of or before the first day of month
+		// Find first Monday
 		while (tempDate.getDay() !== 1) {
 			tempDate.setDate(tempDate.getDate() - 1);
 		}
 
-		// Count each week that has at least one weekday in the month
+		// Count weeks with weekdays in the month
 		while (tempDate <= lastDay) {
-			const weekStart = new SvelteDate(tempDate);
-			const weekEnd = new SvelteDate(tempDate);
-			weekEnd.setDate(weekEnd.getDate() + 4); // Friday of the same week
+			const weekEnd = new Date(tempDate);
+			weekEnd.setDate(weekEnd.getDate() + 4);
 
-			// Check if this week has any weekday in the current month
 			let hasWeekdayInMonth = false;
-			for (let d = new SvelteDate(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
-				if (d.getMonth() === currentMonthNum && d.getFullYear() === currentYear) {
+			for (let d = new Date(tempDate); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+				if (d.getMonth() === month && d.getFullYear() === year) {
 					hasWeekdayInMonth = true;
 					break;
 				}
@@ -91,22 +116,59 @@
 				totalWeeks++;
 			}
 
-			// Move to next week
 			tempDate.setDate(tempDate.getDate() + 7);
 		}
 
-		// Count completed weeks using the updated logic
+		// Count completed weeks
 		completedWeeks = priorities.filter(isWeekComplete).length;
+		progressPercentage = totalWeeks > 0 ? Math.round((completedWeeks / totalWeeks) * 100) : 0;
+		allWeeksCompleted = completedWeeks === totalWeeks && totalWeeks > 0;
+	}
 
-		// Calculate percentage
-		if (totalWeeks > 0) {
-			progressPercentage = Math.round((completedWeeks / totalWeeks) * 100);
-		} else {
-			progressPercentage = 0;
+	function calculateStatistics() {
+		// Calculate total priorities set
+		totalPrioritiesSet = priorities.reduce((total, week) => {
+			const weekPriorities = [
+				week.monday,
+				week.tuesday,
+				week.wednesday,
+				week.thursday,
+				week.friday
+			];
+			return total + weekPriorities.filter((p) => p !== null && p !== undefined).length;
+		}, 0);
+
+		// Calculate streaks
+		let tempCurrentStreak = 0;
+		let tempLongestStreak = 0;
+		let streakActive = true;
+
+		priorities.forEach((week) => {
+			if (isWeekComplete(week)) {
+				if (streakActive) {
+					tempCurrentStreak++;
+				}
+				tempLongestStreak++;
+			} else {
+				streakActive = false;
+				if (tempLongestStreak > longestStreak) {
+					longestStreak = tempLongestStreak;
+				}
+				tempLongestStreak = 0;
+			}
+		});
+
+		currentStreak = tempCurrentStreak;
+		if (tempLongestStreak > longestStreak) {
+			longestStreak = tempLongestStreak;
 		}
 
-		// Check if all weeks are completed
-		allWeeksCompleted = completedWeeks === totalWeeks && totalWeeks > 0;
+		// Calculate completion rate
+		const totalPossiblePriorities = totalWeeks * 5;
+		completionRate =
+			totalPossiblePriorities > 0
+				? Math.round((totalPrioritiesSet / totalPossiblePriorities) * 100)
+				: 0;
 	}
 
 	async function handleLogout() {
@@ -119,106 +181,131 @@
 		}
 	}
 
-	function getMonthName(monthString: string): string {
-		// monthString is already in format "Januar 2025", just return it
-		return monthString;
-	}
-
 	function getNextIncompleteWeek(): number | null {
-		for (let week = 1; week <= totalWeeks; week++) {
-			const weekPriority = priorities.find((p) => p.weekNumber === week);
-			if (!weekPriority || !isWeekComplete(weekPriority)) {
-				return week;
+		for (let i = 0; i < priorities.length; i++) {
+			if (!isWeekComplete(priorities[i])) {
+				return priorities[i].weekNumber;
 			}
 		}
 		return null;
 	}
 
+	async function exportUserData() {
+		try {
+			exportInProgress = true;
+			gdprError = '';
+
+			// Get user data if not already loaded
+			if (!userData) {
+				userData = await apiService.getUserData();
+			}
+
+			// Create JSON blob and download
+			const dataStr = JSON.stringify(userData, null, 2);
+			const blob = new Blob([dataStr], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `meine-daten-${new Date().toISOString().split('T')[0]}.json`;
+			a.click();
+			URL.revokeObjectURL(url);
+
+			gdprMessage = 'Daten erfolgreich exportiert';
+			setTimeout(() => (gdprMessage = ''), 3000);
+		} catch (err: any) {
+			gdprError = 'Fehler beim Exportieren: ' + err.message;
+		} finally {
+			exportInProgress = false;
+		}
+	}
+
 	onMount(() => {
 		if ($isAuthenticated) {
+			if (!isDEKAvailable()) {
+				dekMissing = true;
+				loading = false;
+				setTimeout(() => {
+					authStore.clearAuth();
+					goto('/login');
+				}, 2000);
+				return;
+			}
 			loadPriorities();
 		}
 	});
 
 	// Reload priorities when month changes
-	$: if (selectedMonth && $isAuthenticated) {
+	$: if (selectedMonth && $isAuthenticated && !dekMissing) {
 		loadPriorities();
 	}
 </script>
 
-{#if $isAuthenticated}
+{#if dekMissing}
+	<div
+		class="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
+	>
+		<div class="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800">
+			<div class="mb-4 text-6xl">⚠️</div>
+			<h2 class="mb-4 text-2xl font-bold text-gray-800 dark:text-white">Sitzung abgelaufen</h2>
+			<p class="mb-4 text-gray-600 dark:text-gray-300">
+				Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...
+			</p>
+			<div class="animate-spin text-4xl">⟳</div>
+		</div>
+	</div>
+{:else if $isAuthenticated}
 	<div
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
-		<div class="container mx-auto max-w-4xl px-4 py-10">
+		<div class="container mx-auto max-w-6xl px-4 py-10">
 			<!-- Navigation Bar -->
-			<div class="mb-6 flex items-center justify-end gap-3">
-				<a
-					href="/priorities"
-					class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
+			<div class="mb-6 flex items-center justify-between">
+				<h1 class="text-3xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
+				<div class="flex gap-3">
+					<a
+						href="/priorities"
+						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-						/>
-					</svg>
-					Prioritäten
-				</a>
-
-				<!-- {#if $isAdmin} -->
-				<!-- 	<a -->
-				<!-- 		href="/admin" -->
-				<!-- 		class="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-200 hover:bg-purple-700" -->
-				<!-- 	> -->
-				<!-- 		<svg -->
-				<!-- 			xmlns="http://www.w3.org/2000/svg" -->
-				<!-- 			class="h-5 w-5" -->
-				<!-- 			fill="none" -->
-				<!-- 			viewBox="0 0 24 24" -->
-				<!-- 			stroke="currentColor" -->
-				<!-- 		> -->
-				<!-- 			<path -->
-				<!-- 				stroke-linecap="round" -->
-				<!-- 				stroke-linejoin="round" -->
-				<!-- 				stroke-width="2" -->
-				<!-- 				d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" -->
-				<!-- 			/> -->
-				<!-- 			<path -->
-				<!-- 				stroke-linecap="round" -->
-				<!-- 				stroke-linejoin="round" -->
-				<!-- 				stroke-width="2" -->
-				<!-- 				d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" -->
-				<!-- 			/> -->
-				<!-- 		</svg> -->
-				<!-- 		Admin Panel -->
-				<!-- 	</a> -->
-				<!-- {/if} -->
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+							/>
+						</svg>
+						Prioritäten
+					</a>
+					<button
+						class="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
+						on:click={handleLogout}>Logout</button
+					>
+				</div>
 			</div>
 
-			<!-- Dashboard Header -->
-			<div class="mb-10 flex flex-col items-center">
-				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Willkommen, zurück!</h1>
-				<p class="text-center text-gray-600 dark:text-gray-300">
+			<!-- Welcome Section -->
+			<div class="mb-8 text-center">
+				<h2 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white">
+					Willkommen zurück!
+				</h2>
+				<p class="text-gray-600 dark:text-gray-300">
 					{#if allWeeksCompleted}
-						Super! Alle Wochen für {getMonthName(selectedMonth)} sind priorisiert!
+						🎉 Super! Alle Wochen für {selectedMonth} sind priorisiert!
 					{:else}
-						Hier können die Prioritäten für die nächsten Wochen eingegeben werden.
+						Hier ist Ihre Übersicht für {selectedMonth}
 					{/if}
 				</p>
 
 				<!-- Month Selector -->
-				<div class="mt-4 flex items-center gap-3">
+				<div class="mt-4 flex items-center justify-center gap-3">
 					<label for="month-select" class="text-sm font-medium text-gray-700 dark:text-gray-300">
-						Monat:
+						Monat auswählen:
 					</label>
 					<select
 						id="month-select"
@@ -230,149 +317,152 @@
 						{/each}
 					</select>
 				</div>
-
-				<div class="mt-4 flex gap-4">
-					<button
-						class="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-purple-700"
-						on:click={handleLogout}>Logout</button
-					>
-				</div>
 			</div>
 
 			{#if loading}
-				<Loading message="Lade Prioritäten..." />
+				<Loading message="Lade Dashboard..." />
 			{:else if error}
 				<div class="mb-6 rounded-lg bg-red-100 p-4 text-red-700 dark:bg-red-900 dark:text-red-300">
 					{error}
 				</div>
 			{:else}
-				<!-- Dashboard Cards Overview -->
-				<div class="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2">
-					<!-- Week Progress -->
-					<div
-						class="flex flex-col items-center rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800"
-					>
-						<div class="mb-2 text-lg font-semibold text-purple-600 dark:text-purple-300">
-							Wochenfortschritt - {getMonthName(selectedMonth)}
+				<!-- Main Statistics Grid -->
+				<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+					<!-- Progress Card -->
+					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+						<div class="mb-2 flex items-center justify-between">
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Fortschritt</span>
+							<span class="text-2xl">📊</span>
 						</div>
-
-						{#if allWeeksCompleted}
-							<div class="mb-4 text-center">
-								<div class="mb-2 text-4xl">✅</div>
-								<div class="font-semibold text-green-600 dark:text-green-400">
-									Alle Wochen vollständig!
-								</div>
-							</div>
-						{:else}
-							<div class="mb-2 h-4 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-								<div
-									class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-500"
-									style="width:{progressPercentage}%"
-								></div>
-							</div>
-							<div class="mb-2 text-sm text-gray-600 dark:text-gray-400">
-								{completedWeeks} von {totalWeeks} Wochen abgeschlossen ({progressPercentage}%)
-							</div>
-							{#if getNextIncompleteWeek()}
-								<div class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-									Nächste offene Woche: Woche {getNextIncompleteWeek()}
-								</div>
-							{/if}
-						{/if}
-
-						<a
-							href="/priorities"
-							class="mt-3 rounded bg-purple-100 px-3 py-1 font-medium text-purple-700 transition hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300"
-						>
-							{allWeeksCompleted ? 'Prioritäten ansehen' : 'Prioritäten bearbeiten'}
-						</a>
+						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
+							{progressPercentage}%
+						</div>
+						<div class="mb-2 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+							<div
+								class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-500"
+								style="width:{progressPercentage}%"
+							></div>
+						</div>
+						<div class="text-xs text-gray-600 dark:text-gray-400">
+							{completedWeeks}/{totalWeeks} Wochen
+						</div>
 					</div>
 
-					<!-- Statistics Card -->
-					<div class="flex flex-col rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
-						<div class="mb-3 text-lg font-semibold text-purple-600 dark:text-purple-300">
-							Aktuelle Statistiken
-						</div>
-						<div class="flex-1 space-y-2">
-							<div class="flex justify-between text-sm">
-								<span class="text-gray-600 dark:text-gray-400">Monat:</span>
-								<span class="font-medium text-gray-800 dark:text-gray-200">
-									{getMonthName(selectedMonth)}
-								</span>
-							</div>
-							<div class="flex justify-between text-sm">
-								<span class="text-gray-600 dark:text-gray-400">Gesamte Wochen:</span>
-								<span class="font-medium text-gray-800 dark:text-gray-200">{totalWeeks}</span>
-							</div>
-							<div class="flex justify-between text-sm">
-								<span class="text-gray-600 dark:text-gray-400">Priorisierte Wochen:</span>
-								<span class="font-medium text-gray-800 dark:text-gray-200">{completedWeeks}</span>
-							</div>
-							<div class="flex justify-between text-sm">
-								<span class="text-gray-600 dark:text-gray-400">Offene Wochen:</span>
-								<span class="font-medium text-gray-800 dark:text-gray-200">
-									{totalWeeks - completedWeeks}
-								</span>
-							</div>
-						</div>
-						{#if !allWeeksCompleted && totalWeeks - completedWeeks > 0}
-							<div
-								class="mt-3 rounded bg-orange-50 p-2 text-xs text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
+					<!-- Current Streak -->
+					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+						<div class="mb-2 flex items-center justify-between">
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+								>Aktuelle Serie</span
 							>
-								Noch {totalWeeks - completedWeeks}
-								{totalWeeks - completedWeeks === 1 ? 'Woche' : 'Wochen'} zu priorisieren
-							</div>
-						{/if}
+							<span class="text-2xl">🔥</span>
+						</div>
+						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
+							{currentStreak}
+						</div>
+						<div class="text-xs text-gray-600 dark:text-gray-400">aufeinanderfolgende Wochen</div>
+					</div>
+
+					<!-- Completion Rate -->
+					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+						<div class="mb-2 flex items-center justify-between">
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+								>Abschlussquote</span
+							>
+							<span class="text-2xl">✅</span>
+						</div>
+						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
+							{completionRate}%
+						</div>
+						<div class="text-xs text-gray-600 dark:text-gray-400">
+							{totalPrioritiesSet}/{totalWeeks * 5} Prioritäten
+						</div>
+					</div>
+
+					<!-- Longest Streak -->
+					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+						<div class="mb-2 flex items-center justify-between">
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Längste Serie</span
+							>
+							<span class="text-2xl">🏆</span>
+						</div>
+						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
+							{longestStreak}
+						</div>
+						<div class="text-xs text-gray-600 dark:text-gray-400">Wochen in Folge</div>
 					</div>
 				</div>
 
-				<!-- Recent Priorities Preview -->
+				<!-- Week Overview -->
 				{#if priorities.length > 0}
-					<div class="mb-6 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
-						<div class="mb-4 text-lg font-semibold text-purple-600 dark:text-purple-300">
-							Letzte Prioritäten
-						</div>
-						<div class="space-y-2">
-							{#each priorities.slice(0, 3) as priority (priority)}
+					<div class="mb-8 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
+						<h3 class="mb-4 text-lg font-semibold text-purple-600 dark:text-purple-300">
+							Wochenübersicht - {selectedMonth}
+						</h3>
+						<div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+							{#each priorities as week (week.weekNumber)}
 								<div
 									class="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
 								>
 									<div>
 										<span class="font-medium text-gray-800 dark:text-gray-200">
-											Woche {priority.weekNumber}
-										</span>
-										<span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
-											({priority.startDate} - {priority.endDate})
+											Woche {week.weekNumber}
 										</span>
 									</div>
 									<div>
-										{#if isWeekComplete(priority)}
-											<span class="text-green-600 dark:text-green-400">✓ Vollständig</span>
+										{#if isWeekComplete(week)}
+											<span
+												class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
+											>
+												✓ Vollständig
+											</span>
 										{:else}
-											<span class="text-orange-600 dark:text-orange-400">⚠ Unvollständig</span>
+											<span
+												class="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+											>
+												In Bearbeitung
+											</span>
 										{/if}
 									</div>
 								</div>
 							{/each}
 						</div>
+						{#if !allWeeksCompleted && getNextIncompleteWeek()}
+							<div class="mt-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+								<p class="text-sm text-blue-700 dark:text-blue-300">
+									💡 Nächste zu bearbeitende Woche: <strong>Woche {getNextIncompleteWeek()}</strong>
+								</p>
+								<a
+									href="/priorities"
+									class="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400"
+								>
+									Jetzt bearbeiten →
+								</a>
+							</div>
+						{/if}
 					</div>
 				{/if}
-			{/if}
 
-			<!-- Profile Card -->
-			<div class="flex items-center gap-4 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
-				<div class="flex-1">
-					<div class="font-semibold text-gray-800 dark:text-white">Account</div>
-				</div>
-				<a
-					href="/account"
-					class="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-purple-600 transition-colors hover:bg-purple-200 dark:bg-gray-700 dark:text-purple-300"
+				<!-- Account Management -->
+				<div
+					class="flex items-center justify-between rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800"
 				>
-					Account verwalten
-				</a>
-			</div>
+					<div>
+						<h3 class="font-semibold text-gray-800 dark:text-white">Account-Verwaltung</h3>
+						<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+							Passwort ändern, Gespeicherte Daten einsehen, Account löschen
+						</p>
+					</div>
+					<a
+						href="/account"
+						class="rounded-lg bg-purple-100 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300"
+					>
+						Account verwalten →
+					</a>
+				</div>
+			{/if}
 		</div>
 	</div>
 {:else}
 	<Loading message="Lade..." />
 {/if}
+
