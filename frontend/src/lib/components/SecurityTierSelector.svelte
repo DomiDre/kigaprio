@@ -38,7 +38,7 @@
 </script>
 
 <div class="space-y-3">
-	{#each tiers as tier}
+	{#each tiers as tier (tier)}
 		<button
 			type="button"
 			on:click={() => handleSelect(tier.id)}
@@ -51,9 +51,7 @@
 				<!-- Icon -->
 				<div
 					class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl
-						   {selectedTier === tier.id
-						? 'bg-blue-600 text-white'
-						: 'bg-gray-100 dark:bg-gray-700'}"
+						   {selectedTier === tier.id ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'}"
 				>
 					{tier.icon}
 				</div>
@@ -65,9 +63,7 @@
 							{tier.name}
 						</span>
 						{#if tier.id === 'balanced'}
-							<span
-								class="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white"
-							>
+							<span class="rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
 								{tier.tagline}
 							</span>
 						{/if}

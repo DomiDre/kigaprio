@@ -207,13 +207,11 @@ export class ApiService {
 
 		return this.requestJson(endpoint, {
 			method: 'GET',
-			headers: { "x-dek": dek }
+			headers: { 'x-dek': dek }
 		});
 	}
 
-	async updatePriority(
-		month: string,
-		priorityData: WeekData[]) {
+	async updatePriority(month: string, priorityData: WeekData[]) {
 		const dek = this.getDEKForRequest();
 		if (!dek) {
 			throw new Error('Keine Verschlüsselungsschlüssel verfügbar');
@@ -222,7 +220,7 @@ export class ApiService {
 		return this.requestJson(`/priorities/${month}`, {
 			method: 'PUT',
 			body: JSON.stringify(priorityData),
-			headers: { "x-dek": dek }
+			headers: { 'x-dek': dek }
 		});
 	}
 
@@ -249,7 +247,7 @@ export class ApiService {
 		}
 
 		return this.requestJson(`/admin/users/${month}`, {
-			method: 'GET',
+			method: 'GET'
 		});
 	}
 }

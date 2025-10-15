@@ -247,16 +247,11 @@
 			}
 		}
 
-		try {
-			// Save all weeks for the month (backend expects month-based updates)
-			await saveMonthData();
+		// Save all weeks for the month (backend expects month-based updates)
+		await saveMonthData();
 
-			if (shouldCloseModal) {
-				closeEditModal();
-			}
-		} catch (error) {
-			// Error handling already done in saveMonthData
-			throw error;
+		if (shouldCloseModal) {
+			closeEditModal();
 		}
 	}
 
@@ -372,4 +367,3 @@
 {:else}
 	<Loading message="Lade..." />
 {/if}
-

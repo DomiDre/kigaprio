@@ -12,14 +12,8 @@
 		getDayDates: (weekData: WeekData) => string[];
 		onWeekChange: (dayKey: DayName, priority: Priority) => void;
 	};
-	let {
-		editingWeek,
-		activeWeekIndex,
-		closeEditModal,
-		saveWeek,
-		getDayDates,
-		onWeekChange
-	}: Props = $props();
+	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, getDayDates, onWeekChange }: Props =
+		$props();
 
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
@@ -334,4 +328,3 @@
 		</div>
 	</div>
 </div>
-

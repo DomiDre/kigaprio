@@ -9,6 +9,13 @@
 	let password = '';
 	let error = '';
 	let isLoading = false;
+	let passwordInput: HTMLInputElement;
+	let modalContent: HTMLDivElement;
+
+	// Focus the password input when modal opens
+	$: if (isOpen && passwordInput) {
+		setTimeout(() => passwordInput?.focus(), 0);
+	}
 
 	async function handleReAuth() {
 		error = '';
@@ -36,6 +43,11 @@
 			handleLogout();
 		}
 	}
+
+	function handleContentKeydown(e: KeyboardEvent) {
+		// Stop propagation for keyboard events on the modal content
+		e.stopPropagation();
+	}
 </script>
 
 {#if isOpen}
@@ -45,11 +57,14 @@
 		on:keydown={handleKeydown}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div
+			bind:this={modalContent}
 			class="mx-4 w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-gray-800"
 			on:click|stopPropagation
-			role="document"
+			on:keydown={handleContentKeydown}
+			role="presentation"
 		>
 			<!-- Header -->
 			<div class="border-b border-gray-200 p-6 dark:border-gray-700">
@@ -81,11 +96,11 @@
 					<label class="block">
 						<span class="text-sm font-medium text-gray-700 dark:text-gray-300"> Passwort </span>
 						<input
+							bind:this={passwordInput}
 							type="password"
 							bind:value={password}
 							required
 							disabled={isLoading}
-							autofocus
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600

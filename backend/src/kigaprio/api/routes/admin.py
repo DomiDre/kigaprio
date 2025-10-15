@@ -276,10 +276,11 @@ async def get_user_submissions(
         user_submissions = []
         for user in users:
             user_id = user.id
-            priority = user_priorities.get(user_id)
-            if priority is None:
+            if user_id not in user_priorities:
                 # user did not submit anything to priorities
                 continue
+
+            priority = user_priorities[user_id]
 
             user_submissions.append(
                 UserPriorityRecordForAdmin(

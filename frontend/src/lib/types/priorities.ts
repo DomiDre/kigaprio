@@ -22,21 +22,20 @@ export type WeekPriority = Priorities & {
 // Extended week data used in frontend
 export type WeekData = WeekPriority & {
 	// Optional fields used by the frontend
-	startDate?: string;  // Format: "DD.MM.YYYY"
-	endDate?: string;    // Format: "DD.MM.YYYY"
-	id?: string;         // Backend-provided ID (if needed)
+	startDate?: string; // Format: "DD.MM.YYYY"
+	endDate?: string; // Format: "DD.MM.YYYY"
+	id?: string; // Backend-provided ID (if needed)
 	status?: WeekStatus; // Calculated status
 };
 
 // Backend response structure (matches PriorityResponse)
 export type PriorityResponse = {
-	month: string;  // Format: "YYYY-MM"
+	month: string; // Format: "YYYY-MM"
 	weeks: WeekPriority[];
 };
 
 // Request structure for updating priorities (entire month)
 export type UpdatePrioritiesRequest = {
-	month: string;  // Format: "YYYY-MM"
+	month: string; // Format: "YYYY-MM"
 	weeks: WeekPriority[];
 };
-

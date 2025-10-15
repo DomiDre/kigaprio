@@ -14,11 +14,6 @@ interface AuthState {
 	lastActivityTime: number | null;
 }
 
-interface DEKStorage {
-	dek?: string; // Full DEK for high/convenience modes
-	clientKeyPart?: string; // Client part for balanced mode
-}
-
 const TOKEN_KEY = 'auth_token';
 const DEK_KEY = 'dek';
 const CLIENT_KEY_PART = 'client_key_part';
