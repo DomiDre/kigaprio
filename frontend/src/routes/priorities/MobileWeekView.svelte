@@ -178,9 +178,11 @@
 	<div class="space-y-3">
 		{#each dayKeys as dayKey, dayIndex (dayKey)}
 			{@const dayDates = getDayDates(week)}
-			{@const monthName = new Date(
-				week.startDate.split('.').reverse().join('-')
-			).toLocaleDateString('de-DE', { month: 'short' })}
+			{@const monthName = week.startDate
+				? new Date(week.startDate.split('.').reverse().join('-')).toLocaleDateString('de-DE', {
+						month: 'short'
+					})
+				: ''}
 			{@const currentPriority = week[dayKey]}
 			{@const dayName = dayNames[dayKey]}
 

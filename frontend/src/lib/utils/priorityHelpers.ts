@@ -1,6 +1,6 @@
-import type { DayPriorities } from '$lib/types/priorities';
+import type { Priorities } from '$lib/types/priorities';
 
-export function validateWeekPriorities(priorities: DayPriorities): {
+export function validateWeekPriorities(priorities: Priorities): {
 	isValid: boolean;
 	isComplete: boolean;
 	message: string;
@@ -54,7 +54,7 @@ export function validateWeekPriorities(priorities: DayPriorities): {
 }
 
 // Optional: Strict validation for final submission (if needed)
-export function validateWeekPrioritiesStrict(priorities: DayPriorities): {
+export function validateWeekPrioritiesStrict(priorities: Priorities): {
 	isValid: boolean;
 	message: string;
 } {

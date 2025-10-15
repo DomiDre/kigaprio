@@ -272,7 +272,9 @@
 		const oldPriority = editingWeek[dayKey];
 
 		// Check if this priority is already used elsewhere
-		const dayUsingPriority = dayKeys.find((day) => day !== dayKey && editingWeek[day] === priority);
+		const dayUsingPriority = dayKeys.find(
+			(day) => day !== dayKey && editingWeek![day] === priority
+		);
 
 		// Set the priority for the selected day
 		editingWeek[dayKey] = priority;

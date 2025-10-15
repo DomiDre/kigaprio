@@ -118,6 +118,9 @@ export function formatMonthForDisplay(apiMonth: string): string {
 }
 
 export function getDayDates(weekData: WeekData): string[] {
+	if (!weekData.startDate) {
+		throw new Error('Tried to get day dates for a week where the start date was not set yet');
+	}
 	const [day, month, year] = weekData.startDate.split('.');
 	const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 
