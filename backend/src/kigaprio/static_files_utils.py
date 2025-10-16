@@ -248,7 +248,9 @@ def setup_static_file_serving(
 
     if not should_serve:
         if env == "development" and not serve_static:
-            logger.info("🚀 Development mode: Use Vite dev server at http://localhost:5173")
+            logger.info(
+                "🚀 Development mode: Use Vite dev server at http://localhost:5173"
+            )
             logger.info("   API available at http://localhost:8000/api/docs")
         else:
             logger.info("⚠️  Static files not found at", static_path)
@@ -323,15 +325,7 @@ def setup_static_file_serving(
                     )
                     raise HTTPException(status_code=404, detail="Not found")
 
-                # Security headers to prevent common attacks
-                headers = {
-                    "X-Content-Type-Options": "nosniff",  # Prevent MIME sniffing
-                    "X-Frame-Options": "DENY",  # Prevent clickjacking
-                    "Content-Security-Policy": "default-src 'self'",  # Basic CSP
-                    "Referrer-Policy": "strict-origin-when-cross-origin",
-                }
-
-                return FileResponse(file_to_serve, headers=headers)
+                return FileResponse(file_to_serve)
 
             except ValueError as e:
                 logger.warning(f"Path validation failed during serving: {full_path}")
