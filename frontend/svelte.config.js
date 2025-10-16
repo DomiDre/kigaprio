@@ -15,11 +15,12 @@ const config = {
 			precompress: false,
 			strict: true
 		}),
+		inlineStyleThreshold: 0,
 		csp: {
+			mode: 'auto',
 			directives: {
 				'script-src': ['self']
 			},
-			// must be specified with either the `report-uri` or `report-to` directives, or both
 			reportOnly: {
 				'script-src': ['self'],
 				'report-uri': ['/']
