@@ -6,6 +6,7 @@ path traversal attacks, symlink attacks, and other file system vulnerabilities.
 """
 
 import logging
+import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -41,6 +42,55 @@ ALLOWED_EXTENSIONS = {
 }
 
 
+def sanitize_path_input(user_input: str) -> str:
+    """
+    Sanitize user input before using it in path operations.
+
+    This function explicitly sanitizes user input to prevent path traversal
+    and other injection attacks. It's designed to be recognized by static
+    analysis tools like CodeQL.
+
+    Args:
+        user_input: Raw user input from request
+
+    Returns:
+        Sanitized path string safe for further processing
+
+    Raises:
+        ValueError: If input contains malicious patterns
+    """
+    if not user_input:
+        return ""
+
+    # Check for null bytes (path injection attempt)
+    if "\x00" in user_input:
+        logger.warning(f"Null byte injection attempt: {user_input!r}")
+        raise ValueError("Invalid path: null byte detected")
+
+    # Remove leading/trailing whitespace and slashes
+    sanitized = user_input.strip().lstrip("/")
+
+    # Reject absolute paths (Unix and Windows style)
+    if sanitized.startswith("/") or (len(sanitized) > 1 and sanitized[1] == ":"):
+        logger.warning(f"Absolute path attempt: {user_input}")
+        raise ValueError("Invalid path: absolute paths not allowed")
+
+    # Reject paths with suspicious patterns
+    # This catches many path traversal attempts
+    dangerous_patterns = [
+        r"\.\.",  # Parent directory traversal
+        r"\/\.",  # Hidden files/current dir manipulation
+        r"\\\.",  # Windows path traversal
+    ]
+
+    for pattern in dangerous_patterns:
+        if re.search(pattern, sanitized):
+            logger.warning(f"Suspicious pattern in path: {user_input}")
+            raise ValueError("Invalid path: suspicious pattern detected")
+
+    return sanitized
+
+
 def is_allowed_file(path: Path) -> bool:
     """
     Check if a file has an allowed extension for serving.
@@ -67,7 +117,7 @@ def is_safe_path(base_path: Path, requested_path: str) -> tuple[bool, Path | Non
 
     Args:
         base_path: The base directory that files must be within
-        requested_path: The user-requested path to validate
+        requested_path: The user-requested path to validate (should be pre-sanitized)
 
     Returns:
         Tuple of (is_safe, resolved_path)
@@ -86,19 +136,15 @@ def is_safe_path(base_path: Path, requested_path: str) -> tuple[bool, Path | Non
         if not requested_path:
             return True, base_path / "index.html"
 
-        # Remove any leading slashes and normalize case
-        # Case normalization prevents bypasses on case-insensitive filesystems
-        clean_path = requested_path.lstrip("/").strip().lower()
+        # Normalize case (prevents bypasses on case-insensitive filesystems)
+        clean_path = requested_path.lower()
 
-        # Reject paths with null bytes (potential injection attack)
-        if "\x00" in clean_path:
-            logger.warning(f"Null byte injection attempt: {requested_path!r}")
-            return False, None
-
-        # Reject absolute paths after cleaning
+        # Build path object
         candidate_path = Path(clean_path)
+
+        # Reject absolute paths
         if candidate_path.is_absolute():
-            logger.warning(f"Absolute path attempt: {requested_path}")
+            logger.warning(f"Absolute path in validation: {requested_path}")
             return False, None
 
         # Build and resolve the full path (resolves symlinks, .., etc)
@@ -162,7 +208,7 @@ def find_file_to_serve(base_path: Path, requested_path: str) -> Path | None:
 
     Args:
         base_path: The base static directory
-        requested_path: The requested path (will be cleaned and validated)
+        requested_path: The requested path (must be pre-sanitized)
 
     Returns:
         Path to serve, or None if no valid file found
@@ -298,18 +344,26 @@ def setup_static_file_serving(
         Secure static file server with path traversal protection.
 
         Serves static files for SPA routing while preventing security vulnerabilities.
-        Includes TOCTOU mitigation and security headers.
+        Includes explicit input sanitization and TOCTOU mitigation.
         """
         # API routes should never reach here (they're registered first)
         # but double-check as defense in depth
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
 
-        # Find and serve the appropriate file
-        file_to_serve = find_file_to_serve(static_root, full_path)
+        # STEP 1: Explicitly sanitize user input
+        try:
+            sanitized_path = sanitize_path_input(full_path)
+        except ValueError as e:
+            logger.warning(f"Path sanitization failed for {full_path}: {e}")
+            raise HTTPException(status_code=404, detail="Not found") from e
+
+        # STEP 2: Find and validate the file (using sanitized input)
+        # Now CodeQL can track that the path has been sanitized
+        file_to_serve = find_file_to_serve(static_root, sanitized_path)
 
         if file_to_serve and file_to_serve.is_file():
-            # TOCTOU mitigation: Re-validate the path just before serving
+            # STEP 3: TOCTOU mitigation - Re-validate just before serving
             try:
                 relative_path = str(file_to_serve.relative_to(static_root))
                 is_safe, revalidated_path = is_safe_path(static_root, relative_path)
@@ -318,13 +372,14 @@ def setup_static_file_serving(
                     logger.warning(f"TOCTOU validation failed for: {full_path}")
                     raise HTTPException(status_code=404, detail="Not found")
 
-                # Final file type check
+                # STEP 4: Final file type check
                 if not is_allowed_file(file_to_serve):
                     logger.warning(
                         f"Attempted to serve disallowed file: {file_to_serve}"
                     )
                     raise HTTPException(status_code=404, detail="Not found")
 
+                # STEP 5: Serve the validated file
                 return FileResponse(file_to_serve)
 
             except ValueError as e:
