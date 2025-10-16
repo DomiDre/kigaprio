@@ -285,6 +285,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         use_relaxed_csp = self._should_use_relaxed_csp(path)
         if use_relaxed_csp:
             logger.debug(f"Applied relaxed CSP for {path}")
+            return response
 
         # Only add headers to HTML responses and API responses
         if (
