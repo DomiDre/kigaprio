@@ -6,6 +6,7 @@ path traversal attacks, symlink attacks, and other file system vulnerabilities.
 """
 
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -41,20 +42,66 @@ ALLOWED_EXTENSIONS = {
     ".avif",
 }
 
+# Strict pattern for allowed path components
+# Only allows: alphanumeric, hyphen, underscore, period, forward slash
+SAFE_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9/_.\-]*$")
+
+
+def is_safe_path_string(path_str: str) -> bool:
+    """
+    Check if a path string contains only safe characters.
+
+    This is the first line of defense - reject any path with suspicious
+    characters before doing any path operations.
+
+    Args:
+        path_str: The path string to validate
+
+    Returns:
+        True if the path contains only safe characters
+    """
+    if not path_str:
+        return True
+
+    # Reject null bytes
+    if "\x00" in path_str:
+        logger.warning(f"Null byte in path: {path_str!r}")
+        return False
+
+    # Reject paths that don't match our safe pattern
+    if not SAFE_PATH_PATTERN.match(path_str):
+        logger.warning(f"Path contains unsafe characters: {path_str}")
+        return False
+
+    # Reject parent directory references
+    if ".." in path_str:
+        logger.warning(f"Parent directory reference in path: {path_str}")
+        return False
+
+    # Reject absolute paths
+    if path_str.startswith("/"):
+        logger.warning(f"Absolute path not allowed: {path_str}")
+        return False
+
+    # Reject hidden files/directories (starting with .)
+    parts = path_str.split("/")
+    for part in parts:
+        if part.startswith("."):
+            logger.warning(f"Hidden file/directory in path: {path_str}")
+            return False
+
+    return True
+
 
 def validate_and_resolve_path(base_path: Path, user_input: str) -> Path | None:
     """
     Validate and resolve a user-provided path against a base directory.
 
-    This function performs complete validation and sanitization of user input,
-    returning a fully resolved and validated Path object that is guaranteed to
-    be within the base directory. This approach is recognized by static analysis
-    tools as proper input sanitization.
-
-    Security measures:
-    1. Input sanitization (null bytes, suspicious patterns)
-    2. Path resolution (canonicalizes symlinks, .., etc.)
-    3. Boundary validation (ensures path is within base_path)
+    Uses multiple layers of validation:
+    1. Character allowlist (strict pattern matching)
+    2. Standard library path normalization
+    3. Canonical path resolution
+    4. Boundary validation using os.path.commonpath
 
     Args:
         base_path: The base directory that the path must be within
@@ -68,47 +115,53 @@ def validate_and_resolve_path(base_path: Path, user_input: str) -> Path | None:
         if not user_input:
             return base_path / "index.html"
 
-        # Check for null bytes (injection attack)
-        if "\x00" in user_input:
-            logger.warning(f"Null byte injection attempt: {user_input!r}")
+        # Strip and normalize the input
+        cleaned = user_input.strip().lstrip("/")
+
+        # CRITICAL: First check with allowlist - reject unsafe characters
+        if not is_safe_path_string(cleaned):
             return None
 
-        # Remove leading/trailing whitespace and slashes
-        sanitized = user_input.strip().lstrip("/")
+        # Use os.path.normpath for additional normalization
+        normalized = os.path.normpath(cleaned)
 
-        # Reject paths with suspicious patterns (path traversal)
-        dangerous_patterns = [
-            r"\.\.",  # Parent directory traversal
-            r"\/\.",  # Hidden files/current dir manipulation
-            r"\\\.",  # Windows path traversal
-        ]
+        # Additional check after normalization
+        if normalized.startswith("..") or normalized.startswith("/"):
+            logger.warning(f"Invalid normalized path: {normalized}")
+            return None
 
-        for pattern in dangerous_patterns:
-            if re.search(pattern, sanitized):
-                logger.warning(f"Suspicious pattern in path: {user_input}")
-                return None
+        # Convert to lowercase for case-insensitive filesystems
+        normalized = normalized.lower()
 
-        # Normalize case (prevents bypasses on case-insensitive filesystems)
-        normalized = sanitized.lower()
+        # Build the full path from trusted base
+        full_path_str = os.path.join(str(base_path), normalized)
 
-        # Construct path using only trusted base and normalized input
-        # This is the critical step: we build from a trusted base
-        candidate = base_path / normalized
-
-        # Resolve to canonical absolute path (resolves symlinks, .., etc)
-        resolved = candidate.resolve()
+        # Resolve to absolute canonical path
+        resolved_str = os.path.abspath(full_path_str)
+        resolved_path = Path(resolved_str)
 
         # Get canonical base path
-        base_resolved = base_path.resolve()
+        base_resolved_str = os.path.abspath(str(base_path))
+        base_resolved = Path(base_resolved_str)
 
-        # CRITICAL VALIDATION: Verify resolved path is within base
-        # This is the primary defense against path traversal
-        if not resolved.is_relative_to(base_resolved):
-            logger.warning(f"Path traversal attempt: {user_input} -> {resolved}")
+        # Use os.path.commonpath for validation
+        try:
+            common = os.path.commonpath([resolved_str, base_resolved_str])
+            if common != base_resolved_str:
+                logger.warning(f"Path escapes base directory: {user_input}")
+                return None
+        except ValueError:
+            # Paths are on different drives (Windows) or invalid
+            logger.warning(f"Invalid path comparison: {user_input}")
             return None
 
-        # Path is validated and safe to use
-        return resolved
+        # Double-check with Path.is_relative_to
+        if not resolved_path.is_relative_to(base_resolved):
+            logger.warning(f"Path not relative to base: {user_input}")
+            return None
+
+        # Path is validated and safe
+        return resolved_path
 
     except (ValueError, RuntimeError, OSError) as e:
         logger.warning(f"Path validation error for {user_input}: {e}")
@@ -142,12 +195,16 @@ def validate_directory_safety(directory: Path, base: Path) -> bool:
         True if the directory is safe to use
     """
     try:
-        resolved = directory.resolve()
-        base_resolved = base.resolve()
+        resolved_str = os.path.abspath(str(directory))
+        base_str = os.path.abspath(str(base))
 
-        # Check that resolved directory is within base
-        if not resolved.is_relative_to(base_resolved):
-            logger.warning(f"Directory outside base path: {directory}")
+        try:
+            common = os.path.commonpath([resolved_str, base_str])
+            if common != base_str:
+                logger.warning(f"Directory outside base path: {directory}")
+                return False
+        except ValueError:
+            logger.warning(f"Invalid directory path: {directory}")
             return False
 
         return True
@@ -168,7 +225,7 @@ def find_file_to_serve(base_path: Path, validated_path: Path) -> Path | None:
 
     Args:
         base_path: The base static directory
-        validated_path: A pre-validated Path object (already checked by validate_and_resolve_path)
+        validated_path: A pre-validated Path object
 
     Returns:
         Path to serve, or None if no valid file found
@@ -188,13 +245,11 @@ def find_file_to_serve(base_path: Path, validated_path: Path) -> Path | None:
         index_file = validated_path / "index.html"
         if index_file.is_file():
             # Re-validate that index.html is within base
-            # (defense in depth against symlink attacks)
             try:
-                index_resolved = index_file.resolve()
-                base_resolved = base_path.resolve()
-                if index_resolved.is_relative_to(base_resolved) and is_allowed_file(
-                    index_file
-                ):
+                index_str = os.path.abspath(str(index_file))
+                base_str = os.path.abspath(str(base_path))
+                common = os.path.commonpath([index_str, base_str])
+                if common == base_str and is_allowed_file(index_file):
                     return index_file
             except (ValueError, OSError):
                 logger.warning(f"Index file validation failed: {index_file}")
@@ -205,11 +260,10 @@ def find_file_to_serve(base_path: Path, validated_path: Path) -> Path | None:
     try:
         if html_file.is_file():
             # Validate the .html file is within base
-            html_resolved = html_file.resolve()
-            base_resolved = base_path.resolve()
-            if html_resolved.is_relative_to(base_resolved) and is_allowed_file(
-                html_file
-            ):
+            html_str = os.path.abspath(str(html_file))
+            base_str = os.path.abspath(str(base_path))
+            common = os.path.commonpath([html_str, base_str])
+            if common == base_str and is_allowed_file(html_file):
                 return html_file
     except (ValueError, OSError):
         pass
@@ -293,33 +347,30 @@ def setup_static_file_serving(
         Secure static file server with path traversal protection.
 
         Serves static files for SPA routing while preventing security vulnerabilities.
-        Uses complete validation and sanitization before any path operations.
+        Uses strict allowlist validation and standard library sanitization.
         """
         # API routes should never reach here (they're registered first)
-        # but double-check as defense in depth
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
 
-        # Validate and resolve the user input to a safe path
-        # This performs ALL security checks and returns a validated Path object
-        # CodeQL recognizes this as proper sanitization since we return a new
-        # Path object that's been validated, not derived from user input
+        # Validate user input with strict allowlist and standard library sanitization
         validated_path = validate_and_resolve_path(static_root, full_path)
 
         if validated_path is None:
             # Validation failed - path is unsafe
             raise HTTPException(status_code=404, detail="Not found")
 
-        # Find the appropriate file to serve (using validated path)
+        # Find the appropriate file to serve
         file_to_serve = find_file_to_serve(static_root, validated_path)
 
         if file_to_serve and file_to_serve.is_file():
             # TOCTOU mitigation: Re-validate just before serving
             try:
-                revalidated = file_to_serve.resolve()
-                base_resolved = static_root.resolve()
+                file_str = os.path.abspath(str(file_to_serve))
+                base_str = os.path.abspath(str(static_root))
 
-                if not revalidated.is_relative_to(base_resolved):
+                common = os.path.commonpath([file_str, base_str])
+                if common != base_str:
                     logger.warning(f"TOCTOU validation failed for: {full_path}")
                     raise HTTPException(status_code=404, detail="Not found")
 
