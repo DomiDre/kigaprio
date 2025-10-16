@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from kigaprio.api.routes import admin, auth, health, priorities
 from kigaprio.config import settings
 from kigaprio.middleware.auth_middleware import TokenRefreshMiddleware
+from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
 
 
 class HealthCheckFilter(logging.Filter):
@@ -57,6 +58,9 @@ else:
             allow_headers=["*"],
         )
 
+static_path = Path("/app/static")
+app.add_middleware(SecurityHeadersMiddleware, static_path=static_path)
+
 # add middlewares
 app.add_middleware(TokenRefreshMiddleware)
 
@@ -67,7 +71,6 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Pocketbase"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 # Serve static files (compiled Svelte frontend)
-static_path = Path("/app/static")
 
 # Serve static files in production OR when explicitly enabled in development
 if (ENV == "production" or SERVE_STATIC) and static_path.exists():
