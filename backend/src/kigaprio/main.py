@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from kigaprio.api.routes import admin, auth, health, priorities
@@ -56,7 +56,12 @@ else:
         )
 
 static_path = Path("/app/static")
-app.add_middleware(SecurityHeadersMiddleware, static_path=static_path)
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    static_path=static_path,
+    enable_hsts=(ENV == "production"),
+    csp_report_uri="/api/csp-violations",
+)
 
 # add middlewares
 app.add_middleware(TokenRefreshMiddleware)
@@ -66,6 +71,13 @@ app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(priorities.router, prefix="/api/v1/priorities", tags=["Prioliste"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Pocketbase"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+
+
+@app.post("/api/csp-violations")
+async def csp_violation_report(request: Request):
+    report = await request.json()
+    logger.warning(f"CSP Violation: {report}")
+    return {"status": "ok"}
 
 
 # Serve static files in production OR when explicitly enabled in development
