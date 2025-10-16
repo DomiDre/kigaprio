@@ -200,4 +200,5 @@ def setup_static_file_serving(
 
         raise HTTPException(status_code=404, detail="Not found")
 
+    _ = serve_spa  # suppress warning that function is unused
     print("  ✓ Secure static file serving configured")
