@@ -17,13 +17,9 @@ const config = {
 		}),
 		inlineStyleThreshold: 0,
 		csp: {
-			mode: 'auto',
+			mode: 'hash',
 			directives: {
 				'script-src': ['self']
-			},
-			reportOnly: {
-				'script-src': ['self'],
-				'report-uri': ['/']
 			}
 		}
 	}
