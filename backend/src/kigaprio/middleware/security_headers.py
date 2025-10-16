@@ -15,7 +15,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.static_path = static_path
         self.script_hashes: set[str] = set()
-        self.script_contents: dict[str, str] = {}  # For debugging
 
         # Extract hashes at startup
         self._extract_hashes()
@@ -39,7 +38,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         for match in matches:
             script_content = match.group(1)
-            # DON'T strip - whitespace matters for hashing!
             if script_content:  # Allow empty scripts too if present
                 scripts.append(script_content)
 
@@ -47,13 +45,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     def _calculate_hash(self, content: str) -> str:
         """Calculate SHA-256 hash for content."""
-        # Hash the EXACT content, including all whitespace
         hash_digest = hashlib.sha256(content.encode("utf-8")).digest()
         hash_b64 = base64.b64encode(hash_digest).decode("utf-8")
         hash_str = f"'sha256-{hash_b64}'"
-
-        # Store for debugging
-        self.script_contents[hash_str] = content[:100]  # First 100 chars
 
         return hash_str
 
