@@ -405,14 +405,7 @@ def setup_static_file_serving(
                     raise HTTPException(status_code=404, detail="Not found")
 
                 # Use file descriptor for better TOCTOU protection
-                return FileResponse(
-                    file_to_serve,
-                    headers={
-                        "X-Content-Type-Options": "nosniff",
-                        "X-Frame-Options": "DENY",
-                        "Content-Security-Policy": "default-src 'self'",
-                    },
-                )
+                return FileResponse(file_to_serve)
 
             except (ValueError, OSError, PermissionError) as e:
                 logger.warning(f"Error during file serving: {type(e).__name__}")
