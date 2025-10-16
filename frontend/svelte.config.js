@@ -15,13 +15,6 @@ const config = {
 			precompress: false,
 			strict: true
 		}),
-		inlineStyleThreshold: 0,
-		csp: {
-			mode: 'hash',
-			directives: {
-				'script-src': ['self']
-			}
-		}
 	}
 };
 
