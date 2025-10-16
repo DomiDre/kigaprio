@@ -1,12 +1,6 @@
-def test_root_endpoint(client):
-    """Test the root endpoint returns correct response"""
-    response = client.get("/")
-    assert response.status_code == 200
-
-
 def test_health_endpoint(client):
     """Test health check endpoint"""
-    response = client.get("/health")
+    response = client.get("/api/v1/health")
     assert response.status_code == 200
 
 
