@@ -15,7 +15,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.static_path = static_path
         self.script_hashes: set[str] = set()
-        self.style_hashes: set[str] = set()
+        self.script_contents: dict[str, str] = {}  # For debugging
 
         # Extract hashes at startup
         self._extract_hashes()
@@ -24,28 +24,41 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         self.csp_header = self._build_csp()
         logger.info(f"CSP initialized with {len(self.script_hashes)} script hashes")
 
-    def _extract_inline_scripts(self, html_content: str) -> list[str]:
-        """Extract inline script contents from HTML."""
-        # Match <script> tags without src attribute
-        pattern = r"<script(?![^>]*\ssrc=)[^>]*>(.*?)</script>"
-        matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
-        return [match.strip() for match in matches if match.strip()]
+        # Log all hashes for debugging
+        for hash_val in sorted(self.script_hashes):
+            logger.info(f"  Allowed script hash: {hash_val}")
 
-    def _extract_inline_styles(self, html_content: str) -> list[str]:
-        """Extract inline style contents from HTML."""
-        # Match <style> tags
-        pattern = r"<style[^>]*>(.*?)</style>"
-        matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
-        return [match.strip() for match in matches if match.strip()]
+    def _extract_inline_scripts(self, html_content: str) -> list[str]:
+        """Extract inline script contents from HTML, preserving exact whitespace."""
+        scripts = []
+
+        # Match <script> tags without src attribute
+        # This regex captures the content between <script> and </script>
+        pattern = r"<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>"
+        matches = re.finditer(pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+        for match in matches:
+            script_content = match.group(1)
+            # DON'T strip - whitespace matters for hashing!
+            if script_content:  # Allow empty scripts too if present
+                scripts.append(script_content)
+
+        return scripts
 
     def _calculate_hash(self, content: str) -> str:
         """Calculate SHA-256 hash for content."""
+        # Hash the EXACT content, including all whitespace
         hash_digest = hashlib.sha256(content.encode("utf-8")).digest()
         hash_b64 = base64.b64encode(hash_digest).decode("utf-8")
-        return f"'sha256-{hash_b64}'"
+        hash_str = f"'sha256-{hash_b64}'"
+
+        # Store for debugging
+        self.script_contents[hash_str] = content[:100]  # First 100 chars
+
+        return hash_str
 
     def _extract_hashes(self):
-        """Extract and hash all inline scripts and styles from static HTML files."""
+        """Extract and hash all inline scripts from static HTML files."""
         if not self.static_path.exists():
             logger.warning(f"Static path {self.static_path} does not exist")
             return
@@ -66,21 +79,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
                 # Extract and hash inline scripts
                 inline_scripts = self._extract_inline_scripts(html_content)
-                for script in inline_scripts:
-                    hash_value = self._calculate_hash(script)
-                    self.script_hashes.add(hash_value)
-                    logger.debug(
-                        f"Found inline script in {html_file.name}: {hash_value}"
+
+                if inline_scripts:
+                    logger.info(
+                        f"Found {len(inline_scripts)} inline script(s) in {html_file.name}"
                     )
 
-                # Extract and hash inline styles (optional, for stricter CSP)
-                inline_styles = self._extract_inline_styles(html_content)
-                for style in inline_styles:
-                    hash_value = self._calculate_hash(style)
-                    self.style_hashes.add(hash_value)
-                    logger.debug(
-                        f"Found inline style in {html_file.name}: {hash_value}"
-                    )
+                for i, script in enumerate(inline_scripts):
+                    hash_value = self._calculate_hash(script)
+                    self.script_hashes.add(hash_value)
+
+                    # Debug log
+                    logger.debug(f"  Script {i + 1} hash: {hash_value}")
+                    logger.debug(f"  Script {i + 1} length: {len(script)} bytes")
+                    logger.debug(f"  Script {i + 1} preview: {repr(script[:80])}")
 
             except Exception as e:
                 logger.error(f"Error processing {html_file}: {e}")
@@ -92,16 +104,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if self.script_hashes:
             script_src += " " + " ".join(sorted(self.script_hashes))
 
-        # For styles, you can choose between hashes or 'unsafe-inline'
-        # Option 1: Use hashes (stricter)
-        style_src = "'self'"
-        if self.style_hashes:
-            style_src += " " + " ".join(sorted(self.style_hashes))
-        # Add unsafe-inline as fallback for SvelteKit transitions
-        style_src += " 'unsafe-inline'"
-
-        # Option 2: Just use unsafe-inline (simpler, still secure enough)
-        # style_src = "'self' 'unsafe-inline'"
+        # For styles - keep unsafe-inline for SvelteKit transitions
+        style_src = "'self' 'unsafe-inline'"
 
         csp_parts = [
             "default-src 'self'",
@@ -124,7 +128,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Only add headers to HTML responses and API responses
-        # Skip for static assets like JS, CSS, images
         content_type = response.headers.get("content-type", "")
 
         if (
@@ -144,13 +147,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Permissions-Policy"] = (
                 "accelerometer=(), ambient-light-sensor=(), autoplay=(), "
                 "battery=(), camera=(), display-capture=(), document-domain=(), "
-                "encrypted-media=(), execution-while-not-rendered=(), "
-                "execution-while-out-of-viewport=(), fullscreen=(self), "
-                "geolocation=(), gyroscope=(), hid=(), idle-detection=(), "
-                "magnetometer=(), microphone=(), midi=(), navigation-override=(), "
-                "payment=(), picture-in-picture=(), publickey-credentials-get=(), "
-                "screen-wake-lock=(), serial=(), sync-xhr=(), usb=(), "
-                "web-share=(), xr-spatial-tracking=()"
+                "encrypted-media=(), fullscreen=(self), "
+                "geolocation=(), gyroscope=(), microphone=(), "
+                "payment=(), picture-in-picture=(), "
+                "screen-wake-lock=(), usb=(), web-share=()"
             )
 
             # Other Security Headers
