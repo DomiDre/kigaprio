@@ -283,7 +283,6 @@ async def login_user(
                     encrypted_server_part = EncryptionManager.encrypt_dek_part(
                         server_part
                     )
-                    print(encrypted_server_part)
 
                     # Store encrypted server part in Redis with 30-minute TTL
                     dek_cache_key = f"dek:{user_record.id}:{token}"

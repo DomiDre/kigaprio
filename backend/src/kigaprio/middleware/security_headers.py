@@ -16,11 +16,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         self.static_path = static_path
         self.script_hashes: set[str] = set()
 
+        self.relaxed_csp_routes = [
+            "/api/docs",
+        ]
         # Extract hashes at startup
         self._extract_hashes()
 
         # Build CSP header once
         self.csp_header = self._build_csp()
+        self.relaxed_csp_header = self._build_relaxed_csp()
         logger.info(f"CSP initialized with {len(self.script_hashes)} script hashes")
 
         # Log all hashes for debugging
@@ -117,9 +121,33 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         return "; ".join(csp_parts)
 
+    def _build_relaxed_csp(self) -> str:
+        """Build relaxed CSP for API documentation (Swagger UI, ReDoc)."""
+        csp_parts = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # Swagger needs eval
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: https:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",
+            "object-src 'none'",
+        ]
+
+        return "; ".join(csp_parts)
+
+    def _should_use_relaxed_csp(self, path: str) -> bool:
+        """Check if the request path should use relaxed CSP."""
+        return any(path.startswith(route) for route in self.relaxed_csp_routes)
+
     async def dispatch(self, request: Request, call_next):
         # Process the request normally
         response = await call_next(request)
+        path = request.url.path
+        if self._should_use_relaxed_csp(path):
+            logger.debug(f"Applied relaxed CSP for {path}")
+            return response
 
         # Only add headers to HTML responses and API responses
         content_type = response.headers.get("content-type", "")

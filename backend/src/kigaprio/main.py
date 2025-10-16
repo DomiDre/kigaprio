@@ -2,26 +2,24 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from kigaprio.api.routes import admin, auth, health, priorities
 from kigaprio.config import settings
+from kigaprio.logging_config import setup_logging
 from kigaprio.middleware.auth_middleware import TokenRefreshMiddleware
 from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
+from kigaprio.static_files_utils import setup_static_file_serving
+
+ENV = os.getenv("ENV", "production")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG" if ENV == "development" else "INFO")
+SERVE_STATIC = os.getenv("SERVE_STATIC", "false").lower() == "true"
+setup_logging(LOG_LEVEL)
 
 
-class HealthCheckFilter(logging.Filter):
-    def filter(self, record):
-        message = record.getMessage()
-        return "/api/v1/health" not in message
-
-
-logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
-logging.getLogger("gunicorn.access").addFilter(HealthCheckFilter())
-
+logger = logging.getLogger(__name__)
+logger.info("Starting KigaPrio API")
 # Create FastAPI app
 app = FastAPI(
     title="KigaPrio API",
@@ -30,8 +28,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
-ENV = os.getenv("ENV", "production")
-SERVE_STATIC = os.getenv("SERVE_STATIC", "false").lower() == "true"
+
 
 # CORS configuration
 if ENV == "development":
@@ -70,120 +67,11 @@ app.include_router(priorities.router, prefix="/api/v1/priorities", tags=["Prioli
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Pocketbase"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
-# Serve static files (compiled Svelte frontend)
 
 # Serve static files in production OR when explicitly enabled in development
-if (ENV == "production" or SERVE_STATIC) and static_path.exists():
-    print(f"🎯 Serving static files from {static_path}")
-
-    # Check if static files actually exist
-    if any(static_path.iterdir()):
-        # Mount SvelteKit app directories
-        if (static_path / "_app").exists():
-            app.mount(
-                "/_app",
-                StaticFiles(directory=static_path / "_app", check_dir=True),
-                name="static_app",
-            )
-            print("  ✓ Mounted /_app directory")
-
-        if (static_path / "assets").exists():
-            app.mount(
-                "/assets",
-                StaticFiles(directory=static_path / "assets", check_dir=True),
-                name="assets",
-            )
-            print("  ✓ Mounted /assets directory")
-
-        # Catch-all route for SvelteKit client-side routing
-        @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str):
-            # Skip API routes
-            if full_path.startswith("api/"):
-                raise HTTPException(status_code=404, detail="Not found")
-
-            # Reject absolute paths
-            if Path(full_path).is_absolute() or full_path.startswith("/"):
-                raise HTTPException(status_code=400, detail="Invalid path")
-
-            # Resolve static root once
-            static_root = static_path.resolve()
-
-            # Handle empty path (root request)
-            if not full_path or full_path == "/":
-                index_path = static_root / "index.html"
-                if index_path.exists():
-                    return FileResponse(index_path)
-                raise HTTPException(status_code=404, detail="Not found")
-
-            # Sanitize the requested path
-            try:
-                # Build the full path and resolve it
-                requested_path = (static_root / full_path).resolve()
-
-                # Security check: ensure the resolved path is within static_root
-                requested_path.relative_to(static_root)
-            except (ValueError, RuntimeError) as e:
-                # Path traversal attempt or invalid path
-                raise HTTPException(status_code=400, detail="Invalid path") from e
-
-            # Try exact file match
-            if requested_path.exists() and requested_path.is_file():
-                return FileResponse(requested_path)
-
-            # Try as directory with index.html
-            index_in_dir = requested_path / "index.html"
-            if index_in_dir.exists() and index_in_dir.is_file():
-                return FileResponse(index_in_dir)
-
-            # Try with .html extension
-            html_file = (
-                requested_path.parent / f"{requested_path.name}.html"
-            ).resolve()
-            if html_file.exists() and html_file.is_file():
-                # Verify it's still within static_root
-                try:
-                    html_file.relative_to(static_root)
-                    return FileResponse(html_file)
-                except (ValueError, RuntimeError) as e:
-                    raise HTTPException(status_code=400, detail="Invalid path") from e
-
-            # Fallback to root index.html for client-side routing
-            index_path = static_root / "index.html"
-            if index_path.exists():
-                return FileResponse(index_path)
-
-            raise HTTPException(status_code=404, detail="Not found")
-
-        print("  ✓ Static file serving configured")
-    else:
-        print("  ⚠️  Static directory exists but is empty")
-elif ENV == "development" and not SERVE_STATIC:
-    print("🚀 Development mode: Use Vite dev server at http://localhost:5173")
-    print("   API available at http://localhost:8000/api/docs")
-else:
-    print("⚠️  Static files not found at", static_path)
-
-
-# Catch-all route for SPA routing (should be last)
-@app.get("/{path:path}")
-async def catch_all(path: str):
-    """Catch-all route for SPA routing."""
-    static_dir = os.path.join(os.path.dirname(__file__), "static")
-    index_path = os.path.join(static_dir, "index.html")
-
-    # Check if it's an API route
-    if path.startswith("api/"):
-        return {"error": "API endpoint not found"}
-
-    # Serve index.html for all other routes (SPA routing)
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-
-    return {
-        "message": "Frontend not found. Please build and copy your Svelte app to src/kigaprio/static/"
-    }
-
+setup_static_file_serving(
+    app=app, static_path=static_path, env=ENV, serve_static=SERVE_STATIC
+)
 
 if __name__ == "__main__":
     import uvicorn
