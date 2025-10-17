@@ -25,6 +25,7 @@
 	import { apiService } from '$lib/services/api';
 	import Loading from '$lib/components/Loading.svelte';
 	import { dayKeys } from '$lib/config/priorities';
+	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -259,81 +260,68 @@
 
 {#if isLoading}
 	<Loading message="Lade..." />
-{:else if dekMissing}
-	<div
-		class="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
-	>
-		<div class="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800">
-			<div class="mb-4 text-6xl">⚠️</div>
-			<h2 class="mb-4 text-2xl font-bold text-gray-800 dark:text-white">Sitzung abgelaufen</h2>
-			<p class="mb-4 text-gray-600 dark:text-gray-300">
-				Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...
-			</p>
-			<div class="animate-spin text-4xl">⟳</div>
-		</div>
-	</div>
-{:else if $isAuthenticated}
-	<div
-		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
-	>
-		<div class="container mx-auto max-w-6xl px-4 py-8">
-			<Header {monthOptions} bind:selectedMonth />
+{:else}
+	<ProtectedRoute>
+		<div
+			class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
+		>
+			<div class="container mx-auto max-w-6xl px-4 py-8">
+				<Header {monthOptions} bind:selectedMonth />
 
-			<!-- Navigation Bar -->
-			<div class="mb-6 flex items-center justify-end gap-3">
-				<a
-					href="/dashboard"
-					class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
+				<!-- Navigation Bar -->
+				<div class="mb-6 flex items-center justify-end gap-3">
+					<a
+						href="/dashboard"
+						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+							/>
+						</svg>
+						Dashboard
+					</a>
+				</div>
+
+				<Legend />
+				{#if weeks.length > 0}
+					<ProgressBar {completedWeeks} totalWeeks={weeks.length} {progressPercentage} />
+
+					{#if isMobile}
+						<WeekTabs {weeks} bind:activeWeekIndex />
+						<MobileWeekView
+							week={weeks[activeWeekIndex]}
+							weekIndex={activeWeekIndex}
+							{selectPriority}
+							{saveWeek}
+							{getDayDates}
 						/>
-					</svg>
-					Dashboard
-				</a>
+					{:else}
+						<DesktopGridView {weeks} {openEditModal} />
+					{/if}
+				{/if}
+				<Notifications {saveError} {saveSuccess} />
 			</div>
 
-			<Legend />
-			{#if weeks.length > 0}
-				<ProgressBar {completedWeeks} totalWeeks={weeks.length} {progressPercentage} />
-
-				{#if isMobile}
-					<WeekTabs {weeks} bind:activeWeekIndex />
-					<MobileWeekView
-						week={weeks[activeWeekIndex]}
-						weekIndex={activeWeekIndex}
-						{selectPriority}
-						{saveWeek}
-						{getDayDates}
-					/>
-				{:else}
-					<DesktopGridView {weeks} {openEditModal} />
-				{/if}
+			{#if showEditModal && editingWeek}
+				<EditModal
+					{editingWeek}
+					activeWeekIndex={editingWeekIndex}
+					{closeEditModal}
+					saveWeek={saveEditingWeek}
+					{getDayDates}
+					onWeekChange={handleWeekChange}
+				/>
 			{/if}
-			<Notifications {saveError} {saveSuccess} />
 		</div>
-
-		{#if showEditModal && editingWeek}
-			<EditModal
-				{editingWeek}
-				activeWeekIndex={editingWeekIndex}
-				{closeEditModal}
-				saveWeek={saveEditingWeek}
-				{getDayDates}
-				onWeekChange={handleWeekChange}
-			/>
-		{/if}
-	</div>
-{:else}
-	<Loading message="Lade..." />
+	</ProtectedRoute>
 {/if}

@@ -80,7 +80,7 @@ export class ApiService {
 		});
 
 		// Update auth store (cookies are set automatically by server)
-		authStore.setAuth(response.security_mode);
+		authStore.setAuth();
 
 		return response;
 	}
