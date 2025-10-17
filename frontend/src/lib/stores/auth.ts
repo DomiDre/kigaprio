@@ -13,7 +13,7 @@ interface AuthState {
 function createAuthStore() {
 	const initialState: AuthState = {
 		isLoading: false,
-		isAuthenticated: false,
+		isAuthenticated: false
 	};
 
 	// On page load, check if we have a stored security mode
@@ -64,7 +64,7 @@ function createAuthStore() {
 
 			set({
 				isLoading: false,
-				isAuthenticated: false,
+				isAuthenticated: false
 			});
 		},
 
@@ -88,16 +88,15 @@ function createAuthStore() {
 				set({
 					isLoading: false,
 					isAuthenticated: true,
-					userId: data["user_id"],
-					username: data["username"]
+					userId: data['user_id'],
+					username: data['username']
 				});
-
 			} catch (error) {
 				console.error('Auth verification failed:', error);
 				authStore.clearAuth();
 				return false;
 			}
-		},
+		}
 	};
 }
 
@@ -107,16 +106,10 @@ export const authStore = createAuthStore();
 // DERIVED STORES
 // ============================================================================
 
-export const isAuthenticated = derived(
-	authStore,
-	($auth) => $auth.isAuthenticated
-);
+export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticated);
 
-export const currentUser = derived(
-	authStore,
-	($auth) => ({
-		userId: $auth.userId,
-		username: $auth.username,
-		role: $auth.role
-	})
-);
+export const currentUser = derived(authStore, ($auth) => ({
+	userId: $auth.userId,
+	username: $auth.username,
+	role: $auth.role
+}));

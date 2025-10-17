@@ -12,4 +12,3 @@ export function isSessionValid(): boolean {
 
 	return auth.isAuthenticated;
 }
-
