@@ -5,7 +5,6 @@
 	import { goto } from '$app/navigation';
 	import Loading from '$lib/components/Loading.svelte';
 	import { getMonthOptions, parseMonthString, formatMonthForAPI } from '$lib/utils/dateHelpers';
-	import { isDEKAvailable } from '$lib/utils/sessionUtils';
 	import type { WeekData } from '$lib/types/priorities';
 	import { SvelteDate } from 'svelte/reactivity';
 
@@ -34,8 +33,7 @@
 	}
 
 	async function loadPriorities() {
-		if (!isDEKAvailable()) {
-			dekMissing = true;
+		if (!$isAuthenticated) {
 			error = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
 			setTimeout(() => {
 				authStore.clearAuth();
@@ -182,18 +180,7 @@
 	}
 
 	onMount(() => {
-		if ($isAuthenticated) {
-			if (!isDEKAvailable()) {
-				dekMissing = true;
-				loading = false;
-				setTimeout(() => {
-					authStore.clearAuth();
-					goto('/login');
-				}, 2000);
-				return;
-			}
-			loadPriorities();
-		}
+		loadPriorities();
 	});
 
 	// Reload priorities when month changes

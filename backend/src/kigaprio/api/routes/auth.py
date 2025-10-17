@@ -2,12 +2,10 @@ import base64
 import json
 import secrets
 from datetime import datetime
-from typing import Any, Literal
 
 import httpx
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from kigaprio.models.auth import (
     DatabaseLoginResponse,
@@ -16,19 +14,98 @@ from kigaprio.models.auth import (
     MagicWordRequest,
     MagicWordResponse,
     RegisterRequest,
+    SecurityMode,
+    SessionInfo,
+)
+from kigaprio.models.cookie import (
+    COOKIE_AUTH_TOKEN,
+    COOKIE_DEK,
+    COOKIE_DOMAIN,
+    COOKIE_PATH,
+    COOKIE_SECURE,
 )
 from kigaprio.services.encryption import EncryptionManager
-from kigaprio.services.magic_word import (
-    get_magic_word_from_cache_or_db,
-)
+from kigaprio.services.magic_word import get_magic_word_from_cache_or_db
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import (
-    get_redis,
+from kigaprio.services.redis_service import get_redis
+from kigaprio.utils import (
+    extract_session_info_from_record,
+    get_client_ip,
+    get_current_token,
+    verify_token,
 )
-from kigaprio.utils import extract_session_info_from_record, get_client_ip
 
 router = APIRouter()
-security = HTTPBearer()
+
+# ============================================================================
+# COOKIE CONFIGURATION
+# ============================================================================
+
+
+# Security mode type
+def set_auth_cookies(
+    response: Response,
+    token: str,
+    dek: bytes,
+    max_age: int,
+) -> None:
+    """
+    Set both auth_token and DEK as httpOnly cookies.
+
+    Args:
+        response: FastAPI Response object
+        token: Authentication token
+        dek: Data Encryption Key (raw bytes)
+        max_age: Cookie lifetime in seconds
+    """
+    # Set auth token cookie
+    response.set_cookie(
+        key=COOKIE_AUTH_TOKEN,
+        value=token,
+        max_age=max_age,
+        path=COOKIE_PATH,
+        domain=COOKIE_DOMAIN,
+        secure=COOKIE_SECURE,  # Only send over HTTPS
+        httponly=True,  # Prevent JavaScript access (XSS protection)
+        samesite="strict",  # CSRF protection
+    )
+
+    # Set DEK cookie
+    response.set_cookie(
+        key=COOKIE_DEK,
+        value=base64.b64encode(dek).decode("utf-8"),
+        max_age=max_age,
+        path=COOKIE_PATH,
+        domain=COOKIE_DOMAIN,
+        secure=COOKIE_SECURE,
+        httponly=True,  # XSS protection for encryption key!
+        samesite="strict",
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Clear both auth_token and DEK cookies."""
+    response.delete_cookie(
+        key=COOKIE_AUTH_TOKEN,
+        path=COOKIE_PATH,
+        domain=COOKIE_DOMAIN,
+        secure=COOKIE_SECURE,
+        httponly=True,
+        samesite="strict",
+    )
+    response.delete_cookie(
+        key=COOKIE_DEK,
+        path=COOKIE_PATH,
+        domain=COOKIE_DOMAIN,
+        secure=COOKIE_SECURE,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+# ============================================================================
+# PUBLIC ENDPOINTS (No Authentication Required)
+# ============================================================================
 
 
 @router.post("/verify-magic-word")
@@ -37,14 +114,7 @@ async def verify_magic_word(
     req: Request,
     redis_client: redis.Redis = Depends(get_redis),
 ) -> MagicWordResponse:
-    """Verify the magic word and return a temporary registration token.
-    This endpoint is triggered before a registration and therefore anybody
-    should be able to call it.
-
-    However to avoid spam, rate limits are implemented.
-    """
-
-    # determine if there are too many requests by client_ip
+    """Verify the magic word and return a temporary registration token."""
     client_ip = get_client_ip(req)
     rate_limit_key = f"rate_limit:magic_word:{client_ip}"
     attempts = redis_client.get(rate_limit_key)
@@ -88,13 +158,7 @@ async def verify_magic_word(
 async def register_user(
     request: RegisterRequest, redis_client: redis.Redis = Depends(get_redis)
 ):
-    """Register a new user with magic word token verification.
-
-    As only people who have passed magic word check may register. This
-    endpoint can still be called by anyone, but the token check must
-    be passed at the beginning.
-    """
-
+    """Register a new user with magic word token verification."""
     # Verify registration token
     token_key = f"reg_token:{request.registration_token}"
     token_data = redis_client.get(token_key)
@@ -145,7 +209,6 @@ async def register_user(
                     "user_wrapped_dek": encryption_data["user_wrapped_dek"],
                     "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
                     "encrypted_fields": encrypted_fields,
-                    "security_tier": request.security_tier,
                 },
             )
 
@@ -171,7 +234,6 @@ async def register_user(
                     detail=error_data.get("message", "Registrierung fehlgeschlagen"),
                 )
 
-            # Store registration metadata
             user_data = response.json()
             return user_data
     finally:
@@ -182,17 +244,18 @@ async def register_user(
 @router.post("/login")
 async def login_user(
     request: LoginRequest,
+    response: Response,
     req: Request,
     redis_client: redis.Redis = Depends(get_redis),
 ) -> LoginResponse:
-    """Authenticate a user and return auth token with DEK based on security tier.
-
-    Security tier handling:
-    - High: DEK returned directly to client (sessionStorage only)
-    - Balanced: DEK split into server part (Redis cache) and client part (sessionStorage)
-    - Convenience: DEK returned directly to client (localStorage)
     """
+    Login via pocketbase, fetch session token and DEK and store
+    as httpOnly cookie
 
+    Security modes:
+    - session: Logs out when browser closes (8-hour max)
+    - persistent: Stays logged in (30-day max)
+    """
     # Rate limiting by IP
     client_ip = get_client_ip(req)
     rate_limit_key = f"rate_limit:login:{client_ip}"
@@ -204,7 +267,7 @@ async def login_user(
             detail="Zu viele Login-Versuche. Bitte versuchen Sie es in 1 Minute erneut.",
         )
 
-    # Rate limiting by identity (email/username)
+    # Rate limiting by identity
     identity_rate_limit_key = f"rate_limit:login:identity:{request.identity}"
     identity_attempts = redis_client.get(identity_rate_limit_key)
 
@@ -216,28 +279,29 @@ async def login_user(
 
     # Increment rate limit counters
     redis_client.incr(rate_limit_key)
-    redis_client.expire(rate_limit_key, 60)  # 1 min expiry
+    redis_client.expire(rate_limit_key, 60)
 
     redis_client.incr(identity_rate_limit_key)
-    redis_client.expire(identity_rate_limit_key, 60)  # 1 min expiry
+    redis_client.expire(identity_rate_limit_key, 60)
 
     try:
         async with httpx.AsyncClient() as client:
             # Authenticate with PocketBase
-            response = await client.post(
+            pb_response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
                 json={
                     "identity": request.identity,
                     "password": request.password,
                 },
             )
-            if response.status_code != 200:
+
+            if pb_response.status_code != 200:
                 raise HTTPException(
                     status_code=401,
                     detail="Ungültige Anmeldedaten",
                 )
 
-            auth_data = DatabaseLoginResponse(**response.json())
+            auth_data = DatabaseLoginResponse(**pb_response.json())
 
             if auth_data.record.role == "service":
                 raise HTTPException(
@@ -252,11 +316,9 @@ async def login_user(
             user_record = auth_data.record
             token = auth_data.token
 
-            # Determine security tier (from request or user's stored preference)
-            security_tier: Literal["high", "balanced", "convenience"] = (
-                request.security_tier
-                if hasattr(request, "security_tier") and request.security_tier
-                else user_record.security_tier
+            # Determine security mode (from request or user's stored preference)
+            security_mode: SecurityMode = (
+                "persistent" if request.keep_logged_in else "session"
             )
 
             # Unwrap user's DEK using their password
@@ -266,84 +328,41 @@ async def login_user(
                 user_record.user_wrapped_dek,
             )
 
-            # Store session info
+            # Store session info in Redis
             session_key = f"session:{token}"
             session_info = extract_session_info_from_record(user_record)
             is_admin: bool = session_info.is_admin
 
-            # Handle DEK based on security tier
-            dek_data: dict[str, Any] = {}
-
-            match security_tier:
-                case "balanced":
-                    # Split-key system: divide DEK into server and client parts
-                    server_part, client_part = EncryptionManager.split_dek(dek)
-
-                    # Encrypt server part before caching
-                    encrypted_server_part = EncryptionManager.encrypt_dek_part(
-                        server_part
-                    )
-
-                    # Store encrypted server part in Redis with 30-minute TTL
-                    dek_cache_key = f"dek:{user_record.id}:{token}"
-                    dek_cache_data = {
-                        "encrypted_server_part": encrypted_server_part,
-                        "created_at": datetime.now().isoformat(),
-                        "last_accessed": datetime.now().isoformat(),
-                    }
-                    redis_client.setex(
-                        dek_cache_key,
-                        1800,  # 30 minutes
-                        json.dumps(dek_cache_data),
-                    )
-
-                    dek_data = {
-                        "client_key_part": client_part,
-                    }
-
-                    # Session TTL: 8 hours max for balanced mode
-                    session_ttl = 8 * 3600
-
-                case "high":
-                    # High security: full DEK to client, nothing cached on server
-                    dek_data = {
-                        "dek": base64.b64encode(dek).decode("utf-8"),
-                    }
-
-                    # Session TTL: tab lifetime (client manages this)
-                    session_ttl = 8 * 3600  # Max duration for session record, 8h
-
-                case "convenience":
-                    # Convenience: full DEK to client, persistent storage
-                    dek_data = {
-                        "dek": base64.b64encode(dek).decode("utf-8"),
-                    }
-
-                    # Session TTL: until explicit logout
-                    session_ttl = 30 * 24 * 3600  # 30 days
+            # Determine session/cookie duration based on mode
+            if security_mode == "session":
+                session_ttl = 8 * 3600  # 8 hours
+                cookie_max_age = 8 * 3600
+            else:  # persistent
+                session_ttl = 30 * 24 * 3600  # 30 days
+                cookie_max_age = 30 * 24 * 3600
 
             # Admin sessions always have shorter TTL
             if is_admin:
-                session_ttl = 900  # 15 minutes for admins
+                session_ttl = 900  # 15 minutes
+                cookie_max_age = 900
 
-            # Store session metadata
+            # Store session metadata in Redis
             redis_client.setex(
                 session_key,
                 session_ttl,
                 session_info.model_dump_json(),
             )
 
+            # set auth_token and dek as httponly cookies
+            set_auth_cookies(response, token, dek, cookie_max_age)
+
             return LoginResponse(
-                token=token,
-                security_tier=security_tier,
-                **dek_data,
                 message="Erfolgreich als Administrator angemeldet"
                 if is_admin
                 else "Erfolgreich angemeldet",
             )
 
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
         raise HTTPException(
@@ -352,48 +371,62 @@ async def login_user(
         ) from e
 
 
+# ============================================================================
+# PROTECTED ENDPOINTS (Authentication Required)
+# ============================================================================
+
+
 @router.post("/logout")
 async def logout_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    response: Response,
+    token: str = Depends(get_current_token),
     redis_client: redis.Redis = Depends(get_redis),
 ):
-    """Logout a user by invalidating their session.
-
-    For balanced security mode, also removes cached DEK parts.
-    Note: The PocketBase token will still be valid until it expires.
-    For complete logout, the client should also delete the token and DEK.
-    """
-    token = credentials.credentials
+    """Logout a user by invalidating their session and clearing cookies."""
     session_key = f"session:{token}"
-
-    # Check if session exists
-    session_data = redis_client.get(session_key)
-    if not session_data:
-        raise HTTPException(
-            status_code=404,
-            detail="Sitzung nicht gefunden oder bereits abgelaufen",
-        )
-
-    # Extract user ID from session to clean up DEK cache
-    try:
-        session_info = json.loads(str(session_data))
-        user_id = session_info.get("id")
-
-        # Remove DEK cache for balanced mode
-        if user_id:
-            dek_cache_key = f"dek:{user_id}:{token}"
-            redis_client.delete(dek_cache_key)
-    except (json.JSONDecodeError, KeyError):
-        pass  # Continue with logout even if cleanup fails
 
     # Delete session from Redis
     redis_client.delete(session_key)
 
+    # Clear both httpOnly cookies
+    clear_auth_cookies(response)
+
     return {"success": True, "message": "Erfolgreich abgemeldet"}
+
+
+@router.get("/verify")
+async def verify_session(
+    current_session: SessionInfo = Depends(verify_token),
+):
+    """
+    Verify that the current session is valid.
+
+    Used by the client on page load to check if they have a valid session.
+    Returns basic user info if authenticated.
+    """
+
+    return {
+        "authenticated": True,
+        "user_id": current_session.id,
+        "username": current_session.username,
+        "is_admin": current_session.is_admin,
+    }
 
 
 @router.post("/change-password")
 async def change_password(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_session: SessionInfo = Depends(verify_token),
 ):
+    """
+    Change user password.
+
+    TODO: Implement password change logic:
+    1. Verify current password
+    2. Unwrap DEK with old password
+    3. Rewrap DEK with new password
+    4. Update database
+    5. Invalidate all existing sessions
+    """
+    # TODO: Implement this
+    _ = current_session
     return {"message": "Not implemented yet"}

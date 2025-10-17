@@ -4,14 +4,12 @@
 	import { apiService } from '$lib/services/api';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
-	import SecurityTierSelector from '$lib/components/SecurityTierSelector.svelte';
-	import type { SecurityTier } from '$lib/stores/auth';
 
 	let username = '';
 	let password = '';
+	let keepLoggedIn = false;
 	let error = '';
-	let selectedTier: SecurityTier = 'balanced';
-	let showTierSelector = false;
+	let isLoading = false;
 
 	onMount(() => {
 		if ($isAuthenticated) {
@@ -21,26 +19,20 @@
 
 	async function handleLogin() {
 		error = '';
+		isLoading = true;
+
 		try {
-			await apiService.login(username, password, selectedTier);
+			await apiService.login(username, password, keepLoggedIn);
 			goto('/priorities');
 		} catch (err) {
 			error = (err as Error).message;
+		} finally {
+			isLoading = false;
 		}
 	}
 
 	function goToRegister() {
 		goto('/register');
-	}
-
-	function handleTierChange(tier: SecurityTier) {
-		selectedTier = tier;
-	}
-
-	function getTierLabel(tier: SecurityTier): string {
-		if (tier === 'high') return 'Hoch';
-		if (tier === 'convenience') return 'Bequem';
-		return 'Standard';
 	}
 </script>
 
@@ -67,8 +59,10 @@
 							type="text"
 							bind:value={username}
 							required
+							disabled={isLoading}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
+								   disabled:cursor-not-allowed disabled:opacity-50
 								   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 						/>
 					</label>
@@ -80,57 +74,110 @@
 							type="password"
 							bind:value={password}
 							required
+							disabled={isLoading}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
+								   disabled:cursor-not-allowed disabled:opacity-50
 								   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 						/>
 					</label>
 
+					<!-- Keep Me Logged In Checkbox -->
+					<div
+						class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
+					>
+						<label class="flex cursor-pointer items-start">
+							<input
+								type="checkbox"
+								bind:checked={keepLoggedIn}
+								disabled={isLoading}
+								class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600
+								       focus:ring-2 focus:ring-blue-500 focus:ring-offset-0
+								       disabled:cursor-not-allowed disabled:opacity-50
+								       dark:border-gray-600 dark:bg-gray-700"
+							/>
+							<div class="ml-3 flex-1">
+								<span class="block font-medium text-gray-900 dark:text-white">
+									Angemeldet bleiben
+								</span>
+								<span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">
+									{#if keepLoggedIn}
+										Sie bleiben 30 Tage angemeldet. Empfohlen für persönliche Geräte.
+									{:else}
+										Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen
+										für gemeinsam genutzte Computer.
+									{/if}
+								</span>
+							</div>
+						</label>
+					</div>
+
 					<!-- Login Button -->
 					<button
 						type="submit"
+						disabled={isLoading}
 						class="w-full transform rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 py-3 font-semibold
-							   text-white shadow-lg transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+							   text-white shadow-lg transition hover:scale-105
+							   disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
 					>
-						Anmelden
+						{isLoading ? 'Wird angemeldet...' : 'Anmelden'}
 					</button>
 
 					<!-- Register Button -->
 					<button
 						type="button"
-						class="w-full rounded-xl bg-gray-600 py-3 font-semibold text-white shadow-lg transition-colors hover:bg-gray-700"
+						disabled={isLoading}
+						class="w-full rounded-xl bg-gray-600 py-3 font-semibold text-white shadow-lg
+						       transition-colors hover:bg-gray-700
+						       disabled:cursor-not-allowed disabled:opacity-50"
 						on:click={goToRegister}
 					>
 						Registrieren
 					</button>
-
-					<!-- Security Tier - Compact -->
-					<div class="border-t border-gray-200 pt-4 dark:border-gray-700">
-						<button
-							type="button"
-							on:click={() => (showTierSelector = !showTierSelector)}
-							class="flex w-full items-center justify-between text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-						>
-							<span>Sicherheit: {getTierLabel(selectedTier)}</span>
-							<span class="text-xs">{showTierSelector ? '▲' : '▼'}</span>
-						</button>
-
-						{#if showTierSelector}
-							<div class="mt-3">
-								<SecurityTierSelector {selectedTier} onChange={handleTierChange} />
-							</div>
-						{/if}
-					</div>
 
 					<!-- Error Message -->
 					{#if error}
 						<div
 							class="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
 						>
-							{error}
+							<div class="flex items-start">
+								<svg
+									class="mr-2 h-5 w-5 flex-shrink-0 text-red-600"
+									fill="currentColor"
+									viewBox="0 0 20 20"
+								>
+									<path
+										fill-rule="evenodd"
+										d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+								<span>{error}</span>
+							</div>
 						</div>
 					{/if}
 				</form>
+
+				<!-- Security Note -->
+				<div class="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700">
+					<div class="flex items-start text-xs text-gray-500 dark:text-gray-400">
+						<svg
+							class="mr-2 h-4 w-4 flex-shrink-0 text-green-600"
+							fill="currentColor"
+							viewBox="0 0 20 20"
+						>
+							<path
+								fill-rule="evenodd"
+								d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+								clip-rule="evenodd"
+							/>
+						</svg>
+						<p class="leading-relaxed">
+							Gespeicherte Daten werden Serverseitig verschlüsselt. Wir können Ihre persönlichen
+							Informationen nicht lesen.
+						</p>
+					</div>
+				</div>
 			</div>
 
 			<!-- Footer -->
@@ -157,3 +204,4 @@
 		</div>
 	</div>
 {/if}
+

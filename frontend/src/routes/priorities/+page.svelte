@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, authStore } from '$lib/stores/auth';
-	import { isDEKAvailable } from '$lib/utils/sessionUtils';
 	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/types/priorities';
 
 	// Import components
@@ -74,18 +73,6 @@
 			return;
 		}
 
-		// Check if DEK is available
-		if (!isDEKAvailable()) {
-			dekMissing = true;
-			isLoading = false;
-			// Redirect to login after a short delay
-			setTimeout(() => {
-				authStore.clearAuth();
-				goto('/login');
-			}, 2000);
-			return;
-		}
-
 		checkMobile();
 		window.addEventListener('resize', checkMobile);
 
@@ -99,7 +86,7 @@
 		console.log('Updating...');
 		const { year, month } = parseMonthString(selectedMonth);
 		weeks = getWeeksForMonth(year, month);
-		if (!dekMissing && $isAuthenticated && isDEKAvailable()) {
+		if (!dekMissing && $isAuthenticated) {
 			console.log('Getting that week data');
 			loadUserData();
 		}
@@ -111,15 +98,6 @@
 
 	async function loadUserData() {
 		if (!$isAuthenticated) return;
-		if (!isDEKAvailable()) {
-			dekMissing = true;
-			saveError = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
-			setTimeout(() => {
-				authStore.clearAuth();
-				goto('/login');
-			}, 2000);
-			return;
-		}
 
 		try {
 			const apiMonth = formatMonthForAPI(selectedMonth);
@@ -185,16 +163,6 @@
 			saveError = 'No user id is set currently';
 			setTimeout(() => (saveError = ''), 3000);
 			throw new Error('No user id is set currently');
-		}
-
-		// Check DEK availability before saving
-		if (!isDEKAvailable()) {
-			saveError = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
-			setTimeout(() => {
-				authStore.clearAuth();
-				goto('/login');
-			}, 2000);
-			throw new Error('DEK not available');
 		}
 
 		try {

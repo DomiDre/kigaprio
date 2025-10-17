@@ -1,92 +1,161 @@
+import base64
 import json
-from typing import Annotated
 
 import httpx
 import redis
-from fastapi import Depends, Header, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Cookie, Depends, HTTPException, Request, Response
 
-from kigaprio.models.auth import DEKData, SessionInfo, TokenVerificationData
+from kigaprio.models.auth import SessionInfo
+from kigaprio.models.cookie import (
+    COOKIE_AUTH_TOKEN,
+    COOKIE_DEK,
+    COOKIE_PATH,
+    COOKIE_SECURE,
+)
 from kigaprio.models.pocketbase_schemas import UsersResponse
-from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 
-security = HTTPBearer()
+# Cookie names
+
+
+async def get_current_token(
+    auth_token: str | None = Cookie(None, alias=COOKIE_AUTH_TOKEN),
+) -> str:
+    """Extract auth token from httpOnly cookie."""
+    if not auth_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Nicht authentifiziert - keine gültige Sitzung gefunden",
+        )
+    return auth_token
+
+
+async def get_current_dek(
+    dek: str | None = Cookie(None, alias=COOKIE_DEK),
+) -> bytes:
+    """Extract DEK from httpOnly cookie."""
+    if not dek:
+        raise HTTPException(
+            status_code=400,
+            detail="Verschlüsselungsschlüssel nicht gefunden",
+        )
+    try:
+        return base64.b64decode(dek)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Ungültiger Verschlüsselungsschlüssel",
+        ) from e
 
 
 async def verify_token(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    response: Response,
+    token: str = Depends(get_current_token),
     redis_client: redis.Redis = Depends(get_redis),
-) -> TokenVerificationData:
-    """Verify the authentication token - first check Redis, then PocketBase if needed."""
-    token = credentials.credentials
+) -> SessionInfo:
+    """
+    Verify authentication token from cookie.
+
+    First checks Redis cache, then validates with PocketBase if needed.
+    If PocketBase returns a new token, updates the cookie.
+    """
     session_key = f"session:{token}"
-    cached_user = redis_client.get(session_key)
+    cached_session = redis_client.get(session_key)
 
-    if cached_user:
-        # Token found in cache - it's valid
-        return TokenVerificationData(
-            token=token, user=SessionInfo(**json.loads(str(cached_user)))
-        )
+    if cached_session:
+        # Session found in cache - it's valid
+        return SessionInfo(**json.loads(str(cached_session)))
 
-    # Token not in cache - verify with PocketBase
+    # Session not in cache - verify with PocketBase
     async with httpx.AsyncClient() as client:
-        # IMPORTANT: This will refresh the token and return a NEW one
-        response = await client.post(  # Note: POST, not GET
+        pb_response = await client.post(
             f"{POCKETBASE_URL}/api/collections/users/auth-refresh",
             headers={"Authorization": f"Bearer {token}"},
         )
 
-        if response.status_code != 200:
+        if pb_response.status_code != 200:
             raise HTTPException(
                 status_code=401,
                 detail="Ungültiger oder abgelaufener Token",
             )
 
-        auth_data = response.json()
+        auth_data = pb_response.json()
         new_token = auth_data["token"]
         user_data = UsersResponse(**auth_data["record"])
 
-        # Delete old session and create new one with refreshed token
-        redis_client.delete(session_key)  # Remove old token
-
-        new_session_key = f"session:{new_token}"
+        # Extract session info
         session_info = extract_session_info_from_record(user_data)
         is_admin = session_info.is_admin
-        ttl = (
-            900 if is_admin else (14 * 24 * 3600)
-        )  # 15 min for admin, 14 days for users
 
-        redis_client.setex(
-            new_session_key,
-            ttl,
-            session_info.model_dump_json(),
-        )
+        # Determine TTL and cookie max_age
+        if is_admin:
+            ttl = 900  # 15 minutes
+            cookie_max_age = 900
+        else:
+            # Default to "session" mode when restoring (safer)
+            # User had original TTL set at login, this is just for Redis restore
+            ttl = 8 * 3600  # 8 hours
+            cookie_max_age = 8 * 3600
 
+        # If token was refreshed, update cookie and Redis with new token
         if new_token != token:
-            request.state.new_token = new_token
+            # Delete old session
+            redis_client.delete(session_key)
 
-        return TokenVerificationData(
-            token=token,
-            new_token=new_token if new_token != token else None,
-            user=session_info,
+            # Store new session with new token
+            new_session_key = f"session:{new_token}"
+            redis_client.setex(
+                new_session_key,
+                ttl,
+                session_info.model_dump_json(),
+            )
+
+            # Update cookie with new token
+            response.set_cookie(
+                key=COOKIE_AUTH_TOKEN,
+                value=new_token,
+                max_age=cookie_max_age,
+                httponly=True,
+                secure=COOKIE_SECURE,
+                samesite="strict",
+                path=COOKIE_PATH,
+            )
+        else:
+            # Same token, just restore to Redis
+            redis_client.setex(
+                session_key,
+                ttl,
+                session_info.model_dump_json(),
+            )
+
+        return session_info
+
+
+async def require_admin(
+    session: SessionInfo = Depends(verify_token),
+) -> SessionInfo:
+    """Dependency that requires admin role."""
+    if not session.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Administratorrechte erforderlich",
         )
+    return session
 
 
 def extract_session_info_from_record(record: UsersResponse) -> SessionInfo:
+    """Extract session info from PocketBase user record."""
     is_admin = record.role == "admin"
     return SessionInfo(
         id=record.id,
         username=record.username,
-        security_tier=record.security_tier,
         is_admin=is_admin,
     )
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP from request"""
+    """Extract client IP from request."""
     # Check for X-Forwarded-For header (when behind proxy)
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
@@ -99,42 +168,3 @@ def get_client_ip(request: Request) -> str:
 
     # Fall back to direct connection
     return request.client.host if request.client else "127.0.0.1"
-
-
-async def get_dek_from_request(
-    x_dek: Annotated[str, Header(description="DEK or client key part")],
-    auth_data: TokenVerificationData = Depends(verify_token),
-    redis_client: redis.Redis = Depends(get_redis),
-) -> DEKData:
-    """Extract and reconstruct DEK from request headers.
-
-    Client should send either:
-    - Full DEK (base64) for high/convenience modes
-    - Client key part (base64) for balanced mode
-
-    Header: X-DEK: <base64_encoded_dek_or_part>
-    """
-    try:
-        dek = EncryptionManager.get_dek_from_request(
-            dek_or_client_part=x_dek,
-            user_id=auth_data.user.id,
-            token=auth_data.token,
-            security_tier=auth_data.user.security_tier,
-            redis_client=redis_client,
-        )
-
-        return DEKData(
-            dek=dek,
-            user_id=auth_data.user.id,
-            security_tier=auth_data.user.security_tier,
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=401,
-            detail=str(e),
-        ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail="Fehler bei der Schlüsselverarbeitung",
-        ) from e

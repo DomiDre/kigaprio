@@ -18,7 +18,6 @@ class UsersResponse(BaseModel):
     user_wrapped_dek: str
     salt: str
     encrypted_fields: str
-    security_tier: Literal["balanced", "high", "convenience"]
     collectionId: str
     collectionName: str
     created: str
