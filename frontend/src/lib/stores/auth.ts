@@ -90,7 +90,7 @@ function createAuthStore() {
 					isAuthenticated: true,
 					userId: data['user_id'],
 					username: data['username']
-				})
+				});
 				sessionStorage.setItem('was_authenticated', 'true');
 				return true;
 			} catch (error) {
