@@ -21,7 +21,7 @@ KigaPrio implements a privacy-first architecture for managing sensitive data wit
 
 - **Backend**: FastAPI with SvelteKit server
 - **Database**: PocketBase (SQLite-based with built-in auth)
-- **Cache**: Redis (memory-only, no persistence)
+- **Cache**: Redis
 - **Proxy**: Traefik (reverse proxy with TLS termination)
 - **Deployment**: Docker with network isolation
 

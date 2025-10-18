@@ -85,7 +85,12 @@ services:
     restart: unless-stopped
     expose:
       - 6379
-    command: redis-server --save "" --appendonly no
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

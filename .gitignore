@@ -214,3 +214,5 @@ pocketbase/pb_data
 redis
 
 *.pem
+
+redis_data/
