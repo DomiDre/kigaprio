@@ -4,7 +4,7 @@
 ### Table of Contents
 1. [System Overview](#system-overview)
 2. [Core Security Principles](#core-security-principles)
-3. [Three-Tier Security Model](#three-tier-security-model)
+3. [Two-Tier Security Model](#two-tier-security-model)
 4. [Encryption Implementation](#encryption-implementation)
 5. [Authentication & Session Management](#authentication--session-management)
 6. [Data Storage Specifications](#data-storage-specifications)
@@ -15,7 +15,7 @@
 
 ## System Overview
 
-KigaPrio implements a privacy-first architecture for managing sensitive data with server-side encryption and user-controlled security levels.
+KigaPrio implements a privacy-first architecture for managing sensitive data with server-side encryption and httpOnly cookie-based session management.
 
 ### Technology Stack
 
@@ -69,58 +69,81 @@ All encryption and decryption operations occur server-side to ensure:
 - Admin private key never exists on server
 - User passwords immediately discarded after key derivation
 
-### 3. Network Isolation
+### 3. HttpOnly Cookie Security
+- DEK stored in httpOnly cookies
+- No client-side JavaScript access to encryption keys
+- Automatic cookie management by browser
+- CSRF protection via SameSite=Strict
+
+### 4. Network Isolation
 - Database tier has no internet access
 - Internal services communicate only within Docker network
 - External access only through authenticated API endpoints
 
-### 4. Data Minimization
+### 5. Data Minimization
 - Only essential data collected (GDPR Article 5)
 - Encryption keys user-specific
 - No tracking or analytics
 
-### 5. Role-based access control
+### 6. Role-based Access Control
 - Data access restricted on database level by API rules
-- Additionally restricted on backend level by role based access
+- Additionally restricted on backend level by role-based access
 
 ---
 
-## Three-Tier Security Model
+## Two-Tier Security Model
 
-Users select their preferred security level at login, balancing security with convenience:
+Users select their preferred security level at login, balancing session duration with convenience:
 
-### High Security Mode
-**Target Use Case**: Shared devices, elevated privacy requirements
-
-| Aspect                | Implementation |
-|-----------------------|---------------|
-| **DEK Storage**       | Client sessionStorage only |
-| **Session Duration**  | Browser tab lifetime |
-| **Re-authentication** | Required for each new tab |
-| **Server Exposure**   | Zero (transient processing only) |
-| **XSS Vulnerability** | Medium (DEK in sessionStorage) |
-
-### Balanced Security Mode (Default)
-**Target Use Case**: Personal devices, regular usage
+### Session Mode
+**Target Use Case**: Shared devices, shorter sessions, moderate security
 
 | Aspect                | Implementation |
 |-----------------------|---------------|
-| **DEK Storage**       | Split-key system (server cache + client) |
-| **Session Duration**  | 30-minute inactivity timeout, 8-hour maximum |
-| **Re-authentication** | After timeout or maximum duration |
-| **Server Exposure**   | Encrypted DEK fragment only |
-| **XSS Vulnerability** | Low (requires both key parts) |
+| **DEK Storage**       | HttpOnly cookie (JavaScript-inaccessible) |
+| **Cookie Duration**   | 8 hours maximum |
+| **Session Duration**  | Until cookie expiration or logout |
+| **Re-authentication** | After 8 hours or on logout |
+| **Server Exposure**   | Transient processing only |
+| **XSS Vulnerability** | None (httpOnly protection) |
+| **CSRF Protection**   | SameSite=Strict |
 
-### Convenience Mode
-**Target Use Case**: Trusted personal devices, low-sensitivity scenarios
+**Security Properties:**
+- ✅ Protected from XSS attacks
+- ✅ Automatic browser security
+- ✅ Server doesn't store DEK
+- ⚠️ Shorter session requires more frequent login
+- ✅ Suitable for shared devices
+
+### Persistent Mode
+**Target Use Case**: Personal devices, extended sessions, maximum convenience
 
 | Aspect                | Implementation |
 |-----------------------|---------------|
-| **DEK Storage**       | Client localStorage (persistent) |
-| **Session Duration**  | Until explicit logout |
-| **Re-authentication** | Only on logout/password change |
-| **Server Exposure**   | Zero (transient processing only) |
-| **XSS Vulnerability** | High (full DEK in localStorage) |
+| **DEK Storage**       | HttpOnly cookie (JavaScript-inaccessible) |
+| **Cookie Duration**   | 30 days maximum |
+| **Session Duration**  | Until cookie expiration or logout |
+| **Re-authentication** | After 30 days or on logout |
+| **Server Exposure**   | Transient processing only |
+| **XSS Vulnerability** | None (httpOnly protection) |
+| **CSRF Protection**   | SameSite=Strict |
+
+**Security Properties:**
+- ✅ Protected from XSS attacks
+- ✅ Automatic browser security
+- ✅ Server doesn't store DEK
+- ✅ Convenient for trusted devices
+- ⚠️ Longer exposure window if device stolen
+
+### Admin Sessions
+Administrators always use a special high-security configuration:
+
+| Aspect                | Implementation |
+|-----------------------|---------------|
+| **Session Duration**  | 15 minutes maximum |
+| **DEK Storage**       | HttpOnly cookie |
+| **Re-authentication** | Required after 15 minutes |
+| **Additional Security** | Shorter timeout, frequent re-validation |
 
 ---
 
@@ -132,76 +155,102 @@ Users select their preferred security level at login, balancing security with co
 - 256-bit AES key generated per user
 - Unique for each user account
 - Never stored in plaintext on server
+- Transmitted only via secure httpOnly cookies
 
 **Key Wrapping**
 - **User Access**: DEK wrapped with PBKDF2-derived key from password
 - **Admin Access**: DEK wrapped with admin RSA public key
 - **Password Changes**: Only rewrap required, no data re-encryption
 
-### Encryption Flow
+### HttpOnly Cookie Flow
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
+    participant C as Client Browser
     participant S as Server
     participant DB as Database
     
+    Note over C,DB: Login & DEK Setup
+    C->>S: Login (username + password)
+    S->>DB: Verify credentials
+    S->>S: Derive key from password
+    S->>S: Unwrap DEK
+    S->>C: Set httpOnly cookies (auth_token + DEK)
+    Note over C: Browser stores cookies<br/>(inaccessible to JavaScript)
+    
     Note over C,DB: Data Submission Flow
-    C->>S: Plaintext Data + DEK/Key
-    S->>S: Validate Data
-    S->>S: Encrypt with DEK
-    S->>DB: Store Encrypted
-    S->>S: Discard DEK
+    C->>S: Submit data (cookies auto-sent)
+    S->>S: Extract DEK from cookie
+    S->>S: Validate & encrypt data
+    S->>DB: Store encrypted data
+    S->>S: Discard DEK from memory
     S->>C: Confirmation
     
     Note over C,DB: Data Retrieval Flow
-    C->>S: Request + DEK/Key
-    S->>DB: Fetch Encrypted
+    C->>S: Request data (cookies auto-sent)
+    S->>S: Extract DEK from cookie
+    S->>DB: Fetch encrypted data
     S->>S: Decrypt with DEK
-    S->>S: Discard DEK
-    S->>C: Plaintext Data
+    S->>S: Discard DEK from memory
+    S->>C: Return plaintext data
 ```
 
-### Split-Key Implementation (Balanced Mode)
+### Cookie Security Configuration
 
-The split-key system divides the DEK into two components:
+```python
+# Server-side cookie configuration
+response.set_cookie(
+    key="dek",
+    value=base64.b64encode(dek).decode("utf-8"),
+    max_age=cookie_max_age,  # 8 hours or 30 days
+    path="/",
+    domain=COOKIE_DOMAIN,  # Production domain
+    secure=True,  # HTTPS only
+    httponly=True,  # No JavaScript access
+    samesite="strict"  # CSRF protection
+)
+```
 
-1. **Server Component**: Encrypted and cached in Redis
-2. **Client Component**: Stored in sessionStorage
-
+---
 
 ## Authentication & Session Management
 
 ### Authentication Layers
 
-1. **Primary Authentication**: PocketBase session (30-day validity)
-2. **Encryption Access**: Tier-dependent DEK management
-3. **Session Extension**: Activity-based for Balanced mode
+1. **Primary Authentication**: PocketBase session token in httpOnly cookie
+2. **Encryption Access**: DEK in separate httpOnly cookie
+3. **Session Validation**: Redis-cached session info for performance
 
 ### Session Lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> Login
-    Login --> TierSelection
+    Login --> ModeSelection
     
-    TierSelection --> High: High Security
-    TierSelection --> Balanced: Balanced Security
-    TierSelection --> Convenience: Convenience Mode
+    ModeSelection --> Session: Session Mode
+    ModeSelection --> Persistent: Persistent Mode
     
-    High --> Active: Tab Open
-    Balanced --> Active: Within Timeout
-    Convenience --> Active: Always
+    Session --> Active: 8h Cookie Valid
+    Persistent --> Active: 30d Cookie Valid
     
-    Active --> High: Tab Closed
-    Active --> Balanced: Inactivity/Max Time
-    Active --> Convenience: Logout Only
+    Active --> Timeout: Cookie Expires
+    Active --> Logout: User Logout
     
-    High --> [*]: Session End
-    Balanced --> ReAuth: Timeout
-    ReAuth --> Balanced: Password
-    Convenience --> [*]: Explicit Logout
+    Timeout --> Login: Re-authenticate
+    Logout --> Login: Re-authenticate
+    
+    Login --> [*]: Exit
 ```
+
+### Cookie Management
+
+**Automatic Browser Handling:**
+- Browser automatically includes cookies in requests
+- No JavaScript access to sensitive data
+- Cookies cleared on logout
+- Expiration handled by browser
+
 
 ### Password Change Protocol
 
@@ -211,7 +260,8 @@ stateDiagram-v2
 4. Rewrap with new password
 5. Update database records
 6. Invalidate all existing sessions
-7. Force re-authentication globally
+7. Clear all cookies
+8. Force re-authentication globally
 
 ---
 
@@ -228,7 +278,7 @@ CREATE TABLE users (
     salt TEXT NOT NULL,  -- PBKDF2 salt
     user_wrapped_dek TEXT NOT NULL,  -- Base64
     admin_wrapped_dek TEXT NOT NULL,  -- Base64
-    security_tier TEXT CHECK (tier IN ('high', 'balanced', 'convenience')),
+    role TEXT CHECK (role IN ('user', 'admin', 'service')),
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
@@ -237,8 +287,8 @@ CREATE TABLE users (
 CREATE TABLE priorities (
     id TEXT PRIMARY KEY,
     user_id TEXT REFERENCES users(id),
-    encrypted_data TEXT NOT NULL,  -- AES-256-GCM encrypted
-    iv TEXT NOT NULL,  -- Initialization vector
+    month TEXT NOT NULL,
+    encrypted_fields TEXT NOT NULL,  -- AES-256-GCM encrypted JSON
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
@@ -246,32 +296,34 @@ CREATE TABLE priorities (
 
 ### Cache Structure (Redis)
 
-**Balanced Mode Only**
+**Session Information Cache**
 ```json
 {
-  "key": "dek:{user_id}:{session_token}",
+  "key": "session:{auth_token}",
   "value": {
-    "encrypted_server_part": "base64_string",
-    "created_at": "2024-01-01T00:00:00Z",
-    "last_accessed": "2024-01-01T00:30:00Z"
+    "id": "user_id",
+    "username": "username",
+    "is_admin": false
   },
-  "ttl": 1800
+  "ttl": 28800  // 8 hours (session) or 2592000 (30 days)
 }
 ```
 
-**Redis Configuration**
-```bash
-redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+**Rate Limiting**
+```json
+{
+  "key": "rate_limit:login:{ip}",
+  "value": "attempts_count",
+  "ttl": 60
+}
 ```
 
-### Client Storage
+### Client Storage (Cookies Only)
 
-| Security Tier | Storage Type      | Key               | Persistence |
-|---------------|-------------------|-------------------|-------------|
-| High          | sessionStorage    | `dek`             | Tab session only |
-| Balanced      | sessionStorage    | `client_key_part` | Tab session only |
-| Convenience   | localStorage      | `dek`             | Until logout |
-| All           | Cookie (HttpOnly) | `pb_auth`         | 30 days |
+| Cookie Name   | Content        | HttpOnly | Secure | SameSite | Max Age         |
+|---------------|----------------|----------|--------|----------|-----------------|
+| `auth_token`  | Session token  | ✅       | ✅     | Strict   | 8h or 30d       |
+| `dek`         | Encrypted DEK  | ✅       | ✅     | Strict   | 8h or 30d       |
 
 ---
 
@@ -283,8 +335,8 @@ redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allk
 2. **Purpose Limitation**: Data used only for childcare prioritization (Article 5)
 3. **Data Minimization**: Only essential information collected (Article 5)
 4. **Accuracy**: User-controlled data updates (Article 5)
-5. **Storage Limitation**: User-initiated deletion available, data deleted after month has passed (Article 5)
-6. **Security**: End-to-end encryption implementation (Article 32)
+5. **Storage Limitation**: User-initiated deletion available (Article 5)
+6. **Security**: Server-side encryption implementation (Article 32)
 
 ### User Rights Implementation
 
@@ -301,6 +353,8 @@ redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allk
 - **Encryption**: AES-256-GCM for data at rest
 - **Pseudonymization**: User IDs separate from personal data
 - **Access Control**: Role-based permissions
+- **Secure Transmission**: TLS 1.3 for all connections
+- **HttpOnly Cookies**: XSS protection for sensitive data
 - **Audit Logging**: Security-relevant events tracked
 - **Regular Testing**: Automated security testing pipeline
 
@@ -316,33 +370,44 @@ redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allk
 
 ## Security Guarantees
 
-### All Security Tiers
+### Both Security Modes
 
 ✅ **Server-side encryption** - Data encrypted at rest  
 ✅ **Server validation** - Prevents malicious data injection  
 ✅ **Network isolation** - Database unreachable from internet  
 ✅ **No plaintext storage** - Server never stores plaintext  
-✅ **User control** - Choice of security level  
+✅ **HttpOnly cookies** - Complete XSS protection  
+✅ **CSRF protection** - SameSite=Strict cookie policy  
+✅ **User control** - Choice of session duration  
 ✅ **Admin separation** - Private key on local machine only  
 ✅ **Efficient updates** - Password change without re-encryption  
+✅ **Automatic cleanup** - Browser handles cookie expiration  
 
 ### Attack Resistance Matrix
 
-| Attack Vector          | High         | Balanced      | Convenience   | Mitigation |
-|------------------------|--------------|---------------|---------------|------------|
-| Database breach        | ✅ Protected | ✅ Protected  | ✅ Protected  | AES-256 encryption |
-| Server compromise      | ✅ No DEK    | ⚠️ Partial DEK | ✅ No DEK     | Split-key/transient |
-| Network eavesdropping  | ✅ TLS       | ✅ TLS        | ✅ TLS        | HTTPS enforced |
-| XSS attack             | ⚠️ Session    | ✅ Split-key  | ❌ Full DEK   | CSP headers |
-| Device theft           | ✅ Session   | ✅ Session    | ❌ Persistent | Storage choice |
-| CSRF attack            | ✅ Protected | ✅ Protected  | ✅ Protected  | Token validation |
-| Session hijacking      | ✅ Limited   | ✅ Limited    | ⚠️ Extended    | Timeout/rotation |
-| Role escalation        | ✅ Protected | ✅ Protected  | ✅ Protected  | Disallowed on backend and database |
+| Attack Vector          | Session Mode | Persistent Mode | Mitigation |
+|------------------------|--------------|-----------------|------------|
+| Database breach        | ✅ Protected | ✅ Protected    | AES-256 encryption |
+| Server compromise      | ✅ No DEK    | ✅ No DEK       | Transient processing only |
+| Network eavesdropping  | ✅ TLS       | ✅ TLS          | HTTPS enforced |
+| XSS attack             | ✅ Protected | ✅ Protected    | HttpOnly cookies + CSP |
+| Device theft           | ⚠️ 8h window | ⚠️ 30d window   | Cookie expiration |
+| CSRF attack            | ✅ Protected | ✅ Protected    | SameSite=Strict |
+| Session hijacking      | ⚠️ Limited   | ⚠️ Extended     | Timeout/rotation |
+| Cookie theft           | ⚠️ Limited   | ⚠️ Extended     | HTTPS + Secure flag |
+| Role escalation        | ✅ Protected | ✅ Protected    | Backend + DB validation |
+| Man-in-the-middle      | ✅ Protected | ✅ Protected    | TLS + HSTS |
+
+**Key Security Improvements:**
+- **No XSS vulnerability**: HttpOnly cookies prevent JavaScript access
+- **Simplified architecture**: No split-key complexity
+- **Browser-managed**: Automatic cookie handling and expiration
+- **CSRF protection**: SameSite=Strict prevents cross-site attacks
 
 ### Security Headers
 
 ```nginx
-# Enforced via Traefik
+# Enforced via Traefik and FastAPI middleware
 Strict-Transport-Security: max-age=31536000; includeSubDomains
 Content-Security-Policy: default-src 'self'; script-src 'self'
 X-Frame-Options: DENY
@@ -360,7 +425,15 @@ Referrer-Policy: strict-origin-when-cross-origin
 - Unusual data access patterns
 - Session anomalies
 - Encryption/decryption failures
+- Cookie validation failures
 - System resource utilization
+
+### Backup & Recovery
+
+- Database encrypted at rest
+- Regular automated backups
+- Admin private key stored offline
+- Recovery procedures documented
 
 ---
 
@@ -368,10 +441,12 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 - [GDPR Official Text](https://gdpr-info.eu/)
 - [OWASP Security Guidelines](https://owasp.org/)
+- [OWASP Cookie Security](https://owasp.org/www-community/controls/SecureCookieAttribute)
 - [NIST Cryptographic Standards](https://www.nist.gov/cryptography)
 - [PocketBase Documentation](https://pocketbase.io/docs/)
+- [MDN HttpOnly Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies)
 
 ---
 
 *Last Updated: 2025*  
-*Version: 1.0.0*
+*Version: 2.0.0*  
