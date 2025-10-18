@@ -58,7 +58,6 @@
 		} catch (err: any) {
 			console.error('Error loading priorities:', err);
 			if (err.message?.includes('Verschlüsselungsschlüssel')) {
-				dekMissing = true;
 				error = 'Sitzung abgelaufen. Sie werden zur Anmeldung weitergeleitet...';
 				setTimeout(() => {
 					authStore.clearAuth();
