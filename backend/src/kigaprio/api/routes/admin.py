@@ -1,16 +1,12 @@
-import base64
-import json
-from typing import Any
-
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.models.admin import (
     UpdateMagicWordRequest,
     UserPriorityRecordForAdmin,
 )
+from kigaprio.models.auth import SessionInfo
 from kigaprio.models.pocketbase_schemas import PriorityRecord, UsersResponse
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
@@ -18,141 +14,16 @@ from kigaprio.services.magic_word import (
 )
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
+from kigaprio.utils import get_current_token, require_admin
 
 router = APIRouter()
-security = HTTPBearer()
-
-
-async def get_current_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    redis_client: redis.Redis = Depends(get_redis),
-) -> dict[str, Any]:
-    """Check if token is in redis cache and of an admin, otherwise verify with PocketBase"""
-
-    token = credentials.credentials
-    session_key = f"session:{token}"
-
-    # First, try to get session from Redis cache
-    session_data = redis_client.get(session_key)
-
-    if session_data:
-        # Session found in cache
-        user_data = json.loads(str(session_data))
-
-        # Check if user is admin
-        if not user_data.get("is_admin", False):
-            raise HTTPException(status_code=403, detail="Admin access required")
-
-        # Return admin data in expected format
-        return {
-            "token": token,
-            "user": {
-                "id": user_data["id"],
-                "username": user_data["username"],
-            },
-        }
-
-    # Session not in cache
-    try:
-        async with httpx.AsyncClient() as client:
-            # First, just check if the token is valid by making a simple request
-            test_response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/users/records",
-                params={"perPage": 1, "fields": "id"},
-                headers={"Authorization": f"Bearer {token}"},
-            )
-
-            if test_response.status_code == 401:
-                # Token is invalid or expired
-                raise HTTPException(
-                    status_code=401, detail="Session expired or invalid"
-                )
-
-            if test_response.status_code != 200:
-                raise HTTPException(
-                    status_code=503, detail="Unable to verify authentication"
-                )
-
-            # Token is valid. Now we need to determine if this is an admin.
-            # We'll decode the JWT token to get the user ID
-            # PocketBase tokens are JWT tokens with the user ID in the payload
-            try:
-                # JWT structure: header.payload.signature
-                # We just need the payload
-                parts = token.split(".")
-                if len(parts) != 3:
-                    raise ValueError("Invalid token format")
-
-                # Decode payload (add padding if necessary)
-                payload = parts[1]
-                payload += "=" * (4 - len(payload) % 4)  # Add padding
-                decoded_payload = base64.urlsafe_b64decode(payload)
-                token_data = json.loads(decoded_payload)
-
-                user_id = token_data.get("id")
-                if not user_id:
-                    raise ValueError("No user ID in token")
-
-                # Now fetch the specific user's data to check their role
-                user_response = await client.get(
-                    f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-
-                if user_response.status_code != 200:
-                    raise HTTPException(
-                        status_code=401, detail="Unable to fetch user data"
-                    )
-
-                user_record = user_response.json()
-                is_admin = user_record.get("role") == "admin"
-
-                if not is_admin:
-                    # Non-admin user - just deny access, don't modify anything
-                    raise HTTPException(status_code=403, detail="Admin access required")
-
-                # Admin user - safe to recreate session in cache
-                session_info = {
-                    "id": user_record["id"],
-                    "username": user_record["username"],
-                    "is_admin": True,
-                    "type": "superuser",
-                }
-
-                # Store with admin TTL (15 minutes)
-                redis_client.setex(
-                    session_key,
-                    900,  # 15 min for admin
-                    json.dumps(session_info),
-                )
-
-                return {
-                    "token": token,
-                    "user": {
-                        "id": user_record["id"],
-                        "username": user_record["username"],
-                    },
-                }
-
-            except (ValueError, KeyError, json.JSONDecodeError) as e:
-                # Can't decode token - fall back to denying access
-                raise HTTPException(
-                    status_code=401, detail="Invalid token format"
-                ) from e
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=503, detail="Authentication service unavailable"
-        ) from e
 
 
 @router.get("/magic-word-info")
 async def get_magic_word_info(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
     redis_client: redis.Redis = Depends(get_redis),
-    admin: dict[str, Any] = Depends(get_current_admin),
 ):
     """Admin endpoint to check current magic word settings"""
 
@@ -164,7 +35,6 @@ async def get_magic_word_info(
             )
 
         async with httpx.AsyncClient() as client:
-            token = credentials.credentials
             response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/system_settings/records",
                 params={"filter": 'key="registration_magic_word"'},
@@ -194,17 +64,16 @@ async def get_magic_word_info(
 @router.post("/update-magic-word")
 async def update_magic_word(
     request: UpdateMagicWordRequest,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    token: str = Depends(get_current_token),
+    session_info: SessionInfo = Depends(require_admin),
     redis_client: redis.Redis = Depends(get_redis),
-    admin: dict[str, Any] = Depends(get_current_admin),
 ):
     """Admin endpoint to update the magic word"""
 
-    admin_id = admin["user"]["username"]
-    admin_token = credentials.credentials
+    admin_id = session_info.username
 
     success = await create_or_update_magic_word(
-        request.new_magic_word, admin_token, redis_client, admin_id
+        request.new_magic_word, token, redis_client, admin_id
     )
 
     if not success:
@@ -220,14 +89,14 @@ async def update_magic_word(
 @router.get("/users/{month}")
 async def get_user_submissions(
     month: str,
-    admin: dict[str, Any] = Depends(get_current_admin),
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
 ) -> list[UserPriorityRecordForAdmin]:
     """Get all user submissions for a specific month, data is still
     encrypted and needs to be decrypted locally using admin private key
     and respective admin_wrapped_deks
     """
 
-    token = admin["token"]
     async with httpx.AsyncClient() as client:
         # Fetch regular users (not superusers)
         users_response = await client.get(
@@ -298,13 +167,13 @@ async def get_user_submissions(
 @router.get("/users/info/{user_id}")
 async def get_user_for_admin(
     user_id: str,
-    admin: dict[str, Any] = Depends(get_current_admin),  # Your auth dependency
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
 ):
     """
     Return encrypted user data.
     Server CANNOT decrypt this - admin must decrypt client-side!
     """
-    token = admin["token"]
     async with httpx.AsyncClient() as client:
         try:
             # Fetch user details

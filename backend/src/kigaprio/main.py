@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from kigaprio.api.routes import admin, auth, health, priorities
 from kigaprio.config import settings
 from kigaprio.logging_config import setup_logging
-from kigaprio.middleware.auth_middleware import TokenRefreshMiddleware
 from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
 from kigaprio.static_files_utils import setup_static_file_serving
 
@@ -62,9 +61,6 @@ app.add_middleware(
     enable_hsts=(ENV == "production"),
     csp_report_uri="/api/csp-violations",
 )
-
-# add middlewares
-app.add_middleware(TokenRefreshMiddleware)
 
 # API routes
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])

@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
-	import { authStore, isAuthenticated } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
-	import { isSessionValid } from '$lib/utils/sessionUtils';
+	import { authStore } from '$lib/stores/auth';
 	import ReAuthModal from '$lib/components/ReAuthModal.svelte';
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
@@ -11,60 +9,27 @@
 	let { children } = $props();
 
 	let showReAuthModal = $state(false);
+	let isInitializing = $state(true);
 
-	// Global session observer
-	onMount(() => {
-		if (!browser) return;
+	// Public routes that don't require authentication
+	const publicRoutes = ['/login', '/register', '/', '/imprint', '/privacy'];
 
-		let navigatingToLogin = false;
+	onMount(async () => {
+		// Verify session with server (checks httpOnly cookies)
+		const isValid = await authStore.verifyAuth();
 
-		const handleStorageChange = (e: StorageEvent) => {
-			if (e.key === 'auth_token') {
-				if (!e.newValue) {
-					authStore.clearAuth();
-					if (!navigatingToLogin) {
-						navigatingToLogin = true;
-						goto('/login', { replaceState: true });
-					}
-				} else if (e.newValue && !authStore.getToken()) {
-					setTimeout(() => {
-						window.location.reload();
-					}, 100);
-				}
-			}
-		};
+		const currentPath = window.location.pathname;
+		const isPublicRoute = publicRoutes.includes(currentPath);
 
-		const originalFetch = window.fetch;
-		window.fetch = async (...args) => {
-			const response = await originalFetch(...args);
-			if (response.status === 401) {
-				authStore.clearAuth();
-				if (!navigatingToLogin) {
-					navigatingToLogin = true;
-					goto('/login', { replaceState: true });
-				}
-			}
-			return response;
-		};
+		if (!isValid && !isPublicRoute) {
+			// Not authenticated and trying to access protected route
+			goto('/login');
+		} else if (isValid && currentPath === '/login') {
+			// Already authenticated, redirect to app
+			goto('/priorities');
+		}
 
-		// Session validity checker for balanced mode
-		const checkSession = () => {
-			if ($isAuthenticated && !isSessionValid()) {
-				// Session expired, show re-auth modal
-				showReAuthModal = true;
-			}
-		};
-
-		// Check session every 30 seconds
-		const sessionCheckInterval = setInterval(checkSession, 30000);
-
-		window.addEventListener('storage', handleStorageChange);
-
-		return () => {
-			window.removeEventListener('storage', handleStorageChange);
-			window.fetch = originalFetch;
-			clearInterval(sessionCheckInterval);
-		};
+		isInitializing = false;
 	});
 
 	function handleReAuthSuccess() {
@@ -76,7 +41,18 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children?.()}
+{#if isInitializing}
+	<div class="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+		<div class="text-center">
+			<div
+				class="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"
+			></div>
+			<p class="text-gray-600 dark:text-gray-400">Lade...</p>
+		</div>
+	</div>
+{:else}
+	{@render children?.()}
+{/if}
 
 <!-- Re-Authentication Modal -->
 <ReAuthModal isOpen={showReAuthModal} onClose={handleReAuthSuccess} />

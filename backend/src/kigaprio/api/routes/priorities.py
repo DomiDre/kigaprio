@@ -3,7 +3,7 @@ import redis
 from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, HTTPException
 
-from kigaprio.models.auth import DEKData, TokenVerificationData
+from kigaprio.models.auth import SessionInfo
 from kigaprio.models.pocketbase_schemas import PriorityRecord
 from kigaprio.models.priorities import (
     PriorityResponse,
@@ -14,20 +14,20 @@ from kigaprio.models.request import SuccessResponse
 from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import get_dek_from_request, verify_token
+from kigaprio.utils import get_current_dek, get_current_token, verify_token
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[PriorityResponse])
 async def get_user_priorities(
-    auth_data: TokenVerificationData = Depends(verify_token),
-    dek_data: DEKData = Depends(get_dek_from_request),
+    auth_data: SessionInfo = Depends(verify_token),
+    token: str = Depends(get_current_token),
+    dek: bytes = Depends(get_current_dek),
 ):
     """Get all priorities for the authenticated user, optionally filtered by month."""
 
-    user_id = auth_data.user.id
-    token = auth_data.token
+    user_id = auth_data.id
 
     try:
         async with httpx.AsyncClient() as client:
@@ -59,7 +59,7 @@ async def get_user_priorities(
                 try:
                     decrypted_weeks = EncryptionManager.decrypt_fields(
                         encrypted_record.encrypted_fields,
-                        dek_data.dek,
+                        dek,
                     )
                 except InvalidTag as e:
                     raise HTTPException(
@@ -86,13 +86,13 @@ async def get_user_priorities(
 @router.get("/{month}", response_model=PriorityResponse)
 async def get_priority(
     month: str,
-    auth_data: TokenVerificationData = Depends(verify_token),
-    dek_data: DEKData = Depends(get_dek_from_request),
+    auth_data: SessionInfo = Depends(verify_token),
+    token: str = Depends(get_current_token),
+    dek: bytes = Depends(get_current_dek),
 ):
     """Get a specific priority record by ID."""
 
-    user_id = auth_data.user.id
-    token = auth_data.token
+    user_id = auth_data.id
 
     try:
         async with httpx.AsyncClient() as client:
@@ -134,7 +134,7 @@ async def get_priority(
             try:
                 decrypted_weeks = EncryptionManager.decrypt_fields(
                     encrypted_record.encrypted_fields,
-                    dek_data.dek,
+                    dek,
                 )
             except InvalidTag as e:
                 raise HTTPException(
@@ -158,14 +158,14 @@ async def get_priority(
 async def save_priority(
     month: str,
     weeks: list[WeekPriority],
-    auth_data: TokenVerificationData = Depends(verify_token),
-    dek_data: DEKData = Depends(get_dek_from_request),
+    auth_data: SessionInfo = Depends(verify_token),
+    token: str = Depends(get_current_token),
+    dek: bytes = Depends(get_current_dek),
     redis_client: redis.Redis = Depends(get_redis),
 ):
     """Create or update a priority record for the authenticated user."""
 
-    user_id = auth_data.user.id
-    token = auth_data.token
+    user_id = auth_data.id
 
     # Validate month
     try:
@@ -205,7 +205,7 @@ async def save_priority(
             # Encrypt the weeks data
             encrypted_data = EncryptionManager.encrypt_fields(
                 {"weeks": [week.model_dump() for week in weeks]},
-                dek_data.dek,
+                dek,
             )
 
             # Create encrypted record
@@ -253,12 +253,12 @@ async def save_priority(
 @router.delete("/{month}")
 async def delete_priority(
     month: str,
-    auth_data: TokenVerificationData = Depends(verify_token),
+    auth_data: SessionInfo = Depends(verify_token),
+    token: str = Depends(get_current_token),
 ):
     """Delete a priority record."""
 
-    user_id = auth_data.user.id
-    token = auth_data.token
+    user_id = auth_data.id
 
     try:
         async with httpx.AsyncClient() as client:

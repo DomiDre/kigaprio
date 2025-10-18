@@ -177,6 +177,14 @@ init-admin-key:
 pocketbase-init: init-secrets
     ./pocketbase/init.sh
 
+redis-init:
+    @echo "🔒 Initializing Redis persistence..."
+    @mkdir -p redis_data
+    @chmod 700 redis_data
+    @echo "⚠️  Setting ownership (requires sudo)..."
+    @sudo chown -R 999:999 redis_data || echo "⚠️  Could not set ownership - run: sudo chown -R 999:999 redis_data"
+    @echo "✅ Redis persistence initialized"
+
 # Reset redis cache
 redis-clear:
     docker compose -f ./docker-compose.dev.yml exec redis redis-cli FLUSHALL

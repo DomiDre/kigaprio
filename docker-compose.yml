@@ -93,17 +93,39 @@ services:
     restart: unless-stopped
     expose:
       - 6379
-    command: redis-server --save "" --appendonly no
+    volumes:
+      # Mount Redis data directory for persistence
+      - redis-data:/data
+    command: >
+      redis-server
+      --save 900 1          # Save after 900s if 1+ key changed
+      --save 300 10         # Save after 300s if 10+ keys changed
+      --save 60 10000       # Save after 60s if 10000+ keys changed
+      --appendonly no       # Disable AOF
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --dir /data
+      --dbfilename dump.rdb
+      --rdbcompression yes  # Compress RDB files
+      --rdbchecksum yes     # Integrity checking
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    user: "999:999" 
     networks:
       - kigaprio-prod
 
 volumes:
   frontend-static:
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./redis_data  # Local directory with restricted permissions
+
 
 secrets:
   admin_public_key:

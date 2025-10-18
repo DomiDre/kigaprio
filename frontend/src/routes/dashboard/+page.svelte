@@ -5,9 +5,9 @@
 	import { goto } from '$app/navigation';
 	import Loading from '$lib/components/Loading.svelte';
 	import { getMonthOptions, parseMonthString, formatMonthForAPI } from '$lib/utils/dateHelpers';
-	import { isDEKAvailable } from '$lib/utils/sessionUtils';
 	import type { WeekData } from '$lib/types/priorities';
 	import { SvelteDate } from 'svelte/reactivity';
+	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
 
 	let loading = true;
 	let priorities: WeekData[] = [];
@@ -18,7 +18,6 @@
 	let progressPercentage = 0;
 	let allWeeksCompleted = false;
 	let error: string | null = null;
-	let dekMissing = false;
 
 	// Statistics
 	let totalPrioritiesSet = 0;
@@ -34,8 +33,7 @@
 	}
 
 	async function loadPriorities() {
-		if (!isDEKAvailable()) {
-			dekMissing = true;
+		if (!$isAuthenticated) {
 			error = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
 			setTimeout(() => {
 				authStore.clearAuth();
@@ -60,7 +58,6 @@
 		} catch (err: any) {
 			console.error('Error loading priorities:', err);
 			if (err.message?.includes('Verschlüsselungsschlüssel')) {
-				dekMissing = true;
 				error = 'Sitzung abgelaufen. Sie werden zur Anmeldung weitergeleitet...';
 				setTimeout(() => {
 					authStore.clearAuth();
@@ -182,18 +179,7 @@
 	}
 
 	onMount(() => {
-		if ($isAuthenticated) {
-			if (!isDEKAvailable()) {
-				dekMissing = true;
-				loading = false;
-				setTimeout(() => {
-					authStore.clearAuth();
-					goto('/login');
-				}, 2000);
-				return;
-			}
-			loadPriorities();
-		}
+		loadPriorities();
 	});
 
 	// Reload priorities when month changes
@@ -202,20 +188,7 @@
 	}
 </script>
 
-{#if dekMissing}
-	<div
-		class="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
-	>
-		<div class="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800">
-			<div class="mb-4 text-6xl">⚠️</div>
-			<h2 class="mb-4 text-2xl font-bold text-gray-800 dark:text-white">Sitzung abgelaufen</h2>
-			<p class="mb-4 text-gray-600 dark:text-gray-300">
-				Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...
-			</p>
-			<div class="animate-spin text-4xl">⟳</div>
-		</div>
-	</div>
-{:else if $isAuthenticated}
+<ProtectedRoute>
 	<div
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
@@ -424,6 +397,4 @@
 			{/if}
 		</div>
 	</div>
-{:else}
-	<Loading message="Lade..." />
-{/if}
+</ProtectedRoute>

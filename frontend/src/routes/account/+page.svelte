@@ -3,7 +3,6 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, authStore } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
-	import { isDEKAvailable } from '$lib/utils/sessionUtils';
 	import Loading from '$lib/components/Loading.svelte';
 
 	// Component state
@@ -60,7 +59,7 @@
 
 	// Load user account info
 	async function loadAccountInfo() {
-		if (!isDEKAvailable()) {
+		if (!$isAuthenticated) {
 			dekMissing = true;
 			error = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
 			setTimeout(() => {
@@ -245,16 +244,6 @@
 	onMount(() => {
 		if (!$isAuthenticated) {
 			goto('/login');
-			return;
-		}
-
-		if (!isDEKAvailable()) {
-			dekMissing = true;
-			isLoading = false;
-			setTimeout(() => {
-				authStore.clearAuth();
-				goto('/login');
-			}, 2000);
 			return;
 		}
 

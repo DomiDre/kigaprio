@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { apiService } from '$lib/services/api';
+	// import { apiService } from '$lib/services/api';
 	import { authStore } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
 
@@ -22,7 +22,7 @@
 		isLoading = true;
 
 		try {
-			await apiService.reAuthenticate(password);
+			// await apiService.reAuthenticate(password);
 			password = '';
 			isOpen = false;
 			if (onClose) onClose();
