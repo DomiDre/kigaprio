@@ -18,7 +18,6 @@
 	let progressPercentage = 0;
 	let allWeeksCompleted = false;
 	let error: string | null = null;
-	let dekMissing = false;
 
 	// Statistics
 	let totalPrioritiesSet = 0;
