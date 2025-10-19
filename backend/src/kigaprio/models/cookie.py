@@ -1,7 +1,7 @@
 # Cookie config
 import os
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+ENVIRONMENT = os.getenv("ENV", "development")
 IS_PRODUCTION = ENVIRONMENT != "development"
 
 COOKIE_DOMAIN = "kiga.dhjd.de" if IS_PRODUCTION else None
