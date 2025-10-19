@@ -10,26 +10,46 @@
 
 	let showReAuthModal = $state(false);
 	let isInitializing = $state(true);
+	let isVerifying = $state(false);
 
 	// Public routes that don't require authentication
-	const publicRoutes = ['/login', '/register', '/', '/imprint', '/privacy'];
+	const publicRoutes = ['/login', '/register', '/imprint', '/privacy'];
 
 	onMount(async () => {
-		// Verify session with server (checks httpOnly cookies)
-		const isValid = await authStore.verifyAuth();
+		// Prevent concurrent auth checks
+		if (isVerifying) return;
+		isVerifying = true;
 
-		const currentPath = window.location.pathname;
-		const isPublicRoute = publicRoutes.includes(currentPath);
+		try {
+			// Verify session with server (checks httpOnly cookies)
+			const isValid = await authStore.verifyAuth();
 
-		if (!isValid && !isPublicRoute) {
-			// Not authenticated and trying to access protected route
-			goto('/login');
-		} else if (isValid && currentPath === '/login') {
-			// Already authenticated, redirect to app
-			goto('/priorities');
+			const currentPath = window.location.pathname;
+			const isPublicRoute = publicRoutes.includes(currentPath);
+			const isRootPath = currentPath === '/';
+
+			if (isRootPath) {
+				// Root path - redirect based on auth
+				const destination = isValid ? '/priorities' : '/login';
+				await goto(destination, { replaceState: true });
+			} else if (!isValid && !isPublicRoute) {
+				// Not authenticated and trying to access protected route
+				await goto('/login', { replaceState: true });
+			} else if (isValid && currentPath === '/login') {
+				// Already authenticated on login page
+				await goto('/priorities', { replaceState: true });
+			}
+			// else: stay on current page (valid state)
+		} catch (error) {
+			console.error('Auth initialization error:', error);
+			// On error, redirect to login for safety
+			if (window.location.pathname !== '/login') {
+				await goto('/login', { replaceState: true });
+			}
+		} finally {
+			isInitializing = false;
+			isVerifying = false;
 		}
-
-		isInitializing = false;
 	});
 
 	function handleReAuthSuccess() {

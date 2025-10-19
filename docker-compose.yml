@@ -10,6 +10,7 @@ services:
       - frontend-static:/app/static:ro
     environment:
       - ENV=production
+      - LOG_LEVEL=INFO
       - DEBUG=false
       - REDIS_URL=redis://redis:6379
       - POCKETBASE_URL=http://pocketbase:8090
@@ -98,16 +99,16 @@ services:
       - redis-data:/data
     command: >
       redis-server
-      --save 900 1          # Save after 900s if 1+ key changed
-      --save 300 10         # Save after 300s if 10+ keys changed
-      --save 60 10000       # Save after 60s if 10000+ keys changed
-      --appendonly no       # Disable AOF
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly no
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --dir /data
       --dbfilename dump.rdb
-      --rdbcompression yes  # Compress RDB files
-      --rdbchecksum yes     # Integrity checking
+      --rdbcompression yes
+      --rdbchecksum yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

@@ -36,9 +36,12 @@ export class ApiService {
 
 		// Handle 401 Unauthorized - session expired
 		if (response.status === 401) {
-			authStore.clearAuth();
-			if (browser) {
-				goto('/login');
+			// Clear auth state (don't call logout endpoint - already unauthorized)
+			authStore.clearAuth(false);
+
+			// Only redirect if not already on login page (prevent loop)
+			if (browser && window.location.pathname !== '/login') {
+				goto('/login', { replaceState: true });
 			}
 			throw new Error('Sitzung abgelaufen. Bitte melden Sie sich erneut an.');
 		}
@@ -94,7 +97,8 @@ export class ApiService {
 			console.error('Logout error:', error);
 		}
 
-		authStore.clearAuth();
+		// Clear auth without calling logout endpoint again
+		authStore.clearAuth(false);
 	}
 
 	async verify() {
@@ -135,9 +139,9 @@ export class ApiService {
 		});
 
 		// Password change invalidates all sessions
-		authStore.clearAuth();
+		authStore.clearAuth(false);
 		if (browser) {
-			goto('/login');
+			goto('/login', { replaceState: true });
 		}
 
 		return response;
