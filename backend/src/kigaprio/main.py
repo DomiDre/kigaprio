@@ -27,7 +27,7 @@ logger.info("Starting KigaPrio API")
 async def lifespan(app: FastAPI):
     _ = app  # remove unused warning
     # Startup: test Redis connection
-    if not await redis_health_check():
+    if not redis_health_check():
         raise RuntimeError("Failed to connect to Redis")
     print("✓ Redis connected")
 
