@@ -100,7 +100,7 @@ services:
       - redis-data:/data
     command: >
       sh -c 'redis-server
-      --requirepass "$$(cat $$REDIS_PASS_FILE)"
+      --requirepass "$$(cat /run/secrets/redis_pass)"
       --save 900 1
       --save 300 10
       --save 60 10000
