@@ -25,7 +25,11 @@ from kigaprio.models.cookie import (
     COOKIE_SECURE,
 )
 from kigaprio.services.encryption import EncryptionManager
-from kigaprio.services.magic_word import get_magic_word_from_cache_or_db
+from kigaprio.services.magic_word import (
+    SERVICE_ACCOUNT_ID,
+    SERVICE_ACCOUNT_PASSWORD,
+    get_magic_word_from_cache_or_db,
+)
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 from kigaprio.utils import (
@@ -198,8 +202,24 @@ async def register_user(
 
         # Proxy registration to PocketBase
         async with httpx.AsyncClient() as client:
+            auth_response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": SERVICE_ACCOUNT_ID,
+                    "password": SERVICE_ACCOUNT_PASSWORD,
+                },
+            )
+
+            if auth_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500, detail="Service authentication failed"
+                )
+
+            service_token = auth_response.json()["token"]
+
             response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/records",
+                headers={"Authorization": f"Bearer {service_token}"},
                 json={
                     "username": request.identity,
                     "password": request.password,
@@ -235,7 +255,11 @@ async def register_user(
                 )
 
             user_data = response.json()
-            return user_data
+            return {
+                "success": True,
+                "message": "Registrierung erfolgreich",
+                "username": user_data.get("username"),
+            }
     finally:
         # Remove email lock
         redis_client.delete(identity_key)
