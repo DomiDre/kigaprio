@@ -67,7 +67,7 @@ async def verify_token(
         # Session found in cache - it's valid
         return SessionInfo(**json.loads(str(cached_session)))
 
-    # Session not in cache - verify with PocketBase
+    # Session not in cache - verify with PocketBase (will update the token)
     async with httpx.AsyncClient() as client:
         pb_response = await client.post(
             f"{POCKETBASE_URL}/api/collections/users/auth-refresh",

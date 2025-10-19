@@ -27,6 +27,9 @@ function createAuthStore() {
 
 	const { subscribe, set, update } = writable<AuthState>(initialState);
 
+	// Track if we're currently verifying to prevent concurrent calls
+	let isVerifying = false;
+
 	return {
 		subscribe,
 
@@ -46,19 +49,23 @@ function createAuthStore() {
 		},
 
 		/**
-		 * Clear authentication state and call logout endpoint
+		 * Clear authentication state and optionally call logout endpoint
+		 * @param callLogoutEndpoint - Whether to call the API logout endpoint (default: true)
 		 */
-		clearAuth: async () => {
+		clearAuth: async (callLogoutEndpoint: boolean = true) => {
 			if (browser) {
 				// Clear local state
 				sessionStorage.removeItem('was_authenticated');
 
 				// Call logout endpoint to clear httpOnly cookies
-				try {
-					await apiService.logout();
-				} catch (error) {
-					console.error('Logout request failed:', error);
-					// Continue anyway - clear local state
+				// Only if explicitly requested (not on failed auth verification)
+				if (callLogoutEndpoint) {
+					try {
+						await apiService.logout();
+					} catch (error) {
+						console.error('Logout request failed:', error);
+						// Continue anyway - clear local state
+					}
 				}
 			}
 
@@ -82,6 +89,14 @@ function createAuthStore() {
 		verifyAuth: async () => {
 			if (!browser) return false;
 
+			// Prevent concurrent verification calls
+			if (isVerifying) {
+				console.log('Auth verification already in progress, skipping');
+				return false;
+			}
+
+			isVerifying = true;
+
 			try {
 				const data = await apiService.verify();
 
@@ -90,13 +105,16 @@ function createAuthStore() {
 					isAuthenticated: true,
 					userId: data['user_id'],
 					username: data['username']
-				});
+				})
 				sessionStorage.setItem('was_authenticated', 'true');
 				return true;
 			} catch (error) {
 				console.error('Auth verification failed:', error);
-				authStore.clearAuth();
+				// Don't call logout endpoint on failed verification (already logged out)
+				await authStore.clearAuth(false);
 				return false;
+			} finally {
+				isVerifying = false;
 			}
 		}
 	};
