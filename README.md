@@ -34,22 +34,20 @@ KigaPrio implements a privacy-first architecture with multiple layers of securit
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| **Backend** | FastAPI + Python 3.11 | Async API server with data validation |
+| **Backend** | FastAPI + Python 3.11 | Async API server for data validation & server-side encryption |
 | **Frontend** | SvelteKit | Modern reactive UI framework |
 | **Database** | PocketBase | SQLite-based with built-in auth |
-| **Cache** | Redis | Session management (memory-only) |
+| **Cache** | Redis | Session management |
 | **Proxy** | Traefik | TLS termination and routing |
 | **Container** | Docker + Docker Compose | Consistent deployment environment |
 
 ### Security Model
 
-Three-tier security system allowing users to choose their preferred balance:
+When registering, a data encryption key (DEK) is generated and stored once encrypted by the user password and once by the public key of the administration. 
+To read and write data the DEK is send at login together with the session token as httpOnly cookie.
+For proper data validation and to rely on proper encryption libraries, the encryption happens server-side during a request.
 
-- **🔒 High Security**: Session-based, no server storage
-- **⚖️ Balanced Mode**: Split-key encryption with timeout (default)
-- **🔓 Convenience**: Persistent client storage for trusted devices
-
-Details in [ARCHITECTURE.md](ARCHITECTURE.md#three-tier-security-model).
+Details in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 🚀 Quick Start
 

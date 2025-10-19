@@ -33,6 +33,7 @@ services:
       - pb_service_id
       - pb_service_password
       - server_cache_key
+      - redis_pass
 
   frontend:
     build:
@@ -86,16 +87,26 @@ services:
     expose:
       - 6379
     command: >
-      redis-server
-      --save ""
-      --appendonly no
-      --maxmemory 256mb
+      sh -c 'redis-server 
+      --requirepass "$$(cat /run/secrets/redis_pass)" 
+      --save "" 
+      --appendonly no 
+      --maxmemory 256mb 
       --maxmemory-policy allkeys-lru
+      '
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: sh -c 'redis-cli -a "$$(cat /run/secrets/redis_pass)" --no-auth-warning ping'
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    secrets:
+      - redis_pass
+
 
 secrets:
   admin_public_key:
@@ -108,6 +119,8 @@ secrets:
     file: ./.secrets/pb_service_id
   pb_service_password:
     file: ./.secrets/pb_service_password
+  redis_pass:
+    file: ./.secrets/redis_pass
   server_cache_key:
     file: ./.secrets/server_cache_key
   

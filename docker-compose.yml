@@ -44,6 +44,8 @@ services:
       - admin_public_key
       - pb_service_id
       - pb_service_password
+      - server_cache_key
+      - redis_pass
 
   # Build frontend and copy static files
   frontend-builder:
@@ -95,10 +97,10 @@ services:
     expose:
       - 6379
     volumes:
-      # Mount Redis data directory for persistence
       - redis-data:/data
     command: >
-      redis-server
+      sh -c 'redis-server
+      --requirepass "$$(cat /run/secrets/redis_pass)"
       --save 900 1
       --save 300 10
       --save 60 10000
@@ -109,14 +111,17 @@ services:
       --dbfilename dump.rdb
       --rdbcompression yes
       --rdbchecksum yes
+      '
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: sh -c 'redis-cli -a "$$(cat /run/secrets/redis_pass)" --no-auth-warning ping'
       interval: 10s
       timeout: 5s
       retries: 5
-    user: "999:999" 
+    user: "10001:10001" 
     networks:
       - kigaprio-prod
+    secrets:
+      - redis_pass
 
 volumes:
   frontend-static:
@@ -139,7 +144,10 @@ secrets:
     file: ./.secrets/pb_service_id
   pb_service_password:
     file: ./.secrets/pb_service_password
-  
+  redis_pass:
+    file: ./.secrets/redis_pass
+  server_cache_key:
+    file: ./.secrets/server_cache_key
 
 networks:
   kigaprio-prod:
