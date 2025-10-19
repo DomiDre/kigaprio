@@ -15,6 +15,8 @@ declare -a secrets=(
 	"pb_service_id:PROMPT"
 	"pb_service_password:RANDOM"
 	"server_cache_key:RANDOM"
+	"redis_pass:RANDOM"
+
 )
 
 generate_random() {

@@ -1,9 +1,13 @@
-import os
+from pathlib import Path
 
 import redis
 
 # Redis connection pool
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+redis_pass_path = Path("/run/secrets/redis_pass")
+if not redis_pass_path.exists():
+    raise ValueError("Missing redis password!!! Please set as secret.")
+REDIS_PASS = redis_pass_path.read_text().strip()
+REDIS_URL = f"redis://:{REDIS_PASS}@redis:6379"
 redis_pool = None
 
 
