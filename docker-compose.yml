@@ -45,6 +45,7 @@ services:
       - pb_service_id
       - pb_service_password
       - server_cache_key
+      - redis_pass
 
   # Build frontend and copy static files
   frontend-builder:
