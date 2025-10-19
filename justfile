@@ -178,12 +178,19 @@ pocketbase-init: init-secrets
     ./pocketbase/init.sh
 
 redis-init:
-    @echo "🔒 Initializing Redis persistence..."
-    @mkdir -p redis_data
-    @chmod 700 redis_data
-    @echo "⚠️  Setting ownership (requires sudo)..."
-    @sudo chown -R 999:999 redis_data || echo "⚠️  Could not set ownership - run: sudo chown -R 999:999 redis_data"
-    @echo "✅ Redis persistence initialized"
+    #!/usr/bin/env bash
+    echo "Initializing Redis persistence..."
+    mkdir -p redis_data
+    chmod 700 redis_data
+    echo "Creating user for redis"
+    sudo useradd --system \
+      --uid 10001 --gid 10001 \
+      --no-create-home \
+      --shell /usr/sbin/nologin \
+      redis-kigaprio
+    echo "Setting ownership (requires sudo)..."
+    sudo chown -R 10001:10001 redis_data || echo "⚠️  Could not set ownership - run: sudo chown -R 999:999 redis_data"
+    echo "Redis persistence initialized"
 
 # Reset redis cache
 redis-clear:
