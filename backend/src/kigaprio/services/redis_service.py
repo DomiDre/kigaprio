@@ -11,7 +11,7 @@ class RedisService:
 
     def __init__(self):
         self._pool: redis.ConnectionPool | None = None
-        self._redis_url = self._build_redis_url()
+        self._redis_url: str | None = None
 
     def _build_redis_url(self) -> str:
         """Build Redis URL with password from secret file"""
@@ -50,11 +50,18 @@ class RedisService:
         return redis_url
 
     @property
+    def redis_url(self) -> str:
+        """Lazy-build Redis URL on first access"""
+        if self._redis_url is None:
+            self._redis_url = self._build_redis_url()
+        return self._redis_url
+
+    @property
     def pool(self) -> redis.ConnectionPool:
         """Lazy-initialize connection pool"""
         if self._pool is None:
             self._pool = redis.ConnectionPool.from_url(
-                self._redis_url,
+                self.redis_url,
                 decode_responses=True,
                 max_connections=10,
                 socket_connect_timeout=5,
