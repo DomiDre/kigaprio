@@ -10,6 +10,7 @@ services:
       - frontend-static:/app/static:ro
     environment:
       - ENV=production
+      - LOG_LEVEL=INFO
       - DEBUG=false
       - REDIS_URL=redis://redis:6379
       - POCKETBASE_URL=http://pocketbase:8090
