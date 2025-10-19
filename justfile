@@ -183,9 +183,9 @@ redis-init:
     mkdir -p redis_data
     sudo chmod 700 redis_data
     echo "Creating user for redis"
+    sudo groupadd --gid 10001 redis-kigaprio
     sudo useradd --system \
       --uid 10001 --gid 10001 \
-      --user-group \
       --no-create-home \
       --shell /usr/sbin/nologin \
       redis-kigaprio
