@@ -1,0 +1,132 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '$SMTP_HOST:587'
+  smtp_from: '$SMTP_USER'
+  smtp_auth_username: '$SMTP_USER'
+  smtp_auth_password: '$SMTP_PASSWORD'
+  smtp_require_tls: true
+
+# Templates for alert messages
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Alert routing tree
+route:
+  group_by: ['alertname', 'category', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default'
+  
+  routes:
+    # Critical security alerts - immediate notification
+    - match:
+        severity: critical
+        category: security
+      receiver: 'security-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true
+
+    # Critical availability alerts
+    - match:
+        severity: critical
+        category: availability
+      receiver: 'ops-critical'
+      group_wait: 30s
+      repeat_interval: 2h
+
+    # Security warnings
+    - match:
+        category: security
+      receiver: 'security-team'
+      group_wait: 2m
+      repeat_interval: 6h
+
+    # Performance issues
+    - match:
+        category: performance
+      receiver: 'ops-team'
+      group_wait: 5m
+      repeat_interval: 12h
+
+    # Business alerts (lower priority)
+    - match:
+        category: business
+      receiver: 'admin-team'
+      group_wait: 10m
+      repeat_interval: 24h
+
+# Inhibition rules (suppress alerts based on other alerts)
+inhibit_rules:
+  # If service is down, don't alert on high latency
+  - source_match:
+      severity: critical
+      category: availability
+    target_match:
+      category: performance
+    equal: ['instance']
+
+  # If Redis is down, don't alert on cache misses
+  - source_match:
+      alertname: RedisDown
+    target_match:
+      alertname: HighSessionCacheMissRate
+
+# Notification receivers
+receivers:
+  # Default receiver (catch-all)
+  - name: 'default'
+    email_configs:
+      - to: '$ALERTMANAGER_EMAIL_TO'
+        headers:
+          Subject: '[KigaPrio] {{ .GroupLabels.severity | toUpper }}: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.html" . }}'
+        send_resolved: true
+
+  # Critical security alerts (email)
+  - name: 'security-critical'
+    email_configs:
+      - to: '$ALERTMANAGER_EMAIL_TO'
+        headers:
+          Subject: '🚨 [CRITICAL SECURITY] KigaPrio: {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+        html: '{{ template "email.html" . }}'
+        send_resolved: true
+
+  # Security team notifications
+  - name: 'security-team'
+    email_configs:
+      - to: '$ALERTMANAGER_EMAIL_TO'
+        headers:
+          Subject: '[SECURITY] KigaPrio: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.html" . }}'
+        send_resolved: true
+
+  # Critical ops alerts
+  - name: 'ops-critical'
+    email_configs:
+      - to: '$ALERTMANAGER_EMAIL_TO'
+        headers:
+          Subject: '🔥 [CRITICAL] KigaPrio: {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+        html: '{{ template "email.html" . }}'
+        send_resolved: true
+
+  # Ops team notifications
+  - name: 'ops-team'
+    email_configs:
+      - to: '$ALERTMANAGER_EMAIL_TO'
+        headers:
+          Subject: '[OPS] KigaPrio: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.html" . }}'
+        send_resolved: true
+
+  # Admin team notifications
+  - name: 'admin-team'
+    email_configs:
+      - to: '$ALERTMANAGER_EMAIL_TO'
+        headers:
+          Subject: '[INFO] KigaPrio: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.html" . }}'
+        send_resolved: true

@@ -196,3 +196,46 @@ redis-init:
 # Reset redis cache
 redis-clear:
     docker compose -f ./docker-compose.dev.yml exec redis redis-cli FLUSHALL
+
+
+# Start monitoring stack
+monitoring-up:
+    docker compose -f ./monitoring/docker-compose.monitoring.yml up -d
+
+# Stop monitoring stack
+monitoring-down:
+    docker compose -f ./monitoring/docker-compose.monitoring.yml down
+
+# View monitoring logs
+monitoring-logs service="":
+    #!/usr/bin/env bash
+    if [ -z "{{service}}" ]; then
+        docker compose -f ./monitoring/docker-compose.monitoring.yml logs -f
+    else
+        docker compose -f ./monitoring/docker-compose.monitoring.yml logs -f {{service}}
+    fi
+
+# Restart monitoring service
+monitoring-restart service:
+    docker compose -f ./monitoring/docker-compose.monitoring.yml restart {{service}}
+
+# Check Prometheus targets
+monitoring-targets:
+    @curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health, lastError: .lastError}'
+
+# Reload Prometheus config
+monitoring-reload:
+    @curl -X POST http://localhost:9090/-/reload
+
+# Test alert
+monitoring-test-alert:
+    @curl -X POST http://localhost:9093/api/v1/alerts -d '[{"labels":{"alertname":"TestAlert","severity":"warning"}}]'
+
+# Show monitoring status
+monitoring-status:
+    @echo "=== Monitoring Stack Status ==="
+    @docker compose -f ./monitoring/docker-compose.monitoring.yml ps
+    @echo ""
+    @echo "=== Service URLs ==="
+    @echo "Grafana: https://grafana.kiga.dhjd.de"
+    @echo "Prometheus: https://prometheus.kiga.dhjd.de"

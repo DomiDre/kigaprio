@@ -3,6 +3,11 @@ import redis
 from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, HTTPException
 
+from kigaprio.middleware.metrics import (
+    track_data_operation,
+    track_encryption_error,
+    track_priority_submission,
+)
 from kigaprio.models.auth import SessionInfo
 from kigaprio.models.pocketbase_schemas import PriorityRecord
 from kigaprio.models.priorities import (
@@ -130,6 +135,8 @@ async def get_priority(
                     detail="Keine Berechtigung für diese Priorität",
                 )
 
+            track_data_operation("read", "priorities")
+
             # Decrypt weeks data
             try:
                 decrypted_weeks = EncryptionManager.decrypt_fields(
@@ -137,10 +144,14 @@ async def get_priority(
                     dek,
                 )
             except InvalidTag as e:
+                track_encryption_error("decrypt")
                 raise HTTPException(
                     status_code=500,
                     detail="Entschluesselung der Daten fehlgeschlagen",
                 ) from e
+            except Exception:
+                track_encryption_error("decrypt")
+                raise
 
             return PriorityResponse(
                 month=encrypted_record.month,
@@ -203,10 +214,17 @@ async def save_priority(
                 existing_id = existing["items"][0]["id"]
 
             # Encrypt the weeks data
-            encrypted_data = EncryptionManager.encrypt_fields(
-                {"weeks": [week.model_dump() for week in weeks]},
-                dek,
-            )
+            try:
+                encrypted_data = EncryptionManager.encrypt_fields(
+                    {"weeks": [week.model_dump() for week in weeks]},
+                    dek,
+                )
+            except Exception as e:
+                track_encryption_error("encrypt")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Verschlüsselung der Daten fehlgeschlagen",
+                ) from e
 
             # Create encrypted record
             encrypted_priority = {
@@ -215,7 +233,9 @@ async def save_priority(
                 "encrypted_fields": encrypted_data,
             }
 
+            track_priority_submission(month)
             if existing_id:
+                track_data_operation("update", "priorities")
                 response = await client.patch(
                     f"{POCKETBASE_URL}/api/collections/priorities/records/{existing_id}",
                     headers={"Authorization": f"Bearer {token}"},
@@ -223,6 +243,7 @@ async def save_priority(
                 )
                 message = "Priorität gespeichert"
             else:
+                track_data_operation("create", "priorities")
                 response = await client.post(
                     f"{POCKETBASE_URL}/api/collections/priorities/records",
                     headers={"Authorization": f"Bearer {token}"},

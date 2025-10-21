@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from kigaprio.api.routes import admin, auth, health, priorities
 from kigaprio.config import settings
 from kigaprio.logging_config import setup_logging
+from kigaprio.middleware.metrics import metrics_endpoint, track_csp_violation
 from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
 from kigaprio.services.redis_service import close_redis, redis_health_check
 from kigaprio.static_files_utils import setup_static_file_serving
@@ -92,8 +93,18 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 @app.post("/api/csp-violations")
 async def csp_violation_report(request: Request):
     report = await request.json()
+    violated_directive = report.get("violated-directive", "unknown")
+    if violated_directive:
+        directive = violated_directive.split()[0] if violated_directive else "unknown"
+        track_csp_violation(directive)
     logger.warning(f"CSP Violation: {report}")
     return {"status": "ok"}
+
+
+@app.get("/api/v1/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return await metrics_endpoint()
 
 
 # Serve static files in production OR when explicitly enabled in development

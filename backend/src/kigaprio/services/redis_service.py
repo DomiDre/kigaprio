@@ -5,6 +5,8 @@ from urllib.parse import urlparse, urlunparse
 import redis
 from redis.exceptions import ConnectionError, TimeoutError
 
+from kigaprio.middleware.metrics import track_redis_error
+
 
 class RedisService:
     """Redis connection service with automatic password injection"""
@@ -98,7 +100,11 @@ _redis_service = RedisService()
 
 def get_redis() -> redis.Redis:  # Remove async
     """Get Redis connection from pool"""
-    return _redis_service.get_client()
+    try:
+        return _redis_service.get_client()
+    except Exception:
+        track_redis_error()
+        raise
 
 
 def redis_health_check() -> bool:  # Remove async
