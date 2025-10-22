@@ -30,7 +30,8 @@ services:
       frontend-builder:
         condition: service_completed_successfully
     networks:
-      - kigaprio-prod
+      - db-net
+      - monitoring
       - proxy
     expose:
       - 8000
@@ -86,7 +87,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - kigaprio-prod
+      - db-net
     secrets:
       - pb_admin_email
       - pb_admin_password
@@ -119,7 +120,7 @@ services:
       retries: 5
     user: "10001:10001" 
     networks:
-      - kigaprio-prod
+      - db-net
     secrets:
       - redis_pass
 
@@ -150,7 +151,8 @@ secrets:
     file: ./.secrets/server_cache_key
 
 networks:
-  kigaprio-prod:
+  db-net:
     internal: true
   proxy:
     external: true
+  monitoring:
