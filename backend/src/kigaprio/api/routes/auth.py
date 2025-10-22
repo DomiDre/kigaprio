@@ -7,6 +7,13 @@ import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
+from kigaprio.middleware.metrics import (
+    track_login_attempt,
+    track_magic_word_verification,
+    track_user_registration,
+    update_active_sessions,
+    update_admin_sessions,
+)
 from kigaprio.models.auth import (
     DatabaseLoginResponse,
     LoginRequest,
@@ -134,12 +141,14 @@ async def verify_magic_word(
     if not magic_word:
         raise HTTPException(status_code=500, detail="No magic word is initialized")
 
-    # Increment rate limit counter
-    redis_client.incr(rate_limit_key)
-    redis_client.expire(rate_limit_key, 3600)
-
     # Check magic word (case-insensitive comparison)
-    if request.magic_word.strip().lower() != magic_word.lower():
+    is_valid = request.magic_word.strip().lower() != magic_word.lower()
+    track_magic_word_verification(is_valid)
+
+    if not is_valid:
+        # Increment rate limit counter
+        redis_client.incr(rate_limit_key)
+        redis_client.expire(rate_limit_key, 3600)
         raise HTTPException(status_code=403, detail="Ungültiges Zauberwort")
 
     # Reset rate limit on success
@@ -232,7 +241,9 @@ async def register_user(
                 },
             )
 
-            if response.status_code != 200:
+            registration_success = response.status_code == 200
+            track_user_registration(success=registration_success)
+            if not registration_success:
                 error_data = response.json()
 
                 # Handle PocketBase validation errors
@@ -332,6 +343,8 @@ async def login_user(
                     status_code=403, detail="Login als Service Account verboten"
                 )
 
+            track_login_attempt("success", client_ip)
+
             # Reset rate limits on successful login
             redis_client.delete(rate_limit_key)
             redis_client.delete(identity_rate_limit_key)
@@ -377,6 +390,16 @@ async def login_user(
                 session_info.model_dump_json(),
             )
 
+            if is_admin:
+                # Count active admin sessions
+                admin_count: int = redis_client.scard("active_admin_sessions") or 0  # type: ignore
+                update_admin_sessions(int(admin_count))
+            else:
+                # Count user sessions by mode
+                mode_key = f"active_{security_mode}_sessions"
+                mode_count: int = redis_client.scard(mode_key) or 0  # type: ignore
+                update_active_sessions(int(mode_count), security_mode)
+
             # set auth_token and dek as httponly cookies
             set_auth_cookies(response, token, dek, cookie_max_age)
 
@@ -389,6 +412,7 @@ async def login_user(
     except HTTPException:
         raise
     except Exception as e:
+        track_login_attempt("error", client_ip)
         raise HTTPException(
             status_code=500,
             detail="Ein unerwarteter Fehler ist aufgetreten",

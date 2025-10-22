@@ -21,7 +21,6 @@ services:
       - "traefik.http.routers.kigaprio-backend.tls=true"
       - "traefik.http.routers.kigaprio-backend.tls.certresolver=myresolver"
       - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
-
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -30,7 +29,8 @@ services:
       frontend-builder:
         condition: service_completed_successfully
     networks:
-      - kigaprio-prod
+      - db-net
+      - monitoring
       - proxy
     expose:
       - 8000
@@ -46,6 +46,7 @@ services:
       - pb_service_password
       - server_cache_key
       - redis_pass
+      - metrics_token
 
   # Build frontend and copy static files
   frontend-builder:
@@ -86,7 +87,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - kigaprio-prod
+      - db-net
     secrets:
       - pb_admin_email
       - pb_admin_password
@@ -119,7 +120,7 @@ services:
       retries: 5
     user: "10001:10001" 
     networks:
-      - kigaprio-prod
+      - db-net
     secrets:
       - redis_pass
 
@@ -148,9 +149,12 @@ secrets:
     file: ./.secrets/redis_pass
   server_cache_key:
     file: ./.secrets/server_cache_key
+  metrics_token:
+    file: ./.secrets/metrics_token
 
 networks:
-  kigaprio-prod:
+  db-net:
     internal: true
   proxy:
     external: true
+  monitoring:

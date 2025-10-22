@@ -1,0 +1,215 @@
+{{ define "email.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .severity-critical {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .severity-warning {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        .severity-info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .content {
+            background: #f9f9f9;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 0 0 8px 8px;
+        }
+        .alert-info {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .alert-critical {
+            border-left-color: #f5576c;
+        }
+        .alert-warning {
+            border-left-color: #fee140;
+        }
+        .metric {
+            background: #fff;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        .metric-name {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .metric-value {
+            font-size: 1.2em;
+            color: #333;
+        }
+        .footer {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9em;
+            color: #666;
+            text-align: center;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 10px 5px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-firing {
+            background: #f5576c;
+            color: white;
+        }
+        .status-resolved {
+            background: #4caf50;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header {{ if eq .Status "firing" }}severity-{{ .GroupLabels.severity }}{{ end }}">
+        <h1>
+            {{ if eq .Status "firing" }}🚨 Alert Firing{{ else }}✅ Alert Resolved{{ end }}
+        </h1>
+        <h2>{{ .GroupLabels.alertname }}</h2>
+        <span class="status status-{{ .Status }}">{{ .Status }}</span>
+    </div>
+
+    <div class="content">
+        <!-- Alert Summary -->
+        <div class="alert-info alert-{{ .GroupLabels.severity }}">
+            <h3>Summary</h3>
+            <p><strong>Severity:</strong> {{ .GroupLabels.severity | toUpper }}</p>
+            <p><strong>Category:</strong> {{ .GroupLabels.category }}</p>
+            <p><strong>Status:</strong> {{ .Status }}</p>
+            {{ if .Alerts }}
+            {{ $first := index .Alerts 0 }}
+            <p><strong>Started:</strong> {{ $first.StartsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+            {{ end }}
+        </div>
+
+        <!-- Firing Alerts -->
+        {{ if eq .Status "firing" }}
+        <h3>Firing Alerts ({{ .Alerts.Firing | len }})</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Alert</th>
+                    <th>Description</th>
+                    <th>Started</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Alerts.Firing }}
+                <tr>
+                    <td><strong>{{ .Labels.alertname }}</strong></td>
+                    <td>{{ .Annotations.description }}</td>
+                    <td>{{ .StartsAt.Format "15:04:05" }}</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+        {{ end }}
+
+        <!-- Resolved Alerts -->
+        {{ if gt (len .Alerts.Resolved) 0 }}
+        <h3>Resolved Alerts ({{ .Alerts.Resolved | len }})</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Alert</th>
+                    <th>Duration</th>
+                    <th>Resolved At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Alerts.Resolved }}
+                <tr>
+                    <td><strong>{{ .Labels.alertname }}</strong></td>
+                    <td>{{ .EndsAt.Sub .StartsAt }}</td>
+                    <td>{{ .EndsAt.Format "15:04:05" }}</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+        {{ end }}
+
+        <!-- Alert Details -->
+        <h3>Details</h3>
+        {{ range .Alerts }}
+        <div class="metric">
+            <div class="metric-name">{{ .Annotations.summary }}</div>
+            <div class="metric-value">{{ .Annotations.description }}</div>
+            {{ if .Labels.instance }}
+            <p><small>Instance: {{ .Labels.instance }}</small></p>
+            {{ end }}
+        </div>
+        {{ end }}
+
+        <!-- Action Buttons -->
+        <div style="text-align: center; margin: 20px 0;">
+            <a href="https://grafana.kiga.dhjd.de" class="button">View Grafana Dashboard</a>
+            <a href="https://prometheus.kiga.dhjd.de" class="button">View Prometheus</a>
+        </div>
+
+        <!-- Runbook Link (if available) -->
+        {{ if .CommonAnnotations.runbook_url }}
+        <div class="alert-info">
+            <p>📖 <strong>Runbook:</strong> <a href="{{ .CommonAnnotations.runbook_url }}">{{ .CommonAnnotations.runbook_url }}</a></p>
+        </div>
+        {{ end }}
+    </div>
+
+    <div class="footer">
+        <p>KigaPrio Monitoring System</p>
+        <p>This is an automated alert from AlertManager</p>
+        <p><small>Alert fingerprint: {{ .GroupLabels.alertname }}-{{ .GroupLabels.severity }}</small></p>
+    </div>
+</body>
+</html>
+{{ end }}
+

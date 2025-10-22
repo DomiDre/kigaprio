@@ -6,6 +6,7 @@ import httpx
 import redis
 from fastapi import Cookie, Depends, HTTPException, Request, Response
 
+from kigaprio.middleware.metrics import track_session_lookup
 from kigaprio.models.auth import SessionInfo
 from kigaprio.models.cookie import (
     COOKIE_AUTH_TOKEN,
@@ -72,11 +73,13 @@ async def verify_token(
         )
     except Exception as e:
         logger.error(f"Redis connection error: {e}")
+        track_session_lookup("error")
         # If Redis fails, try PocketBase refresh
         cached_session = None
 
     if cached_session:
         # Session found in cache - it's valid
+        track_session_lookup("cache_hit")
         try:
             session_data = (
                 json.loads(cached_session)
@@ -85,9 +88,11 @@ async def verify_token(
             )
             return SessionInfo(**session_data)
         except Exception as e:
+            track_session_lookup("invalid")
             logger.error(f"Failed to parse cached session: {e}")
             # If parsing fails, fall through to PocketBase refresh
 
+    track_session_lookup("cache_miss")
     # Session not in cache - verify with PocketBase
     logger.debug(
         f"Session not in cache, refreshing with PocketBase for token: {token[:10]}..."

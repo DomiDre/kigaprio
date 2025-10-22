@@ -1,0 +1,369 @@
+groups:
+  # ============================================================================
+  # SECURITY ALERTS
+  # ============================================================================
+  - name: security_alerts
+    interval: 30s
+    rules:
+      # High rate of failed login attempts (potential brute force)
+      - alert: HighFailedLoginRate
+        expr: rate(kigaprio_failed_login_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "High failed login rate detected"
+          description: "{{ $value }} failed login attempts per second in the last 5 minutes. Possible brute force attack."
+
+      # Rate limiting triggered frequently
+      - alert: FrequentRateLimiting
+        expr: rate(kigaprio_rate_limit_exceeded_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Frequent rate limiting triggered"
+          description: "{{ $value }} rate limit violations per second. Possible DoS attempt or misconfigured client."
+
+      # Suspicious authentication patterns
+      - alert: MultipleUserLoginFromSameIP
+        expr: |
+          sum by (client_ip) (
+            rate(kigaprio_login_attempts_total[10m])
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Multiple users logging in from same IP"
+          description: "IP {{ $labels.client_ip }} has {{ $value }} login attempts from different users in 10 minutes."
+
+      # Encryption/decryption failures
+      - alert: EncryptionFailures
+        expr: rate(kigaprio_encryption_error_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Encryption/decryption failures detected"
+          description: "{{ $value }} encryption errors per second. Possible key corruption or attack."
+
+      # Unauthorized access attempts
+      - alert: UnauthorizedAccessAttempts
+        expr: rate(kigaprio_unauthorized_access_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High rate of unauthorized access attempts"
+          description: "{{ $value }} unauthorized access attempts per second."
+
+      # CSP violations
+      - alert: CSPViolations
+        expr: rate(kigaprio_csp_violation_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Content Security Policy violations detected"
+          description: "{{ $value }} CSP violations per second. Possible XSS attack or misconfiguration."
+
+      # Admin session hijacking attempt
+      - alert: AdminSessionAnomalies
+        expr: |
+          (kigaprio_admin_sessions_active > 3)
+          or
+          (rate(kigaprio_admin_failed_auth_total[5m]) > 0.5)
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Admin session anomalies detected"
+          description: "Unusual admin session activity detected."
+
+  # ============================================================================
+  # AVAILABILITY ALERTS
+  # ============================================================================
+  - name: availability_alerts
+    interval: 30s
+    rules:
+      # Service is down
+      - alert: ServiceDown
+        expr: up{job="kigaprio-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "KigaPrio backend is down"
+          description: "Backend service has been down for more than 1 minute."
+
+      # Redis is down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Redis is down"
+          description: "Redis service has been down for more than 1 minute."
+
+      # PocketBase is down
+      - alert: PocketBaseDown
+        expr: up{job="pocketbase"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "PocketBase is down"
+          description: "PocketBase service has been down for more than 1 minute."
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(kigaprio_http_requests_total{status=~"5.."}[5m])) 
+          / 
+          sum(rate(kigaprio_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "High HTTP error rate"
+          description: "{{ $value | humanizePercentage }} of requests are failing (5xx errors)."
+
+      # Health check failures
+      - alert: HealthCheckFailing
+        expr: kigaprio_health_check_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Health check failing"
+          description: "Service health check has been failing for 2 minutes."
+
+  # ============================================================================
+  # PERFORMANCE ALERTS
+  # ============================================================================
+  - name: performance_alerts
+    interval: 30s
+    rules:
+      # High API latency
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, 
+            rate(kigaprio_http_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High API latency"
+          description: "95th percentile latency is {{ $value }}s (threshold: 2s)."
+
+      # Slow database queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            rate(kigaprio_db_query_duration_seconds_bucket[5m])
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Slow database queries"
+          description: "95th percentile database query time is {{ $value }}s."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) 
+          / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}."
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}."
+
+      # Disk space running low
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} 
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Disk space running low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining."
+
+      # High connection count
+      - alert: HighConnectionCount
+        expr: kigaprio_active_connections > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High number of active connections"
+          description: "{{ $value }} active connections (threshold: 100)."
+
+      # PocketBase API latency
+      - alert: HighPocketBaseLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(kigaprio_pocketbase_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High PocketBase API latency"
+          description: "95th percentile PocketBase request time is {{ $value }}s."
+
+      # PocketBase error rate
+      - alert: HighPocketBaseErrorRate
+        expr: |
+          sum(rate(kigaprio_pocketbase_request_total{status=~"5.."}[5m]))
+          /
+          sum(rate(kigaprio_pocketbase_request_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "High PocketBase error rate"
+          description: "{{ $value | humanizePercentage }} of PocketBase requests are failing."
+
+  # ============================================================================
+  # DATA INTEGRITY ALERTS
+  # ============================================================================
+  - name: data_integrity_alerts
+    interval: 60s
+    rules:
+      # Session cache misses too high
+      - alert: HighSessionCacheMissRate
+        expr: |
+          rate(kigaprio_session_cache_miss_total[10m]) 
+          / 
+          rate(kigaprio_session_lookups_total[10m]) > 0.3
+        for: 10m
+        labels:
+          severity: warning
+          category: data
+        annotations:
+          summary: "High session cache miss rate"
+          description: "{{ $value | humanizePercentage }} of session lookups are missing cache."
+
+      # Redis connection errors
+      - alert: RedisConnectionErrors
+        expr: rate(kigaprio_redis_connection_error_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: data
+        annotations:
+          summary: "Redis connection errors"
+          description: "{{ $value }} Redis connection errors per second."
+
+      # Redis pool exhaustion
+      - alert: RedisPoolExhausted
+        expr: kigaprio_redis_pool_connections_available <= 0
+        for: 2m
+        labels:
+          severity: critical
+          category: data
+        annotations:
+          summary: "Redis connection pool exhausted"
+          description: "No available Redis connections in the pool."
+
+      # Redis memory usage high
+      - alert: RedisMemoryHigh
+        expr: |
+          kigaprio_redis_info_memory_used_bytes 
+          / 
+          kigaprio_redis_info_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: data
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis is using {{ $value | humanizePercentage }} of allocated memory."
+
+  # ============================================================================
+  # BUSINESS LOGIC ALERTS
+  # ============================================================================
+  - name: business_alerts
+    interval: 60s
+    rules:
+      # Unusual submission rate
+      - alert: UnusualSubmissionRate
+        expr: |
+          abs(
+            rate(kigaprio_priority_submissions_total[1h])
+            - rate(kigaprio_priority_submissions_total[1h] offset 24h)
+          ) / rate(kigaprio_priority_submissions_total[1h] offset 24h) > 2
+        for: 15m
+        labels:
+          severity: info
+          category: business
+        annotations:
+          summary: "Unusual priority submission rate"
+          description: "Submission rate differs significantly from same time yesterday."
+
+      # No submissions in expected timeframe
+      - alert: NoRecentSubmissions
+        expr: |
+          (hour() >= 6 and hour() <= 22)
+          and
+          rate(kigaprio_priority_submissions_total[2h]) == 0
+        for: 2h
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "No priority submissions in 2 hours"
+          description: "No submissions during expected hours (6AM-10PM)."
+
+      # High magic word verification failure rate
+      - alert: HighMagicWordFailureRate
+        expr: |
+          rate(kigaprio_magic_word_verification_failed_total[10m])
+          / 
+          rate(kigaprio_magic_word_verification_total[10m]) > 0.5
+        for: 10m
+        labels:
+          severity: info
+          category: business
+        annotations:
+          summary: "High magic word verification failure rate"
+          description: "{{ $value | humanizePercentage }} of magic word verifications are failing."

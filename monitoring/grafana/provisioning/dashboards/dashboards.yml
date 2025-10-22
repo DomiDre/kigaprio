@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'KigaPrio Dashboards'
+    orgId: 1
+    folder: 'KigaPrio'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

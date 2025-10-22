@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'kigaprio-production'
+    environment: 'production'
+
+# Alert rules
+rule_files:
+  - 'alerts.yml'
+
+# AlertManager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'prometheus'
+
+  # FastAPI Backend metrics
+  - job_name: 'kigaprio-backend'
+    metrics_path: '/api/v1/metrics'
+    static_configs:
+      - targets: ['backend:8000']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'kigaprio-backend'
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/metrics_token
+

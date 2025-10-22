@@ -177,7 +177,7 @@ init-admin-key:
 pocketbase-init: init-secrets
     ./pocketbase/init.sh
 
-redis-init:
+services-init:
     #!/usr/bin/env bash
     echo "Initializing Redis persistence..."
     mkdir -p redis_data
@@ -190,9 +190,88 @@ redis-init:
       --shell /usr/sbin/nologin \
       redis-kigaprio
     echo "Setting ownership (requires sudo)..."
-    sudo chown -R 10001:10001 redis_data || echo "⚠️  Could not set ownership - run: sudo chown -R 999:999 redis_data"
+    sudo chown -R 10001:10001 redis_data || echo "⚠️  Could not set ownership for redis"
     echo "Redis persistence initialized"
+
+    mkdir -p monitoring/prometheus/data
+    sudo chmod 700 monitoring/prometheus/data
+    sudo groupadd --gid 10002 prometheus-kigaprio
+    sudo useradd --system \
+      --uid 10002 --gid 10002 \
+      --no-create-home \
+      --shell /usr/sbin/nologin \
+      prometheus-kigaprio
+    echo "Setting ownership (requires sudo)..."
+    sudo chown -R 10002:10002 monitoring/prometheus || echo "⚠️  Could not set ownership for prometheus"
+    echo "Prometheus initialized"
+
+    mkdir -p monitoring/grafana/data
+    sudo chmod 700 monitoring/grafana/data
+    sudo groupadd --gid 10003 grafana-kigaprio
+    sudo useradd --system \
+      --uid 10003 --gid 10003 \
+      --no-create-home \
+      --shell /usr/sbin/nologin \
+      grafana-kigaprio
+    echo "Setting ownership (requires sudo)..."
+    sudo chown -R 10003:10003 monitoring/grafana || echo "⚠️  Could not set ownership for prometheus"
+    echo "grafana initialized"
+
+    mkdir -p monitoring/alertmanager/data
+    sudo chmod 700 monitoring/alertmanager/data
+    sudo groupadd --gid 10004 alertmanager-kigaprio
+    sudo useradd --system \
+      --uid 10004 --gid 10004 \
+      --no-create-home \
+      --shell /usr/sbin/nologin \
+      alertmanager-kigaprio
+    echo "Setting ownership (requires sudo)..."
+    sudo chown -R 10004:10004 monitoring/alertmanager || echo "⚠️  Could not set ownership for prometheus"
+    echo "alertmanager initialized"
 
 # Reset redis cache
 redis-clear:
     docker compose -f ./docker-compose.dev.yml exec redis redis-cli FLUSHALL
+
+
+# Start monitoring stack
+monitoring-up:
+    docker compose -f ./monitoring/docker-compose.monitoring.yml up -d
+
+# Stop monitoring stack
+monitoring-down:
+    docker compose -f ./monitoring/docker-compose.monitoring.yml down
+
+# View monitoring logs
+monitoring-logs service="":
+    #!/usr/bin/env bash
+    if [ -z "{{service}}" ]; then
+        docker compose -f ./monitoring/docker-compose.monitoring.yml logs -f
+    else
+        docker compose -f ./monitoring/docker-compose.monitoring.yml logs -f {{service}}
+    fi
+
+# Restart monitoring service
+monitoring-restart service:
+    docker compose -f ./monitoring/docker-compose.monitoring.yml restart {{service}}
+
+# Check Prometheus targets
+monitoring-targets:
+    @curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health, lastError: .lastError}'
+
+# Reload Prometheus config
+monitoring-reload:
+    @curl -X POST http://localhost:9090/-/reload
+
+# Test alert
+monitoring-test-alert:
+    @curl -X POST http://localhost:9093/api/v1/alerts -d '[{"labels":{"alertname":"TestAlert","severity":"warning"}}]'
+
+# Show monitoring status
+monitoring-status:
+    @echo "=== Monitoring Stack Status ==="
+    @docker compose -f ./monitoring/docker-compose.monitoring.yml ps
+    @echo ""
+    @echo "=== Service URLs ==="
+    @echo "Grafana: https://grafana.kiga.dhjd.de"
+    @echo "Prometheus: https://prometheus.kiga.dhjd.de"

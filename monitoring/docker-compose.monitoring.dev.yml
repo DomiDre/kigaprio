@@ -1,0 +1,148 @@
+services:
+  # Prometheus - Metrics collection and storage
+  prometheus:
+    image: prom/prometheus:v3.7.1
+    restart: unless-stopped
+    user: "1000:1000"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./prometheus/data:/prometheus
+    networks:
+      - kigaprio_default
+    #   - monitoring
+      # - proxy
+    ports:
+      - "9090:9090"
+    expose:
+      - 9090
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.kiga.dhjd.de`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=myresolver"
+      - "traefik.http.routers.prometheus.middlewares=admin-auth"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:12.2
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      - GF_SERVER_ROOT_URL=https://grafana.kiga.dhjd.de
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST__FILE=/run/secrets/smtp_host
+      - GF_SMTP_USER__FILE=/run/secrets/smtp_user
+      - GF_SMTP_PASSWORD__FILE=/run/secrets/smtp_password
+      - GF_SMTP_FROM_ADDRESS=alerts@dhjd.de
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - kigaprio_default
+      # - monitoring
+      # - proxy
+    ports:
+      - "3000:3000"
+    expose:
+      - 3000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.kiga.dhjd.de`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=myresolver"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    secrets:
+      - grafana_admin_password
+      - smtp_host
+      - smtp_user
+      - smtp_password
+    depends_on:
+      - prometheus
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+
+  # AlertManager - Alert routing and deduplication
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    user: "1000:1000"
+    entrypoint: /etc/load-secrets.sh
+    command:
+    - /bin/sh 
+    - -c
+    - |
+      sed -e 's|$$SMTP_HOST|'"$$SMTP_HOST"'|g' \
+          -e 's|$$SMTP_USER|'"$$SMTP_USER"'|g' \
+          -e 's|$$SMTP_PASSWORD|'"$$SMTP_PASSWORD"'|g' \
+          -e 's|$$ALERTMANAGER_EMAIL_TO|'"$$ALERTMANAGER_EMAIL_TO"'|g' \
+          /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml && \
+      exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
+    volumes:
+      - ../scripts/load-secrets.sh:/etc/load-secrets.sh:ro
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alertmanager/data:/alertmanager
+      - ./alertmanager/templates/:/etc/alertmanager/templates:ro
+    networks:
+      - kigaprio_default
+      # - monitoring
+    ports:
+      - "9093:9093"
+    expose:
+      - 9093
+    secrets:
+      - alertmanager_email_to
+      - smtp_host
+      - smtp_user
+      - smtp_password
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  kigaprio_default:
+    external: true
+#   monitoring:
+#     driver: bridge
+  # kigaprio-prod:
+  #   external: true
+  # proxy:
+  #   external: true
+
+secrets:
+  grafana_admin_password:
+    file: ../.secrets/grafana_admin_password
+  smtp_host:
+    file: ../.secrets/smtp_host
+  smtp_user:
+    file: ../.secrets/smtp_user
+  smtp_password:
+    file: ../.secrets/smtp_password
+  alertmanager_email_to:
+    file: ../.secrets/alertmanager_email_to

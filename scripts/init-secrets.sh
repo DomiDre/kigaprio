@@ -16,7 +16,12 @@ declare -a secrets=(
 	"pb_service_password:RANDOM"
 	"server_cache_key:RANDOM"
 	"redis_pass:RANDOM"
-
+	"grafana_admin_password:RANDOM"
+	"smtp_host:PROMPT"
+	"smtp_user:PROMPT"
+	"smtp_password:PROMPT"
+	"alertmanager_email_to:PROMPT"
+	"metrics_token:RANDOM"
 )
 
 generate_random() {
