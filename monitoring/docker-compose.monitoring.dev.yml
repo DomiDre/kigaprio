@@ -3,7 +3,7 @@ services:
   prometheus:
     image: prom/prometheus:v3.7.1
     restart: unless-stopped
-    user: "10002:10002"
+    user: "1000:1000"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -14,8 +14,11 @@ services:
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - ./prometheus/data:/prometheus
     networks:
-      - monitoring
-      - proxy
+      - kigaprio_default
+    #   - monitoring
+      # - proxy
+    ports:
+      - "9090:9090"
     expose:
       - 9090
     labels:
@@ -39,7 +42,7 @@ services:
   grafana:
     image: grafana/grafana:12.2
     restart: unless-stopped
-    user: "10003:10003"
+    user: "1000:1000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
@@ -54,8 +57,11 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
-      - monitoring
-      - proxy
+      - kigaprio_default
+      # - monitoring
+      # - proxy
+    ports:
+      - "3000:3000"
     expose:
       - 3000
     labels:
@@ -85,7 +91,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.28.1
     restart: unless-stopped
-    user: "10004:10004"
+    user: "1000:1000"
     entrypoint: /etc/load-secrets.sh
     command:
     - /bin/sh 
@@ -103,7 +109,10 @@ services:
       - ./alertmanager/data:/alertmanager
       - ./alertmanager/templates/:/etc/alertmanager/templates:ro
     networks:
-      - monitoring
+      - kigaprio_default
+      # - monitoring
+    ports:
+      - "9093:9093"
     expose:
       - 9093
     secrets:
@@ -117,10 +126,14 @@ services:
       - ALL
 
 networks:
-  monitoring:
-    driver: bridge
-  proxy:
+  kigaprio_default:
     external: true
+#   monitoring:
+#     driver: bridge
+  # kigaprio-prod:
+  #   external: true
+  # proxy:
+  #   external: true
 
 secrets:
   grafana_admin_password:
