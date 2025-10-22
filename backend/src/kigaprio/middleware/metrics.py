@@ -112,22 +112,24 @@ data_operations_total = Counter(
     ["operation", "collection"],  # operation: create, read, update, delete
 )
 
-# Database metrics
-db_query_duration_seconds = Histogram(
-    "kigaprio_db_query_duration_seconds",
-    "Database query duration",
-    ["operation", "collection"],
+# PocketBase HTTP API metrics
+pocketbase_request_duration_seconds = Histogram(
+    "kigaprio_pocketbase_request_duration_seconds",
+    "PocketBase API request duration",
+    ["operation", "collection", "status"],
     buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0),
 )
 
-db_connection_pool_active = Gauge(
-    "kigaprio_db_connection_pool_active",
-    "Active database connections",
+pocketbase_request_total = Counter(
+    "kigaprio_pocketbase_request_total",
+    "Total PocketBase API requests",
+    ["operation", "collection", "status"],
 )
 
-db_connection_pool_max = Gauge(
-    "kigaprio_db_connection_pool_max",
-    "Maximum database connections",
+pocketbase_error_total = Counter(
+    "kigaprio_pocketbase_error_total",
+    "PocketBase API errors",
+    ["operation", "collection", "error_type"],
 )
 
 # Redis metrics
@@ -141,6 +143,36 @@ redis_operation_duration_seconds = Histogram(
     "Redis operation duration",
     ["operation"],
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5),
+)
+
+redis_pool_connections_active = Gauge(
+    "kigaprio_redis_pool_connections_active",
+    "Active Redis pool connections",
+)
+
+redis_pool_connections_available = Gauge(
+    "kigaprio_redis_pool_connections_available",
+    "Available Redis pool connections",
+)
+
+redis_pool_connections_max = Gauge(
+    "kigaprio_redis_pool_connections_max",
+    "Maximum Redis pool connections",
+)
+
+redis_info_memory_used_bytes = Gauge(
+    "kigaprio_redis_info_memory_used_bytes",
+    "Redis memory used in bytes",
+)
+
+redis_info_memory_max_bytes = Gauge(
+    "kigaprio_redis_info_memory_max_bytes",
+    "Redis max memory in bytes",
+)
+
+redis_info_connected_clients = Gauge(
+    "kigaprio_redis_info_connected_clients",
+    "Number of connected Redis clients",
 )
 
 # System metrics
@@ -344,11 +376,23 @@ def update_admin_sessions(count: int):
     admin_sessions_active.set(count)
 
 
-def track_db_query(operation: str, collection: str, duration: float):
-    """Track database query"""
-    db_query_duration_seconds.labels(
-        operation=operation, collection=collection
+def track_pocketbase_request(
+    operation: str, collection: str, status: int, duration: float
+):
+    """Track PocketBase API request"""
+    pocketbase_request_total.labels(
+        operation=operation, collection=collection, status=str(status)
+    ).inc()
+    pocketbase_request_duration_seconds.labels(
+        operation=operation, collection=collection, status=str(status)
     ).observe(duration)
+
+
+def track_pocketbase_error(operation: str, collection: str, error_type: str):
+    """Track PocketBase API error"""
+    pocketbase_error_total.labels(
+        operation=operation, collection=collection, error_type=error_type
+    ).inc()
 
 
 def track_redis_operation(operation: str, duration: float):
@@ -359,6 +403,22 @@ def track_redis_operation(operation: str, duration: float):
 def track_redis_error():
     """Track Redis connection error"""
     redis_connection_error_total.inc()
+
+
+def update_redis_pool_metrics(active: int, available: int, max_connections: int):
+    """Update Redis connection pool metrics"""
+    redis_pool_connections_active.set(active)
+    redis_pool_connections_available.set(available)
+    redis_pool_connections_max.set(max_connections)
+
+
+def update_redis_info_metrics(
+    memory_used: int, memory_max: int, connected_clients: int
+):
+    """Update Redis INFO metrics"""
+    redis_info_memory_used_bytes.set(memory_used)
+    redis_info_memory_max_bytes.set(memory_max)
+    redis_info_connected_clients.set(connected_clients)
 
 
 def update_health_status(component: str, is_healthy: bool):

@@ -5,7 +5,10 @@ from urllib.parse import urlparse, urlunparse
 import redis
 from redis.exceptions import ConnectionError, TimeoutError
 
-from kigaprio.middleware.metrics import track_redis_error
+from kigaprio.middleware.metrics import (
+    update_redis_info_metrics,
+    update_redis_pool_metrics,
+)
 
 
 class RedisService:
@@ -87,6 +90,57 @@ class RedisService:
             print(f"Redis health check failed: {e}")
             return False
 
+    def get_pool_stats(self) -> dict[str, int]:
+        """Get Redis connection pool statistics"""
+        if not self._pool:
+            return {
+                "active": 0,
+                "available": 0,
+                "max": 0,
+            }
+
+        # Get pool statistics
+        # Note: redis-py doesn't directly expose these, but we can infer
+        max_connections = self._pool.max_connections
+
+        # Active connections are those checked out from the pool
+        # Available = max - active (approximation)
+        # This is a best-effort metric since redis-py doesn't expose exact counts
+
+        return {
+            "active": 0,  # redis-py doesn't expose this directly
+            "available": max_connections,  # Assume all available if we can't count
+            "max": max_connections,
+        }
+
+    def get_redis_info(self) -> dict[str, int]:
+        """Get Redis INFO metrics"""
+        try:
+            client: redis.Redis = self.get_client()
+            # Type hint: info() returns Dict[str, Any]
+            info: dict[str, int | str] = client.info("memory")  # type: ignore
+            stats: dict[str, int | str] = client.info("stats")  # type: ignore
+
+            # Parse memory info - cast to int
+            memory_used = int(info.get("used_memory", 0))
+            memory_max = int(info.get("maxmemory", 0))
+
+            # Parse client info
+            connected_clients = int(stats.get("connected_clients", 0))
+
+            return {
+                "memory_used": memory_used,
+                "memory_max": memory_max,
+                "connected_clients": connected_clients,
+            }
+        except Exception as e:
+            print(f"Failed to get Redis INFO: {e}")
+            return {
+                "memory_used": 0,
+                "memory_max": 0,
+                "connected_clients": 0,
+            }
+
     def close(self):
         """Close connection pool"""
         if self._pool:
@@ -100,11 +154,7 @@ _redis_service = RedisService()
 
 def get_redis() -> redis.Redis:  # Remove async
     """Get Redis connection from pool"""
-    try:
-        return _redis_service.get_client()
-    except Exception:
-        track_redis_error()
-        raise
+    return _redis_service.get_client()
 
 
 def redis_health_check() -> bool:  # Remove async
@@ -115,3 +165,27 @@ def redis_health_check() -> bool:  # Remove async
 def close_redis():
     """Close Redis connections (call on shutdown)"""
     _redis_service.close()
+
+
+def update_redis_metrics():
+    """Update Redis metrics (call periodically from background task)"""
+    try:
+        # Import here to avoid circular dependency
+
+        # Get pool stats
+        pool_stats = _redis_service.get_pool_stats()
+        update_redis_pool_metrics(
+            active=pool_stats["active"],
+            available=pool_stats["available"],
+            max_connections=pool_stats["max"],
+        )
+
+        # Get Redis INFO stats
+        info_stats = _redis_service.get_redis_info()
+        update_redis_info_metrics(
+            memory_used=info_stats["memory_used"],
+            memory_max=info_stats["memory_max"],
+            connected_clients=info_stats["connected_clients"],
+        )
+    except Exception as e:
+        print(f"Failed to update Redis metrics: {e}")

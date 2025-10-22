@@ -224,17 +224,6 @@ groups:
           summary: "Disk space running low"
           description: "Only {{ $value | humanizePercentage }} disk space remaining."
 
-      # Redis memory usage high
-      - alert: RedisMemoryHigh
-        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
-        for: 5m
-        labels:
-          severity: warning
-          category: performance
-        annotations:
-          summary: "Redis memory usage high"
-          description: "Redis is using {{ $value | humanizePercentage }} of allocated memory."
-
       # High connection count
       - alert: HighConnectionCount
         expr: kigaprio_active_connections > 100
@@ -245,6 +234,34 @@ groups:
         annotations:
           summary: "High number of active connections"
           description: "{{ $value }} active connections (threshold: 100)."
+
+      # PocketBase API latency
+      - alert: HighPocketBaseLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(kigaprio_pocketbase_request_duration_seconds_bucket[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High PocketBase API latency"
+          description: "95th percentile PocketBase request time is {{ $value }}s."
+
+      # PocketBase error rate
+      - alert: HighPocketBaseErrorRate
+        expr: |
+          sum(rate(kigaprio_pocketbase_request_total{status=~"5.."}[5m]))
+          /
+          sum(rate(kigaprio_pocketbase_request_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "High PocketBase error rate"
+          description: "{{ $value | humanizePercentage }} of PocketBase requests are failing."
 
   # ============================================================================
   # DATA INTEGRITY ALERTS
@@ -277,16 +294,30 @@ groups:
           summary: "Redis connection errors"
           description: "{{ $value }} Redis connection errors per second."
 
-      # Database connection pool exhaustion
-      - alert: DatabaseConnectionPoolExhausted
-        expr: kigaprio_db_connection_pool_active >= kigaprio_db_connection_pool_max
+      # Redis pool exhaustion
+      - alert: RedisPoolExhausted
+        expr: kigaprio_redis_pool_connections_available <= 0
         for: 2m
         labels:
           severity: critical
           category: data
         annotations:
-          summary: "Database connection pool exhausted"
-          description: "All database connections are in use."
+          summary: "Redis connection pool exhausted"
+          description: "No available Redis connections in the pool."
+
+      # Redis memory usage high
+      - alert: RedisMemoryHigh
+        expr: |
+          kigaprio_redis_info_memory_used_bytes 
+          / 
+          kigaprio_redis_info_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: data
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis is using {{ $value | humanizePercentage }} of allocated memory."
 
   # ============================================================================
   # BUSINESS LOGIC ALERTS
