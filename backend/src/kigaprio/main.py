@@ -38,6 +38,7 @@ logger.info("Starting KigaPrio API")
 
 # Background task state
 _monitoring_task = None
+_ = _monitoring_task
 
 
 async def monitoring_loop():
@@ -106,7 +107,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    livespan=lifespan,
+    lifespan=lifespan,
 )
 
 

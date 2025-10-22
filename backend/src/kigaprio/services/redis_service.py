@@ -12,10 +12,10 @@ from kigaprio.middleware.metrics import (
 
 
 class RedisService:
-    """Redis connection service with automatic password injection"""
+    """Redis connection service with automatic password injection and accurate pool tracking"""
 
     def __init__(self):
-        self._pool: redis.ConnectionPool | None = None
+        self._pool: redis.BlockingConnectionPool | None = None
         self._redis_url: str | None = None
 
     def _build_redis_url(self) -> str:
@@ -62,13 +62,21 @@ class RedisService:
         return self._redis_url
 
     @property
-    def pool(self) -> redis.ConnectionPool:
-        """Lazy-initialize connection pool"""
+    def pool(self) -> redis.BlockingConnectionPool:
+        """Lazy-initialize blocking connection pool with accurate tracking"""
         if self._pool is None:
-            self._pool = redis.ConnectionPool.from_url(
-                self.redis_url,
+            parsed = urlparse(self.redis_url)
+
+            # Use BlockingConnectionPool for better tracking and automatic blocking
+            # when pool is exhausted (prevents silent failures)
+            self._pool = redis.BlockingConnectionPool(
+                host=parsed.hostname,
+                port=parsed.port or 6379,
+                password=parsed.password,
+                db=int(parsed.path.lstrip("/")) if parsed.path else 0,
                 decode_responses=True,
                 max_connections=10,
+                timeout=20,  # Timeout for waiting for a connection from pool
                 socket_connect_timeout=5,
                 socket_timeout=5,
                 retry_on_timeout=True,
@@ -80,7 +88,7 @@ class RedisService:
         """Get Redis client from pool"""
         return redis.Redis(connection_pool=self.pool)
 
-    def health_check(self) -> bool:  # Remove async
+    def health_check(self) -> bool:
         """Check Redis connection health"""
         try:
             client: redis.Redis = self.get_client()
@@ -91,7 +99,12 @@ class RedisService:
             return False
 
     def get_pool_stats(self) -> dict[str, int]:
-        """Get Redis connection pool statistics"""
+        """Get Redis connection pool statistics
+
+        BlockingConnectionPool provides accurate tracking through:
+        - _available_connections: Queue of available connections
+        - _in_use_connections: Set of connections currently in use
+        """
         if not self._pool:
             return {
                 "active": 0,
@@ -99,17 +112,41 @@ class RedisService:
                 "max": 0,
             }
 
-        # Get pool statistics
-        # Note: redis-py doesn't directly expose these, but we can infer
         max_connections = self._pool.max_connections
 
-        # Active connections are those checked out from the pool
-        # Available = max - active (approximation)
-        # This is a best-effort metric since redis-py doesn't expose exact counts
+        try:
+            # BlockingConnectionPool has better internal tracking
+            # _available_connections is a queue of connections ready to use
+            pool_obj = self._pool.pool if hasattr(self._pool, "pool") else None
+
+            if pool_obj is not None:
+                # Get number of available connections in the pool
+                available_count = pool_obj.qsize()
+            else:
+                # Fallback: try to access _available_connections directly
+                available_count = len(getattr(self._pool, "_available_connections", []))
+
+            # _in_use_connections tracks borrowed connections
+            in_use = getattr(self._pool, "_in_use_connections", set())
+            active_count = len(in_use)
+
+            # Sanity check: active + available should not exceed max
+            # (though it can be less if not all connections have been created yet)
+            if active_count + available_count > max_connections:
+                # Use created connections as source of truth
+                created = getattr(self._pool, "_created_connections", 0)
+                active_count = max(0, created - available_count)
+
+        except Exception as e:
+            # Fallback if internal API changes
+            print(f"Warning: Could not get exact pool stats: {e}")
+            # Make a pessimistic assumption - show pool as exhausted to be safe
+            available_count = 0
+            active_count = max_connections
 
         return {
-            "active": 0,  # redis-py doesn't expose this directly
-            "available": max_connections,  # Assume all available if we can't count
+            "active": active_count,
+            "available": available_count,
             "max": max_connections,
         }
 
@@ -117,7 +154,6 @@ class RedisService:
         """Get Redis INFO metrics"""
         try:
             client: redis.Redis = self.get_client()
-            # Type hint: info() returns Dict[str, Any]
             info: dict[str, int | str] = client.info("memory")  # type: ignore
             stats: dict[str, int | str] = client.info("stats")  # type: ignore
 
@@ -152,14 +188,14 @@ class RedisService:
 _redis_service = RedisService()
 
 
-def get_redis() -> redis.Redis:  # Remove async
+def get_redis() -> redis.Redis:
     """Get Redis connection from pool"""
     return _redis_service.get_client()
 
 
-def redis_health_check() -> bool:  # Remove async
+def redis_health_check() -> bool:
     """Check if Redis is healthy"""
-    return _redis_service.health_check()  # Remove await
+    return _redis_service.health_check()
 
 
 def close_redis():
@@ -170,8 +206,6 @@ def close_redis():
 def update_redis_metrics():
     """Update Redis metrics (call periodically from background task)"""
     try:
-        # Import here to avoid circular dependency
-
         # Get pool stats
         pool_stats = _redis_service.get_pool_stats()
         update_redis_pool_metrics(
