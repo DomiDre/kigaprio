@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from kigaprio.api.routes import admin, auth, health, priorities
 from kigaprio.config import settings
@@ -105,8 +106,8 @@ app = FastAPI(
     title="KigaPrio API",
     description="API for analyzing images and PDFs with Excel output generation",
     version="0.1.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    docs_url=None if ENV == "production" else "/api/docs",
+    redoc_url=None if ENV == "production" else "/api/redoc",
     lifespan=lifespan,
 )
 
@@ -165,9 +166,22 @@ async def csp_violation_report(request: Request):
     return {"status": "ok"}
 
 
+metrics_token_file = Path("/run/secrets/metrics_token")
+if not metrics_token_file.exists():
+    raise FileNotFoundError("Missing metrics token file")
+
+METRICS_TOKEN = metrics_token_file.read_text().strip()
+
+security = HTTPBearer()
+
+
 @app.get("/api/v1/metrics")
-async def metrics():
+async def metrics(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Prometheus metrics endpoint"""
+    if credentials.credentials != METRICS_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid metrics token"
+        )
     return await metrics_endpoint()
 
 

@@ -21,6 +21,7 @@ declare -a secrets=(
 	"smtp_user:PROMPT"
 	"smtp_password:PROMPT"
 	"alertmanager_email_to:PROMPT"
+	"metrics_token:RANDOM"
 )
 
 generate_random() {

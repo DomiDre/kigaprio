@@ -18,6 +18,8 @@ services:
       - proxy
     expose:
       - 9090
+    secrets:
+      - metrics_token
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.kiga.dhjd.de`)"
@@ -133,3 +135,5 @@ secrets:
     file: ../.secrets/smtp_password
   alertmanager_email_to:
     file: ../.secrets/alertmanager_email_to
+  metrics_token:
+    file: ../.secrets/metrics_token

@@ -36,4 +36,7 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: instance
         replacement: 'kigaprio-backend'
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/metrics_token
 
