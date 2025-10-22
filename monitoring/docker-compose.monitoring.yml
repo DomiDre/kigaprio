@@ -14,7 +14,7 @@ services:
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - ./prometheus/data:/prometheus
     networks:
-      - monitoring
+      - kigaprio_monitoring
       - proxy
     expose:
       - 9090
@@ -54,7 +54,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
-      - monitoring
+      - kigaprio_monitoring
       - proxy
     expose:
       - 3000
@@ -103,7 +103,7 @@ services:
       - ./alertmanager/data:/alertmanager
       - ./alertmanager/templates/:/etc/alertmanager/templates:ro
     networks:
-      - monitoring
+      - kigaprio_monitoring
     expose:
       - 9093
     secrets:
@@ -117,7 +117,7 @@ services:
       - ALL
 
 networks:
-  monitoring:
+  kigaprio_monitoring:
     external: true
   proxy:
     external: true
