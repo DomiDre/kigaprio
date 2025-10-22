@@ -392,12 +392,12 @@ async def login_user(
 
             if is_admin:
                 # Count active admin sessions
-                admin_count = redis_client.scard("active_admin_sessions") or 0
+                admin_count: int = redis_client.scard("active_admin_sessions") or 0  # type: ignore
                 update_admin_sessions(int(admin_count))
             else:
                 # Count user sessions by mode
                 mode_key = f"active_{security_mode}_sessions"
-                mode_count = redis_client.scard(mode_key) or 0
+                mode_count: int = redis_client.scard(mode_key) or 0  # type: ignore
                 update_active_sessions(int(mode_count), security_mode)
 
             # set auth_token and dek as httponly cookies

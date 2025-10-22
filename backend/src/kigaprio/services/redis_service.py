@@ -127,7 +127,7 @@ class RedisService:
                 available_count = len(getattr(self._pool, "_available_connections", []))
 
             # _in_use_connections tracks borrowed connections
-            in_use = getattr(self._pool, "_in_use_connections", set())
+            in_use: set = getattr(self._pool, "_in_use_connections", set())
             active_count = len(in_use)
 
             # Sanity check: active + available should not exceed max
