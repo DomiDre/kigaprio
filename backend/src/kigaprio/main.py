@@ -168,7 +168,7 @@ async def csp_violation_report(request: Request):
 
 metrics_token_file = Path("/run/secrets/metrics_token")
 if not metrics_token_file.exists():
-    raise FileNotFoundError("Missing metrics token file")
+    logger.warning("Missing metrics token file")
 
 METRICS_TOKEN = metrics_token_file.read_text().strip()
 
