@@ -164,6 +164,8 @@
 						on:drop={handleKeyDrop}
 						on:dragover={preventDefaults}
 						on:dragenter={preventDefaults}
+						role="region"
+						aria-label="Private key file drop zone to locally decrypt data"
 					>
 						<input
 							type="file"
@@ -448,8 +450,11 @@
 
 			<div class="space-y-4 p-6">
 				<div>
-					<label class="mb-2 block text-sm font-medium text-gray-700">Select User</label>
+					<label for="userSelect" class="mb-2 block text-sm font-medium text-gray-700"
+						>Select User</label
+					>
 					<select
+						id="userSelect"
 						class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
 					>
 						<option value="">Choose a user...</option>
@@ -495,4 +500,3 @@
 <style>
 	/* Additional custom styles if needed */
 </style>
-
