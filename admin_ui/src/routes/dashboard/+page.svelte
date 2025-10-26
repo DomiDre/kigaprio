@@ -589,7 +589,7 @@
 					</div>
 
 					{#if showOverview}
-						<div class="overflow-x-auto p-6">
+						<div class="p-6">
 							<!-- Legend -->
 							<div class="mb-6 flex flex-wrap gap-4">
 								<div class="flex items-center gap-2">
@@ -608,87 +608,101 @@
 								{/each}
 							</div>
 
-							<!-- Overview Table -->
-							<table class="w-full border-collapse">
-								<thead>
-									<tr class="border-b-2 border-gray-300 dark:border-gray-600">
-										<th
-											class="sticky left-0 bg-white px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:bg-gray-800 dark:text-white"
-										>
-											User
-										</th>
-										{#each allWeeks as weekNum}
-											<th
-												class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
-												colspan="5"
-											>
-												<div class="text-xs font-semibold text-gray-700 dark:text-gray-300">
-													Week {weekNum}
-												</div>
-												<div class="mt-1 flex justify-around">
-													{#each dayLabels as day}
-														<span class="text-xs text-gray-500 dark:text-gray-400">{day}</span>
-													{/each}
-												</div>
-											</th>
-										{/each}
-									</tr>
-								</thead>
-								<tbody>
-									{#each overviewData as userData}
-										<tr
-											class="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
-										>
-											<td
-												class="sticky left-0 bg-white px-4 py-3 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
-											>
-												<div class="flex items-center gap-2">
-													<div
-														class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-blue-600 text-sm font-semibold text-white"
+							<!-- Table Container with proper overflow handling -->
+							<div class="-mx-6 overflow-x-auto px-6">
+								<div class="inline-block min-w-full align-middle">
+									<div class="overflow-hidden">
+										<!-- Overview Table -->
+										<table class="min-w-full border-collapse">
+											<thead>
+												<tr class="border-b-2 border-gray-300 dark:border-gray-600">
+													<th
+														class="sticky left-0 z-20 bg-white px-4 py-3 text-left text-sm font-semibold text-gray-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] dark:bg-gray-800 dark:text-white dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]"
 													>
-														{userData.userName.charAt(0).toUpperCase()}
-													</div>
-													<span class="text-sm">{userData.userName}</span>
-												</div>
-											</td>
-											{#each allWeeks as weekNum}
-												{@const week = userData.weeks.find((w: any) => w.weekNumber === weekNum)}
-												{#if week}
-													{#each week.priorities as priority}
-														<td
+														User
+													</th>
+													{#each allWeeks as weekNum}
+														<th
 															class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
-														>
-															{#if priority}
-																<div
-																	class="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold {priorityColors[
-																		priority as 1 | 2 | 3 | 4 | 5
-																	]}"
-																>
-																	{priority}
-																</div>
-															{:else}
-																<div
-																	class="mx-auto h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-700"
-																></div>
-															{/if}
-														</td>
-													{/each}
-												{:else}
-													{#each [1, 2, 3, 4, 5] as _}
-														<td
-															class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
+															colspan="5"
 														>
 															<div
-																class="mx-auto h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-700"
-															></div>
-														</td>
+																class="text-xs font-semibold whitespace-nowrap text-gray-700 dark:text-gray-300"
+															>
+																Week {weekNum}
+															</div>
+															<div class="mt-1 flex justify-around gap-1">
+																{#each dayLabels as day}
+																	<span
+																		class="min-w-[2rem] text-xs text-gray-500 dark:text-gray-400"
+																		>{day}</span
+																	>
+																{/each}
+															</div>
+														</th>
 													{/each}
-												{/if}
-											{/each}
-										</tr>
-									{/each}
-								</tbody>
-							</table>
+												</tr>
+											</thead>
+											<tbody>
+												{#each overviewData as userData}
+													<tr
+														class="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
+													>
+														<td
+															class="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-gray-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] dark:bg-gray-800 dark:text-white dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]"
+														>
+															<div class="flex items-center gap-2 whitespace-nowrap">
+																<div
+																	class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-blue-600 text-sm font-semibold text-white"
+																>
+																	{userData.userName.charAt(0).toUpperCase()}
+																</div>
+																<span class="text-sm">{userData.userName}</span>
+															</div>
+														</td>
+														{#each allWeeks as weekNum}
+															{@const week = userData.weeks.find(
+																(w: any) => w.weekNumber === weekNum
+															)}
+															{#if week}
+																{#each week.priorities as priority}
+																	<td
+																		class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
+																	>
+																		{#if priority}
+																			<div
+																				class="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold {priorityColors[
+																					priority as 1 | 2 | 3 | 4 | 5
+																				]}"
+																			>
+																				{priority}
+																			</div>
+																		{:else}
+																			<div
+																				class="mx-auto h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-700"
+																			></div>
+																		{/if}
+																	</td>
+																{/each}
+															{:else}
+																{#each [1, 2, 3, 4, 5] as _}
+																	<td
+																		class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
+																	>
+																		<div
+																			class="mx-auto h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-700"
+																		></div>
+																	</td>
+																{/each}
+															{/if}
+														{/each}
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+									</div>
+								</div>
+							</div>
 
 							<!-- Demand Statistics -->
 							<div class="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
@@ -703,7 +717,7 @@
 											<div class="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
 												Week {weekNum}
 											</div>
-											<div class="grid grid-cols-5 gap-2">
+											<div class="grid grid-cols-2 gap-2 md:grid-cols-5">
 												{#each dayKeys as day, dayIndex}
 													{@const dayStat = demandStats[weekNum]?.[day]}
 													<div
