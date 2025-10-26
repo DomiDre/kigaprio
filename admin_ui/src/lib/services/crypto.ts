@@ -17,6 +17,7 @@
  * - Data Encryption: AES-GCM with 12-byte nonces and 128-bit authentication tags
  * - Encoding: Base64 encoding of nonce + ciphertext
  */
+import type { DecryptedPriorities, DecryptedUserData } from '$lib/types/dashboard';
 import forge from 'node-forge';
 
 /**
@@ -235,7 +236,7 @@ export class CryptoService {
 	 * console.log(userData.name); // Access decrypted properties
 	 * ```
 	 */
-	async decryptFields(encryptedJson: string, dek: Uint8Array<ArrayBuffer>): Promise<any> {
+	async decryptFields(encryptedJson: string, dek: Uint8Array<ArrayBuffer>): Promise<unknown> {
 		const jsonString = await this.decryptData(encryptedJson, dek);
 		return JSON.parse(jsonString);
 	}
@@ -273,17 +274,20 @@ export class CryptoService {
 		userEncryptedFields: string,
 		prioritiesEncryptedFields: string
 	): Promise<{
-		userData: any;
-		priorities: any;
+		userData: DecryptedUserData;
+		priorities: DecryptedPriorities;
 	}> {
 		// Step 1: Decrypt the DEK using RSA private key
 		const dek = await this.decryptDEK(adminWrappedDek);
 
 		// Step 2: Decrypt user fields using the DEK
-		const userData = await this.decryptFields(userEncryptedFields, dek);
+		const userData = (await this.decryptFields(userEncryptedFields, dek)) as DecryptedUserData;
 
 		// Step 3: Decrypt priorities using the DEK
-		const priorities = await this.decryptFields(prioritiesEncryptedFields, dek);
+		const priorities = (await this.decryptFields(
+			prioritiesEncryptedFields,
+			dek
+		)) as DecryptedPriorities;
 
 		return {
 			userData,

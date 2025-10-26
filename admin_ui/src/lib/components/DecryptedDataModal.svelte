@@ -3,11 +3,13 @@
 	import Account from 'virtual:icons/mdi/account';
 	import Calendar from 'virtual:icons/mdi/calendar';
 	import Information from 'virtual:icons/mdi/information';
+	import type { DecryptedPriorities, DecryptedUserData } from '$lib/types/dashboard';
+	import type { DayName } from '$lib/types/priorities';
 
 	interface Props {
 		userName: string;
-		userData: any;
-		priorities: any;
+		userData: DecryptedUserData;
+		priorities: DecryptedPriorities;
 		onClose: () => void;
 	}
 
@@ -32,11 +34,11 @@
 	};
 
 	const priorityLabels: Record<number, string> = {
-		1: 'Höchste Priorität',
-		2: 'Hohe Priorität',
+		5: 'Höchste Priorität',
+		4: 'Hohe Priorität',
 		3: 'Mittlere Priorität',
-		4: 'Niedrige Priorität',
-		5: 'Niedrigste Priorität'
+		2: 'Niedrige Priorität',
+		1: 'Niedrigste Priorität'
 	};
 </script>
 
@@ -89,15 +91,15 @@
 						</div>
 					{/if}
 
-					{#if userData.email}
-						<div class="flex items-start gap-3">
-							<span class="w-32 text-sm font-medium text-gray-600">E-Mail:</span>
-							<span class="text-sm text-gray-900">{userData.email}</span>
-						</div>
-					{/if}
+					<!-- {#if userData.email} -->
+					<!-- 	<div class="flex items-start gap-3"> -->
+					<!-- 		<span class="w-32 text-sm font-medium text-gray-600">E-Mail:</span> -->
+					<!-- 		<span class="text-sm text-gray-900">{userData.email}</span> -->
+					<!-- 	</div> -->
+					<!-- {/if} -->
 
-					{#each Object.entries(userData) as [key, value]}
-						{#if key !== 'name' && key !== 'email' && value}
+					{#each Object.entries(userData) as [key, value] (key)}
+						{#if key !== 'name' && value}
 							<div class="flex items-start gap-3">
 								<span class="w-32 text-sm font-medium text-gray-600 capitalize">{key}:</span>
 								<span class="text-sm text-gray-900">{value}</span>
@@ -116,20 +118,20 @@
 					</div>
 
 					<div class="space-y-4">
-						{#each priorities.weeks as week}
+						{#each priorities.weeks as week (week)}
 							<div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
 								<div class="mb-3 flex items-center justify-between">
 									<h4 class="font-semibold text-gray-900">Woche {week.weekNumber}</h4>
-									{#if week.startDate && week.endDate}
-										<span class="text-sm text-gray-500">
-											{week.startDate} - {week.endDate}
-										</span>
-									{/if}
+									<!-- {#if week.startDate && week.endDate} -->
+									<!-- 	<span class="text-sm text-gray-500"> -->
+									<!-- 		{week.startDate} - {week.endDate} -->
+									<!-- 	</span> -->
+									<!-- {/if} -->
 								</div>
 
 								<div class="grid grid-cols-1 gap-2 sm:grid-cols-5">
-									{#each Object.entries(dayNames) as [dayKey, dayLabel]}
-										{@const priority = week[dayKey]}
+									{#each Object.entries(dayNames) as [dayLabel] (dayLabel)}
+										{@const priority = week[dayLabel as DayName]}
 										<div class="rounded-lg border bg-white p-3 text-center">
 											<div class="mb-2 text-xs font-medium text-gray-600">{dayLabel}</div>
 											{#if priority && priority !== null}

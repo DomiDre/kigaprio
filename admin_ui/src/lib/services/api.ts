@@ -40,7 +40,7 @@ export class ApiService {
 
 			// Only redirect if not already on login page (prevent loop)
 			if (browser && window.location.pathname !== '/login') {
-				goto('/login', { replaceState: true });
+				await goto('/login', { replaceState: true });
 			}
 			throw new Error('Sitzung abgelaufen. Bitte melden Sie sich erneut an.');
 		}
@@ -119,7 +119,7 @@ export class ApiService {
 		// Password change invalidates all sessions
 		authStore.clearAuth(false);
 		if (browser) {
-			goto('/login', { replaceState: true });
+			await goto('/login', { replaceState: true });
 		}
 
 		return response;

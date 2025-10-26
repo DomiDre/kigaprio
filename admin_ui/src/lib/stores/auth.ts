@@ -97,7 +97,7 @@ function createAuthStore() {
 				});
 				sessionStorage.setItem('was_authenticated', 'true');
 				return true;
-			} catch (error) {
+			} catch {
 				console.info('Auth verification failed - user is not logged in.');
 				// Don't call logout endpoint on failed verification (already logged out)
 				await authStore.clearAuth(false);

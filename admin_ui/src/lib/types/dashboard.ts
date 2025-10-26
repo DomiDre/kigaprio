@@ -13,7 +13,7 @@ export interface UserSubmissionDisplay extends UserPriorityRecord {
 	encrypted: boolean;
 	// These will be populated after decryption
 	decryptedName?: string;
-	decryptedPriorities?: any;
+	decryptedPriorities?: DecryptedPriorities;
 }
 
 export interface UserDisplay {
@@ -34,8 +34,25 @@ export interface Stats {
 	submissionRate: number;
 }
 
+export interface DecryptedUserData {
+	name: string;
+}
+
+export interface WeekPriority {
+	weekNumber: number;
+	monday: number;
+	tuesday: number;
+	wednesday: number;
+	thursday: number;
+	friday: number;
+}
+
+export interface DecryptedPriorities {
+	weeks: WeekPriority[];
+}
+
 export interface DecryptedData {
 	userName: string;
-	userData: any;
-	priorities: any;
+	userData: DecryptedUserData;
+	priorities: DecryptedPriorities;
 }

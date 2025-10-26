@@ -14,11 +14,13 @@
 	import Alert from 'virtual:icons/mdi/alert';
 	import ChevronDown from 'virtual:icons/mdi/chevron-down';
 	import ChevronUp from 'virtual:icons/mdi/chevron-up';
+	import Refresh from 'virtual:icons/mdi/refresh';
 	import { apiService } from '$lib/services/api';
 	import { cryptoService } from '$lib/services/crypto';
 	import DecryptedDataModal from '$lib/components/DecryptedDataModal.svelte';
 	import type { DecryptedData, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
 	import { dayKeys, dayLabels, priorityColors } from '$lib/config/priorities';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	// State
 	let selectedMonth = $state('2025-10');
@@ -27,6 +29,7 @@
 	let searchQuery = $state('');
 	let keyFile = $state<File | null>(null);
 	let isLoading = $state(true);
+	let isRefreshing = $state(false);
 	let error = $state('');
 	let decryptionError = $state('');
 	let showOverview = $state(false);
@@ -36,7 +39,9 @@
 	let isDecryptingAll = $state(false);
 	let showDecryptedModal = $state(false);
 	let decryptedData = $state<DecryptedData | null>(null);
-	let decryptedUsers = $state(new Map<string, { name: string; userData: any; priorities: any }>());
+	let decryptedUsers = $state(
+		new SvelteMap<string, { name: string; userData: any; priorities: any }>()
+	);
 
 	// Data
 	let userSubmissions = $state<UserPriorityRecord[]>([]);
@@ -91,7 +96,7 @@
 
 	// Get all unique weeks across all users
 	let allWeeks = $derived.by(() => {
-		const weekSet = new Set<number>();
+		const weekSet = new SvelteSet<number>();
 		decryptedUsers.forEach((userData) => {
 			const weeks = userData.priorities?.weeks || [];
 			weeks.forEach((week: any) => {
@@ -99,7 +104,6 @@
 			});
 		});
 		const weeks = Array.from(weekSet).sort((a, b) => a - b);
-		console.log('All weeks:', weeks);
 		return weeks;
 	});
 
@@ -172,7 +176,10 @@
 		decryptionError = '';
 
 		// Create a new map for the decrypted data
-		const newDecryptedUsers = new Map();
+		const newDecryptedUsers = new SvelteMap<
+			string,
+			{ name: string; userData: any; priorities: any }
+		>();
 
 		try {
 			for (const user of users) {
@@ -232,7 +239,7 @@
 		if (initialFetchDone && selectedMonth) {
 			console.log('Month changed to:', selectedMonth);
 			// Clear decrypted data when month changes
-			decryptedUsers = new Map();
+			decryptedUsers = new SvelteMap();
 			showOverview = false;
 			fetchUserSubmissions();
 		}
@@ -274,7 +281,7 @@
 			passphraseInput = '';
 			pendingKeyFile = null;
 			await decryptAllUsers();
-		} catch (err) {
+		} catch {
 			decryptionError = 'Incorrect passphrase or invalid key';
 		}
 	}
@@ -319,7 +326,7 @@
 		keyFile = null;
 		cryptoService.clearKey();
 		decryptionError = '';
-		decryptedUsers = new Map();
+		decryptedUsers = new SvelteMap();
 		showOverview = false;
 	}
 
@@ -393,6 +400,24 @@
 	function closeManualEntry() {
 		showManualEntry = false;
 	}
+
+	async function handleRefresh() {
+		if (isRefreshing || isLoading) return; // Prevent multiple simultaneous refreshes
+
+		isRefreshing = true;
+		error = '';
+		decryptionError = '';
+
+		try {
+			console.log('Manually refreshing data for month:', selectedMonth);
+			await fetchUserSubmissions();
+		} catch (err) {
+			error = 'Fehler beim Aktualisieren der Daten';
+			console.error('Refresh error:', err);
+		} finally {
+			isRefreshing = false;
+		}
+	}
 </script>
 
 <div
@@ -417,6 +442,20 @@
 						<option value="2025-09">September 2025</option>
 						<option value="2025-08">August 2025</option>
 					</select>
+
+					<!-- Refresh Button -->
+					<button
+						type="button"
+						onclick={handleRefresh}
+						disabled={isRefreshing || isLoading}
+						class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+						title="Refresh data"
+					>
+						<Refresh class="h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
+						<span class="hidden sm:inline">
+							{isRefreshing ? 'Refreshing...' : 'Refresh'}
+						</span>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -468,6 +507,22 @@
 					></div>
 					<p class="text-sm font-medium text-purple-900 dark:text-purple-300">
 						Entschlüssele Benutzerdaten... ({decryptedUsers.size}/{users.length})
+					</p>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Refresh Progress -->
+		{#if isRefreshing}
+			<div
+				class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
+			>
+				<div class="flex items-center gap-3">
+					<div
+						class="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"
+					></div>
+					<p class="text-sm font-medium text-blue-900 dark:text-blue-300">
+						Aktualisiere Daten{keyUploaded ? ' und entschlüssele...' : '...'}
 					</p>
 				</div>
 			</div>
@@ -596,7 +651,7 @@
 									<span class="text-sm font-medium text-gray-700 dark:text-gray-300">Priority:</span
 									>
 								</div>
-								{#each [1, 2, 3, 4, 5] as priority}
+								{#each [1, 2, 3, 4, 5] as priority (priority)}
 									<div class="flex items-center gap-2">
 										<div
 											class="h-4 w-4 rounded {priorityColors[
@@ -621,7 +676,7 @@
 													>
 														User
 													</th>
-													{#each allWeeks as weekNum}
+													{#each allWeeks as weekNum, i (i)}
 														<th
 															class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
 															colspan="5"
@@ -632,7 +687,7 @@
 																Week {weekNum}
 															</div>
 															<div class="mt-1 flex justify-around gap-1">
-																{#each dayLabels as day}
+																{#each dayLabels as day (day)}
 																	<span
 																		class="min-w-[2rem] text-xs text-gray-500 dark:text-gray-400"
 																		>{day}</span
@@ -644,7 +699,7 @@
 												</tr>
 											</thead>
 											<tbody>
-												{#each overviewData as userData}
+												{#each overviewData as userData (userData.userName)}
 													<tr
 														class="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
 													>
@@ -660,12 +715,12 @@
 																<span class="text-sm">{userData.userName}</span>
 															</div>
 														</td>
-														{#each allWeeks as weekNum}
+														{#each allWeeks as weekNum (weekNum)}
 															{@const week = userData.weeks.find(
 																(w: any) => w.weekNumber === weekNum
 															)}
 															{#if week}
-																{#each week.priorities as priority}
+																{#each week.priorities as priority, i (i)}
 																	<td
 																		class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
 																	>
@@ -685,7 +740,7 @@
 																	</td>
 																{/each}
 															{:else}
-																{#each [1, 2, 3, 4, 5] as _}
+																{#each [1, 2, 3, 4, 5]}
 																	<td
 																		class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
 																	>
@@ -710,7 +765,7 @@
 									Demand per Day
 								</h3>
 								<div class="space-y-4">
-									{#each allWeeks as weekNum}
+									{#each allWeeks as weekNum, i (i)}
 										<div
 											class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50"
 										>
@@ -718,7 +773,7 @@
 												Week {weekNum}
 											</div>
 											<div class="grid grid-cols-2 gap-2 md:grid-cols-5">
-												{#each dayKeys as day, dayIndex}
+												{#each dayKeys as day, dayIndex (day)}
 													{@const dayStat = demandStats[weekNum]?.[day]}
 													<div
 														class="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-600 dark:bg-gray-800"
@@ -730,7 +785,7 @@
 														</div>
 														{#if dayStat}
 															<div class="space-y-1">
-																{#each [1, 2, 3, 4, 5] as priority}
+																{#each [1, 2, 3, 4, 5] as priority (priority)}
 																	{#if dayStat[priority] > 0}
 																		<div class="flex items-center gap-1 text-xs">
 																			<div
@@ -962,7 +1017,7 @@
 											</td>
 										</tr>
 									{:else}
-										{#each filteredUsers as user}
+										{#each filteredUsers as user (user.name)}
 											{@const displayName = getDisplayName(user.name)}
 											{@const isDecrypted = decryptedUsers.has(user.name)}
 											<tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
