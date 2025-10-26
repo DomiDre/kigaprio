@@ -11,7 +11,7 @@
 	let isVerifying = $state(false);
 
 	// Public routes that don't require authentication
-	const publicRoutes = ['/login', '/register', '/imprint', '/privacy'];
+	const publicRoutes = ['/login', '/imprint', '/privacy'];
 
 	onMount(async () => {
 		// Prevent concurrent auth checks
@@ -39,7 +39,7 @@
 			}
 			// else: stay on current page (valid state)
 		} catch (error) {
-			console.error('Auth initialization error:', error);
+			console.info('Auth did not succeed:', error);
 			// On error, redirect to login for safety
 			if (window.location.pathname !== '/login') {
 				await goto('/login', { replaceState: true });
