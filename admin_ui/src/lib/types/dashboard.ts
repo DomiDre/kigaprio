@@ -34,3 +34,8 @@ export interface Stats {
 	submissionRate: number;
 }
 
+export interface DecryptedData {
+	userName: string;
+	userData: any;
+	priorities: any;
+}

@@ -11,10 +11,11 @@
 	import Magnify from 'virtual:icons/mdi/magnify';
 	import Close from 'virtual:icons/mdi/close';
 	import Lock from 'virtual:icons/mdi/lock';
+	import Alert from 'virtual:icons/mdi/alert';
 	import { apiService } from '$lib/services/api';
-	import type { Stats, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
-
-	// Types
+	import { cryptoService } from '$lib/services/crypto';
+	import DecryptedDataModal from '$lib/components/DecryptedDataModal.svelte';
+	import type { DecryptedData, Stats, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
 
 	// State
 	let selectedMonth = '2025-10';
@@ -24,6 +25,12 @@
 	let keyFile: File | null = null;
 	let isLoading = true;
 	let error = '';
+	let decryptionError = '';
+
+	// Decryption state
+	let isDecrypting = false;
+	let showDecryptedModal = false;
+	let decryptedData: DecryptedData | null = null;
 
 	// Data
 	let userSubmissions: UserPriorityRecord[] = [];
@@ -95,19 +102,78 @@
 		fetchUserSubmissions();
 	}
 
-	function handleKeyUpload(event: Event) {
+	let passphraseInput = '';
+	let showPassphrasePrompt = false;
+	let pendingKeyFile: File | null = null;
+
+	async function handleKeyUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
 			keyFile = input.files[0];
-			keyUploaded = true;
+			decryptionError = '';
+
+			try {
+				await cryptoService.loadPrivateKey(keyFile);
+				keyUploaded = true;
+			} catch (err) {
+				const error = err as Error;
+
+				if (error.message.includes('passphrase-protected')) {
+					// Show passphrase input UI instead of browser prompt
+					pendingKeyFile = keyFile;
+					keyFile = null;
+					showPassphrasePrompt = true;
+				} else {
+					decryptionError = error.message;
+					keyFile = null;
+				}
+			}
 		}
 	}
 
-	function handleKeyDrop(event: DragEvent) {
+	async function submitPassphrase() {
+		if (!pendingKeyFile || !passphraseInput) return;
+
+		try {
+			await cryptoService.loadPrivateKey(pendingKeyFile, passphraseInput);
+			keyFile = pendingKeyFile;
+			keyUploaded = true;
+			showPassphrasePrompt = false;
+			passphraseInput = '';
+			pendingKeyFile = null;
+		} catch (err) {
+			decryptionError = 'Incorrect passphrase or invalid key';
+		}
+	}
+
+	function cancelPassphrase() {
+		showPassphrasePrompt = false;
+		passphraseInput = '';
+		pendingKeyFile = null;
+	}
+	async function handleKeyDrop(event: DragEvent) {
 		event.preventDefault();
 		if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
 			keyFile = event.dataTransfer.files[0];
-			keyUploaded = true;
+			decryptionError = '';
+
+			try {
+				// Load and parse the private key
+				await cryptoService.loadPrivateKey(keyFile);
+				keyUploaded = true;
+			} catch (err) {
+				const error = err as Error;
+
+				if (error.message.includes('passphrase-protected')) {
+					// Show passphrase input UI instead of browser prompt
+					pendingKeyFile = keyFile;
+					keyFile = null;
+					showPassphrasePrompt = true;
+				} else {
+					decryptionError = error.message;
+					keyFile = null;
+				}
+			}
 		}
 	}
 
@@ -115,9 +181,59 @@
 		event.preventDefault();
 	}
 
+	function removeKey() {
+		keyUploaded = false;
+		keyFile = null;
+		cryptoService.clearKey();
+		decryptionError = '';
+	}
+
+	async function viewUserData(user: UserDisplay) {
+		if (!keyUploaded) {
+			decryptionError = 'Bitte laden Sie zuerst den privaten Schlüssel hoch';
+			return;
+		}
+
+		if (!user.adminWrappedDek || !user.userEncryptedFields || !user.prioritiesEncryptedFields) {
+			decryptionError = 'Unvollständige Daten für diesen Benutzer';
+			return;
+		}
+
+		isDecrypting = true;
+		decryptionError = '';
+
+		try {
+			// Decrypt the data
+			const result = await cryptoService.decryptUserData(
+				user.adminWrappedDek,
+				user.userEncryptedFields,
+				user.prioritiesEncryptedFields
+			);
+
+			// Show modal with decrypted data
+			decryptedData = {
+				userName: user.name,
+				userData: result.userData,
+				priorities: result.priorities
+			};
+			showDecryptedModal = true;
+		} catch (err) {
+			console.error('Decryption error:', err);
+			decryptionError = (err as Error).message;
+		} finally {
+			isDecrypting = false;
+		}
+	}
+
+	function closeDecryptedModal() {
+		showDecryptedModal = false;
+		decryptedData = null;
+	}
+
 	function exportToExcel() {
 		console.log('Exporting to Excel...');
 		// TODO: Implement Excel export with decrypted data
+		alert('Excel-Export wird noch implementiert');
 	}
 
 	function openManualEntry() {
@@ -126,16 +242,6 @@
 
 	function closeManualEntry() {
 		showManualEntry = false;
-	}
-
-	function viewUserData(user: UserDisplay) {
-		if (!keyUploaded) {
-			alert('Bitte laden Sie zuerst den privaten SchlÃ¼ssel hoch');
-			return;
-		}
-		// TODO: Implement decryption and display
-		console.log('View data for:', user);
-		alert('EntschlÃ¼sselung wird noch implementiert');
 	}
 </script>
 
@@ -166,7 +272,30 @@
 		<!-- Error Display -->
 		{#if error}
 			<div class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-				<p class="text-sm text-red-800">{error}</p>
+				<div class="flex items-start gap-2">
+					<Alert class="h-5 w-5 text-red-600" />
+					<p class="text-sm text-red-800">{error}</p>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Decryption Error Display -->
+		{#if decryptionError}
+			<div class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+				<div class="flex items-start gap-2">
+					<Alert class="h-5 w-5 text-red-600" />
+					<div class="flex-1">
+						<p class="text-sm font-medium text-red-900">Entschlüsselungsfehler</p>
+						<p class="text-sm text-red-800">{decryptionError}</p>
+					</div>
+					<button
+						type="button"
+						class="text-red-600 hover:text-red-800"
+						onclick={() => (decryptionError = '')}
+					>
+						<Close class="h-5 w-5" />
+					</button>
+				</div>
 			</div>
 		{/if}
 
@@ -246,68 +375,104 @@
 							<h2 class="text-lg font-semibold text-gray-900">Private Key</h2>
 						</div>
 
-						<div
-							class="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
-							on:drop={handleKeyDrop}
-							on:dragover={preventDefaults}
-							on:dragenter={preventDefaults}
-							role="region"
-							aria-label="Private key file drop zone to locally decrypt data"
-						>
-							<input
-								type="file"
-								id="keyFileInput"
-								accept=".pem,.key"
-								class="hidden"
-								on:change={handleKeyUpload}
-							/>
+						{#if showPassphrasePrompt}
+							<!-- Passphrase Input -->
+							<div class="rounded-lg border-2 border-blue-300 bg-blue-50 p-6">
+								<div class="mb-4 text-center">
+									<p class="text-sm font-medium text-gray-900">This key is passphrase-protected</p>
+									<p class="mt-1 text-xs text-gray-600">
+										Enter your passphrase to decrypt the private key
+									</p>
+								</div>
 
-							{#if keyUploaded && keyFile}
-								<div class="flex flex-col items-center">
-									<div class="mb-3 rounded-full bg-green-50 p-3">
-										<CheckCircle class="h-8 w-8 text-green-600" />
-									</div>
-									<p class="text-sm font-medium text-gray-900">{keyFile.name}</p>
-									<p class="mt-1 text-xs text-gray-500">Private key loaded successfully</p>
+								<input
+									type="password"
+									bind:value={passphraseInput}
+									placeholder="Enter passphrase"
+									class="mb-4 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+									onkeypress={(e) => e.key === 'Enter' && submitPassphrase()}
+								/>
+
+								<div class="flex gap-3">
 									<button
 										type="button"
-										class="mt-4 px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-										on:click={() => {
-											keyUploaded = false;
-											keyFile = null;
-										}}
+										class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+										onclick={cancelPassphrase}
 									>
-										Remove
+										Cancel
+									</button>
+									<button
+										type="button"
+										class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+										onclick={submitPassphrase}
+										disabled={!passphraseInput}
+									>
+										Unlock Key
 									</button>
 								</div>
-							{:else}
-								<div class="flex flex-col items-center">
-									<Upload class="mb-3 h-12 w-12 text-gray-400" />
-									<p class="mb-1 text-sm font-medium text-gray-900">
-										Drop your private key file here
-									</p>
-									<p class="mb-4 text-xs text-gray-500">or</p>
-									<label
-										for="keyFileInput"
-										class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-									>
-										Browse Files
-									</label>
-									<p class="mt-2 text-xs text-gray-400">Accepts .pem or .key files</p>
-								</div>
-							{/if}
-						</div>
+							</div>
+						{:else}
+							<!-- Normal upload area -->
+							<div
+								class="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
+								ondrop={handleKeyDrop}
+								ondragover={preventDefaults}
+								ondragenter={preventDefaults}
+								role="region"
+								aria-label="Private key file drop zone to locally decrypt data"
+							>
+								<input
+									type="file"
+									id="keyFileInput"
+									accept=".pem,.key"
+									class="hidden"
+									onchange={handleKeyUpload}
+								/>
+
+								{#if keyUploaded && keyFile}
+									<div class="flex flex-col items-center">
+										<div class="mb-3 rounded-full bg-green-50 p-3">
+											<CheckCircle class="h-8 w-8 text-green-600" />
+										</div>
+										<p class="text-sm font-medium text-gray-900">{keyFile.name}</p>
+										<p class="mt-1 text-xs text-gray-500">Private key loaded successfully</p>
+										<button
+											type="button"
+											class="mt-4 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+											onclick={removeKey}
+										>
+											Remove Key
+										</button>
+									</div>
+								{:else}
+									<div class="flex flex-col items-center">
+										<Upload class="mb-3 h-12 w-12 text-gray-400" />
+										<p class="mb-1 text-sm font-medium text-gray-900">
+											Drop your private key file here
+										</p>
+										<p class="mb-4 text-xs text-gray-500">or</p>
+										<label
+											for="keyFileInput"
+											class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+										>
+											Browse Files
+										</label>
+										<p class="mt-2 text-xs text-gray-400">Accepts .pem or .key files</p>
+									</div>
+								{/if}
+							</div>
+						{/if}
 
 						{#if keyUploaded}
 							<div class="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
 								<p class="text-sm text-green-800">
-									âœ" Key loaded. You can now view and decrypt user data.
+									✓ Key loaded. You can now view and decrypt user data.
 								</p>
 							</div>
 						{:else}
 							<div class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
 								<p class="text-sm text-yellow-800">
-									âš Upload your private key to decrypt and view submission data.
+									⚠ Upload your private key to decrypt and view submission data.
 								</p>
 							</div>
 						{/if}
@@ -365,9 +530,9 @@
 										<tr>
 											<td colspan="4" class="px-6 py-8 text-center text-gray-500">
 												{#if users.length === 0}
-													Keine Einreichungen fÃ¼r diesen Monat gefunden
+													Keine Einreichungen für diesen Monat gefunden
 												{:else}
-													Keine Benutzer gefunden fÃ¼r "{searchQuery}"
+													Keine Benutzer gefunden für "{searchQuery}"
 												{/if}
 											</td>
 										</tr>
@@ -421,10 +586,11 @@
 													{#if user.submitted && user.hasData && keyUploaded}
 														<button
 															type="button"
-															class="font-medium text-blue-600 hover:text-blue-800"
-															on:click={() => viewUserData(user)}
+															class="font-medium text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+															onclick={() => viewUserData(user)}
+															disabled={isDecrypting}
 														>
-															View Data
+															{isDecrypting ? 'Entschlüsseln...' : 'View Data'}
 														</button>
 													{:else if user.submitted && user.hasData && !keyUploaded}
 														<span class="text-gray-400">Upload key first</span>
@@ -432,7 +598,7 @@
 														<button
 															type="button"
 															class="font-medium text-gray-600 hover:text-gray-800"
-															on:click={openManualEntry}
+															onclick={openManualEntry}
 														>
 															Enter Manually
 														</button>
@@ -456,7 +622,7 @@
 							<button
 								type="button"
 								class="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-								on:click={openManualEntry}
+								onclick={openManualEntry}
 							>
 								<Plus class="h-5 w-5" />
 								Manual Entry
@@ -465,7 +631,7 @@
 							<button
 								type="button"
 								class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700"
-								on:click={exportToExcel}
+								onclick={exportToExcel}
 								disabled={!keyUploaded || users.length === 0}
 								class:opacity-50={!keyUploaded || users.length === 0}
 								class:cursor-not-allowed={!keyUploaded || users.length === 0}
@@ -530,6 +696,16 @@
 	</div>
 </div>
 
+<!-- Decrypted Data Modal -->
+{#if showDecryptedModal && decryptedData}
+	<DecryptedDataModal
+		userName={decryptedData.userName}
+		userData={decryptedData.userData}
+		priorities={decryptedData.priorities}
+		onClose={closeDecryptedModal}
+	/>
+{/if}
+
 <!-- Manual Entry Modal -->
 {#if showManualEntry}
 	<div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
@@ -540,7 +716,7 @@
 					<button
 						type="button"
 						class="text-gray-400 transition-colors hover:text-gray-600"
-						on:click={closeManualEntry}
+						onclick={closeManualEntry}
 					>
 						<Close class="h-6 w-6" />
 					</button>
@@ -566,7 +742,7 @@
 				<button
 					type="button"
 					class="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
-					on:click={closeManualEntry}
+					onclick={closeManualEntry}
 				>
 					Cancel
 				</button>
