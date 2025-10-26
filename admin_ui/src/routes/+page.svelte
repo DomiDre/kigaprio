@@ -7,13 +7,10 @@
 	onMount(() => {
 		// Redirect based on authentication status
 		const unsubscribe = authStore.subscribe(($auth) => {
-			// Wait for auth to finish initializing
-			if (!$auth.isLoading) {
-				if ($auth.isAuthenticated) {
-					goto('/dashboard');
-				} else {
-					goto('/login');
-				}
+			if ($auth.isAuthenticated) {
+				goto('/dashboard');
+			} else {
+				goto('/login');
 			}
 		});
 

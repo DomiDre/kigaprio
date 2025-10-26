@@ -3,7 +3,6 @@ import { browser } from '$app/environment';
 import { apiService } from '$lib/services/api';
 
 interface AuthState {
-	isLoading: boolean;
 	isAuthenticated: boolean;
 	userId?: string;
 	username?: string;
@@ -12,7 +11,6 @@ interface AuthState {
 
 function createAuthStore() {
 	const initialState: AuthState = {
-		isLoading: false,
 		isAuthenticated: false
 	};
 
@@ -42,7 +40,6 @@ function createAuthStore() {
 			}
 
 			set({
-				isLoading: false,
 				isAuthenticated: true,
 				...userInfo
 			});
@@ -70,16 +67,8 @@ function createAuthStore() {
 			}
 
 			set({
-				isLoading: false,
 				isAuthenticated: false
 			});
-		},
-
-		/**
-		 * Set loading state (for UI spinners)
-		 */
-		setLoading: (loading: boolean) => {
-			update((state) => ({ ...state, isLoading: loading }));
 		},
 
 		/**
@@ -101,7 +90,6 @@ function createAuthStore() {
 				const data = await apiService.verify();
 
 				set({
-					isLoading: false,
 					isAuthenticated: true,
 					userId: data['user_id'],
 					username: data['username']
