@@ -12,37 +12,134 @@
 	import Close from 'virtual:icons/mdi/close';
 	import Lock from 'virtual:icons/mdi/lock';
 	import Alert from 'virtual:icons/mdi/alert';
+	import ChevronDown from 'virtual:icons/mdi/chevron-down';
+	import ChevronUp from 'virtual:icons/mdi/chevron-up';
 	import { apiService } from '$lib/services/api';
 	import { cryptoService } from '$lib/services/crypto';
 	import DecryptedDataModal from '$lib/components/DecryptedDataModal.svelte';
 	import type { DecryptedData, Stats, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
 
 	// State
-	let selectedMonth = '2025-10';
-	let keyUploaded = false;
-	let showManualEntry = false;
-	let searchQuery = '';
-	let keyFile: File | null = null;
-	let isLoading = true;
-	let error = '';
-	let decryptionError = '';
+	let selectedMonth = $state('2025-10');
+	let keyUploaded = $state(false);
+	let showManualEntry = $state(false);
+	let searchQuery = $state('');
+	let keyFile = $state<File | null>(null);
+	let isLoading = $state(true);
+	let error = $state('');
+	let decryptionError = $state('');
+	let showOverview = $state(false);
 
 	// Decryption state
-	let isDecrypting = false;
-	let isDecryptingAll = false;
-	let showDecryptedModal = false;
-	let decryptedData: DecryptedData | null = null;
-	let decryptedUsers: Map<string, { name: string; userData: any; priorities: any }> = new Map();
+	let isDecrypting = $state(false);
+	let isDecryptingAll = $state(false);
+	let showDecryptedModal = $state(false);
+	let decryptedData = $state<DecryptedData | null>(null);
+	let decryptedUsers = $state(new Map<string, { name: string; userData: any; priorities: any }>());
 
 	// Data
-	let userSubmissions: UserPriorityRecord[] = [];
-	let users: UserDisplay[] = [];
-	let stats: Stats = {
-		totalUsers: 0,
-		submitted: 0,
-		pending: 0,
-		submissionRate: 0
+	let userSubmissions = $state<UserPriorityRecord[]>([]);
+	let users = $state<UserDisplay[]>([]);
+
+	// Calculate statistics reactively using $derived
+	let stats = $derived.by(() => {
+		const totalUsers = users.length;
+		const submitted = users.filter((u) => u.submitted && u.hasData).length;
+		const pending = totalUsers - submitted;
+		const submissionRate = totalUsers > 0 ? Math.round((submitted / totalUsers) * 100) : 0;
+
+		return {
+			totalUsers,
+			submitted,
+			pending,
+			submissionRate
+		};
+	});
+
+	// Passphrase state
+	let passphraseInput = $state('');
+	let showPassphrasePrompt = $state(false);
+	let pendingKeyFile = $state<File | null>(null);
+
+	// Track if initial fetch is done
+	let initialFetchDone = $state(false);
+
+	// Priority colors
+	const priorityColors: Record<number, string> = {
+		1: 'bg-red-500 text-white',
+		2: 'bg-orange-500 text-white',
+		3: 'bg-yellow-500 text-white',
+		4: 'bg-green-500 text-white',
+		5: 'bg-blue-500 text-white'
 	};
+
+	const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+	const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+
+	// Build overview data structure using $derived
+	let overviewData = $derived.by(() => {
+		console.log('Building overview data, decryptedUsers size:', decryptedUsers.size);
+		if (decryptedUsers.size === 0) return [];
+
+		const data: any[] = [];
+
+		decryptedUsers.forEach((userData, username) => {
+			const weeks = userData.priorities?.weeks || [];
+
+			data.push({
+				userName: userData.name,
+				weeks: weeks.map((week: any) => ({
+					weekNumber: week.weekNumber,
+					priorities: dayNames.map((day) => week[day] || null)
+				}))
+			});
+		});
+
+		const sorted = data.sort((a, b) => a.userName.localeCompare(b.userName));
+		console.log('Overview data built:', sorted.length, 'users');
+		return sorted;
+	});
+
+	// Get all unique weeks across all users
+	let allWeeks = $derived.by(() => {
+		const weekSet = new Set<number>();
+		decryptedUsers.forEach((userData) => {
+			const weeks = userData.priorities?.weeks || [];
+			weeks.forEach((week: any) => {
+				weekSet.add(week.weekNumber);
+			});
+		});
+		const weeks = Array.from(weekSet).sort((a, b) => a - b);
+		console.log('All weeks:', weeks);
+		return weeks;
+	});
+
+	// Calculate demand statistics
+	let demandStats = $derived.by(() => {
+		const stats: Record<number, Record<string, Record<number, number>>> = {};
+
+		decryptedUsers.forEach((userData) => {
+			const weeks = userData.priorities?.weeks || [];
+			weeks.forEach((week: any) => {
+				if (!stats[week.weekNumber]) {
+					stats[week.weekNumber] = {};
+					dayNames.forEach((day) => {
+						stats[week.weekNumber][day] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+					});
+				}
+
+				dayNames.forEach((day) => {
+					const priority = week[day];
+					if (priority) {
+						stats[week.weekNumber][day][priority]++;
+					}
+				});
+			});
+		});
+
+		console.log('Demand stats calculated for', Object.keys(stats).length, 'weeks');
+		return stats;
+	});
 
 	// Fetch user submissions from API
 	async function fetchUserSubmissions() {
@@ -65,9 +162,6 @@
 				prioritiesEncryptedFields: submission.prioritiesEncryptedFields
 			}));
 
-			// Calculate statistics
-			calculateStats();
-
 			// If key is already uploaded, decrypt all data
 			if (keyUploaded) {
 				await decryptAllUsers();
@@ -80,28 +174,16 @@
 		}
 	}
 
-	// Calculate statistics from real data
-	function calculateStats() {
-		const totalUsers = users.length;
-		const submitted = users.filter((u) => u.submitted && u.hasData).length;
-		const pending = totalUsers - submitted;
-		const submissionRate = totalUsers > 0 ? Math.round((submitted / totalUsers) * 100) : 0;
-
-		stats = {
-			totalUsers,
-			submitted,
-			pending,
-			submissionRate
-		};
-	}
-
 	// Decrypt all users' data automatically
 	async function decryptAllUsers() {
-		if (!keyUploaded || users.length === 0) return;
+		if (!keyUploaded || users.length === 0 || isDecryptingAll) return;
 
+		console.log('Starting decryption of', users.length, 'users');
 		isDecryptingAll = true;
 		decryptionError = '';
-		decryptedUsers = new Map();
+
+		// Create a new map for the decrypted data
+		const newDecryptedUsers = new Map();
 
 		try {
 			for (const user of users) {
@@ -113,20 +195,21 @@
 							user.prioritiesEncryptedFields
 						);
 
-						decryptedUsers.set(user.name, {
+						newDecryptedUsers.set(user.name, {
 							name: result.userData.name || user.name,
 							userData: result.userData,
 							priorities: result.priorities
 						});
 					} catch (err) {
 						console.error(`Failed to decrypt data for ${user.name}:`, err);
-						// Continue with other users
 					}
 				}
 			}
 
-			// Trigger reactivity
-			decryptedUsers = decryptedUsers;
+			// Update the state once with all decrypted data
+			decryptedUsers = newDecryptedUsers;
+			console.log('Decryption complete:', decryptedUsers.size, 'users decrypted');
+			showOverview = true; // Auto-show overview when decryption completes
 		} catch (err) {
 			console.error('Error during batch decryption:', err);
 			decryptionError = 'Einige Daten konnten nicht entschlüsselt werden';
@@ -141,29 +224,30 @@
 		return decrypted?.name || userName;
 	}
 
-	// Filter users based on search query
-	$: filteredUsers = users.filter((user) => {
-		const displayName = getDisplayName(user.name);
-		return displayName.toLowerCase().includes(searchQuery.toLowerCase());
+	// Filter users based on search query using $derived
+	let filteredUsers = $derived.by(() => {
+		return users.filter((user) => {
+			const displayName = getDisplayName(user.name);
+			return displayName.toLowerCase().includes(searchQuery.toLowerCase());
+		});
 	});
 
-	// Fetch data on mount and when month changes
+	// Fetch data on mount
 	onMount(() => {
 		fetchUserSubmissions();
+		initialFetchDone = true;
 	});
 
-	$: if (selectedMonth) {
-		fetchUserSubmissions();
-	}
-
-	// Watch for key upload and trigger auto-decryption
-	$: if (keyUploaded && users.length > 0 && decryptedUsers.size === 0) {
-		decryptAllUsers();
-	}
-
-	let passphraseInput = '';
-	let showPassphrasePrompt = false;
-	let pendingKeyFile: File | null = null;
+	// Watch for month changes using $effect (skip initial run)
+	$effect(() => {
+		if (initialFetchDone && selectedMonth) {
+			console.log('Month changed to:', selectedMonth);
+			// Clear decrypted data when month changes
+			decryptedUsers = new Map();
+			showOverview = false;
+			fetchUserSubmissions();
+		}
+	});
 
 	async function handleKeyUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -174,13 +258,11 @@
 			try {
 				await cryptoService.loadPrivateKey(keyFile);
 				keyUploaded = true;
-				// Auto-decrypt all users
 				await decryptAllUsers();
 			} catch (err) {
 				const error = err as Error;
 
 				if (error.message.includes('passphrase-protected')) {
-					// Show passphrase input UI instead of browser prompt
 					pendingKeyFile = keyFile;
 					keyFile = null;
 					showPassphrasePrompt = true;
@@ -202,7 +284,6 @@
 			showPassphrasePrompt = false;
 			passphraseInput = '';
 			pendingKeyFile = null;
-			// Auto-decrypt all users
 			await decryptAllUsers();
 		} catch (err) {
 			decryptionError = 'Incorrect passphrase or invalid key';
@@ -222,16 +303,13 @@
 			decryptionError = '';
 
 			try {
-				// Load and parse the private key
 				await cryptoService.loadPrivateKey(keyFile);
 				keyUploaded = true;
-				// Auto-decrypt all users
 				await decryptAllUsers();
 			} catch (err) {
 				const error = err as Error;
 
 				if (error.message.includes('passphrase-protected')) {
-					// Show passphrase input UI instead of browser prompt
 					pendingKeyFile = keyFile;
 					keyFile = null;
 					showPassphrasePrompt = true;
@@ -253,6 +331,7 @@
 		cryptoService.clearKey();
 		decryptionError = '';
 		decryptedUsers = new Map();
+		showOverview = false;
 	}
 
 	async function viewUserData(user: UserDisplay) {
@@ -261,7 +340,6 @@
 			return;
 		}
 
-		// Check if already decrypted
 		const cached = decryptedUsers.get(user.name);
 		if (cached) {
 			decryptedData = {
@@ -282,14 +360,12 @@
 		decryptionError = '';
 
 		try {
-			// Decrypt the data
 			const result = await cryptoService.decryptUserData(
 				user.adminWrappedDek,
 				user.userEncryptedFields,
 				user.prioritiesEncryptedFields
 			);
 
-			// Cache it
 			decryptedUsers.set(user.name, {
 				name: result.userData.name || user.name,
 				userData: result.userData,
@@ -297,7 +373,6 @@
 			});
 			decryptedUsers = decryptedUsers;
 
-			// Show modal with decrypted data
 			decryptedData = {
 				userName: result.userData.name || user.name,
 				userData: result.userData,
@@ -319,7 +394,6 @@
 
 	function exportToExcel() {
 		console.log('Exporting to Excel...');
-		// TODO: Implement Excel export with decrypted data
 		alert('Excel-Export wird noch implementiert');
 	}
 
@@ -496,6 +570,185 @@
 				</div>
 			</div>
 
+			<!-- Priorities Overview Table -->
+			{#if keyUploaded && decryptedUsers.size > 0}
+				<div
+					class="mb-8 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800"
+				>
+					<div class="border-b border-gray-200 p-6 dark:border-gray-700">
+						<button
+							type="button"
+							class="flex w-full items-center justify-between"
+							onclick={() => (showOverview = !showOverview)}
+						>
+							<div class="flex items-center gap-3">
+								<h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+									Priorities Overview
+								</h2>
+								<span
+									class="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
+								>
+									{decryptedUsers.size} users
+								</span>
+							</div>
+							{#if showOverview}
+								<ChevronUp class="h-5 w-5 text-gray-600 dark:text-gray-400" />
+							{:else}
+								<ChevronDown class="h-5 w-5 text-gray-600 dark:text-gray-400" />
+							{/if}
+						</button>
+					</div>
+
+					{#if showOverview}
+						<div class="overflow-x-auto p-6">
+							<!-- Legend -->
+							<div class="mb-6 flex flex-wrap gap-4">
+								<div class="flex items-center gap-2">
+									<span class="text-sm font-medium text-gray-700 dark:text-gray-300">Priority:</span
+									>
+								</div>
+								{#each [1, 2, 3, 4, 5] as priority}
+									<div class="flex items-center gap-2">
+										<div class="h-4 w-4 rounded {priorityColors[priority]}"></div>
+										<span class="text-xs text-gray-600 dark:text-gray-400">{priority}</span>
+									</div>
+								{/each}
+							</div>
+
+							<!-- Overview Table -->
+							<table class="w-full border-collapse">
+								<thead>
+									<tr class="border-b-2 border-gray-300 dark:border-gray-600">
+										<th
+											class="sticky left-0 bg-white px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:bg-gray-800 dark:text-white"
+										>
+											User
+										</th>
+										{#each allWeeks as weekNum}
+											<th
+												class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
+												colspan="5"
+											>
+												<div class="text-xs font-semibold text-gray-700 dark:text-gray-300">
+													Week {weekNum}
+												</div>
+												<div class="mt-1 flex justify-around">
+													{#each dayLabels as day}
+														<span class="text-xs text-gray-500 dark:text-gray-400">{day}</span>
+													{/each}
+												</div>
+											</th>
+										{/each}
+									</tr>
+								</thead>
+								<tbody>
+									{#each overviewData as userData}
+										<tr
+											class="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50"
+										>
+											<td
+												class="sticky left-0 bg-white px-4 py-3 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
+											>
+												<div class="flex items-center gap-2">
+													<div
+														class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-blue-600 text-sm font-semibold text-white"
+													>
+														{userData.userName.charAt(0).toUpperCase()}
+													</div>
+													<span class="text-sm">{userData.userName}</span>
+												</div>
+											</td>
+											{#each allWeeks as weekNum}
+												{@const week = userData.weeks.find((w: any) => w.weekNumber === weekNum)}
+												{#if week}
+													{#each week.priorities as priority}
+														<td
+															class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
+														>
+															{#if priority}
+																<div
+																	class="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold {priorityColors[
+																		priority
+																	]}"
+																>
+																	{priority}
+																</div>
+															{:else}
+																<div
+																	class="mx-auto h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-700"
+																></div>
+															{/if}
+														</td>
+													{/each}
+												{:else}
+													{#each [1, 2, 3, 4, 5] as _}
+														<td
+															class="border-l border-gray-200 px-2 py-3 text-center dark:border-gray-700"
+														>
+															<div
+																class="mx-auto h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-700"
+															></div>
+														</td>
+													{/each}
+												{/if}
+											{/each}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+
+							<!-- Demand Statistics -->
+							<div class="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+								<h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+									Demand per Day
+								</h3>
+								<div class="space-y-4">
+									{#each allWeeks as weekNum}
+										<div
+											class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50"
+										>
+											<div class="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+												Week {weekNum}
+											</div>
+											<div class="grid grid-cols-5 gap-2">
+												{#each dayNames as day, dayIndex}
+													{@const dayStat = demandStats[weekNum]?.[day]}
+													<div
+														class="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-600 dark:bg-gray-800"
+													>
+														<div
+															class="mb-1 text-center text-xs font-medium text-gray-600 dark:text-gray-400"
+														>
+															{dayLabels[dayIndex]}
+														</div>
+														{#if dayStat}
+															<div class="space-y-1">
+																{#each [1, 2, 3, 4, 5] as priority}
+																	{#if dayStat[priority] > 0}
+																		<div class="flex items-center gap-1 text-xs">
+																			<div class="h-3 w-3 rounded {priorityColors[priority]}"></div>
+																			<span class="text-gray-700 dark:text-gray-300"
+																				>{dayStat[priority]}</span
+																			>
+																		</div>
+																	{/if}
+																{/each}
+															</div>
+														{:else}
+															<div class="text-center text-xs text-gray-400">-</div>
+														{/if}
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
 				<!-- Main Content Area -->
 				<div class="space-y-6 lg:col-span-2">
@@ -614,7 +867,7 @@
 								class="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
 							>
 								<p class="text-sm text-green-800 dark:text-green-400">
-									✓ Key loaded. Data is being automatically decrypted for display.
+									✓ Key loaded. Data decrypted and overview available above.
 								</p>
 							</div>
 						{:else}
@@ -892,9 +1145,8 @@
 							Encryption Status
 						</h3>
 						<p class="text-xs text-purple-800 dark:text-purple-400">
-							All user data is encrypted. To view or export data, you must upload the admin private
-							key. The decryption happens locally in your browser - the server never sees the
-							unencrypted data.
+							All user data is encrypted. Upload the admin private key to decrypt and view the
+							priorities overview table.
 						</p>
 					</div>
 				</div>
