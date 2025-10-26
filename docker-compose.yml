@@ -124,6 +124,29 @@ services:
     secrets:
       - redis_pass
 
+  admin:
+    build:
+      context: ./admin_ui
+      dockerfile: Dockerfile
+      target: production
+    image: kigaprio-admin
+    environment:
+      - NODE_ENV=production
+    expose:
+      - 3000
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kigaprio-admin.rule=Host(`admin.kiga.dhjd.de`)"
+      - "traefik.http.routers.kigaprio-admin.entrypoints=websecure"
+      - "traefik.http.routers.kigaprio-admin.tls=true"
+      - "traefik.http.routers.kigaprio-admin.tls.certresolver=myresolver"
+      - "traefik.http.services.kigaprio-admin.loadbalancer.server.port=3000"
+
 volumes:
   frontend-static:
   redis-data:
