@@ -139,6 +139,10 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+    networks:
+      - db-net
+      - monitoring
+      - proxy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kigaprio-admin.rule=Host(`admin.kiga.dhjd.de`)"
