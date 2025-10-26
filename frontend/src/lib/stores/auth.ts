@@ -23,7 +23,7 @@ function createAuthStore() {
 		}
 	}
 
-	const { subscribe, set, update } = writable<AuthState>(initialState);
+	const { subscribe, set } = writable<AuthState>(initialState);
 
 	// Track if we're currently verifying to prevent concurrent calls
 	let isVerifying = false;
