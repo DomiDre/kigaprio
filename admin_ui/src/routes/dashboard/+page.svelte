@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AccountGroup from 'virtual:icons/mdi/account-group';
 	import CheckCircle from 'virtual:icons/mdi/check-circle';
 	import ClockOutline from 'virtual:icons/mdi/clock-outline';
@@ -9,33 +10,90 @@
 	import Plus from 'virtual:icons/mdi/plus';
 	import Magnify from 'virtual:icons/mdi/magnify';
 	import Close from 'virtual:icons/mdi/close';
+	import Lock from 'virtual:icons/mdi/lock';
+	import { apiService } from '$lib/services/api';
+	import type { Stats, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
 
+	// Types
+
+	// State
 	let selectedMonth = '2025-10';
 	let keyUploaded = false;
 	let showManualEntry = false;
 	let searchQuery = '';
 	let keyFile: File | null = null;
+	let isLoading = true;
+	let error = '';
 
-	// Mock data for design purposes
-	const stats = {
-		totalUsers: 45,
-		submitted: 32,
-		pending: 13,
-		submissionRate: 71
+	// Data
+	let userSubmissions: UserPriorityRecord[] = [];
+	let users: UserDisplay[] = [];
+	let stats: Stats = {
+		totalUsers: 0,
+		submitted: 0,
+		pending: 0,
+		submissionRate: 0
 	};
 
-	const users = [
-		{ id: 1, name: 'Anna Schmidt', submitted: true, date: '2025-10-15', encrypted: true },
-		{ id: 2, name: 'Max Müller', submitted: true, date: '2025-10-18', encrypted: true },
-		{ id: 3, name: 'Lisa Weber', submitted: false, date: null, encrypted: false },
-		{ id: 4, name: 'Tom Fischer', submitted: true, date: '2025-10-12', encrypted: true },
-		{ id: 5, name: 'Sarah Klein', submitted: false, date: null, encrypted: false },
-		{ id: 6, name: 'Michael Wolf', submitted: true, date: '2025-10-20', encrypted: true },
-		{ id: 7, name: 'Julia Becker', submitted: false, date: null, encrypted: false },
-		{ id: 8, name: 'David Koch', submitted: true, date: '2025-10-14', encrypted: true },
-		{ id: 9, name: 'Emma Wagner', submitted: true, date: '2025-10-16', encrypted: true },
-		{ id: 10, name: 'Lukas Hoffmann', submitted: false, date: null, encrypted: false }
-	];
+	// Fetch user submissions from API
+	async function fetchUserSubmissions() {
+		isLoading = true;
+		error = '';
+
+		try {
+			const data = await apiService.getUserSubmissions(selectedMonth);
+			userSubmissions = data;
+
+			// Transform API data into display format
+			users = userSubmissions.map((submission, index) => ({
+				id: index + 1,
+				name: submission.userName,
+				submitted: true,
+				encrypted: true,
+				hasData: !!submission.prioritiesEncryptedFields,
+				adminWrappedDek: submission.adminWrappedDek,
+				userEncryptedFields: submission.userEncryptedFields,
+				prioritiesEncryptedFields: submission.prioritiesEncryptedFields
+			}));
+
+			// Calculate statistics
+			calculateStats();
+		} catch (err) {
+			error = (err as Error).message;
+			console.error('Error fetching submissions:', err);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Calculate statistics from real data
+	function calculateStats() {
+		const totalUsers = users.length;
+		const submitted = users.filter((u) => u.submitted && u.hasData).length;
+		const pending = totalUsers - submitted;
+		const submissionRate = totalUsers > 0 ? Math.round((submitted / totalUsers) * 100) : 0;
+
+		stats = {
+			totalUsers,
+			submitted,
+			pending,
+			submissionRate
+		};
+	}
+
+	// Filter users based on search query
+	$: filteredUsers = users.filter((user) =>
+		user.name.toLowerCase().includes(searchQuery.toLowerCase())
+	);
+
+	// Fetch data on mount and when month changes
+	onMount(() => {
+		fetchUserSubmissions();
+	});
+
+	$: if (selectedMonth) {
+		fetchUserSubmissions();
+	}
 
 	function handleKeyUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -59,6 +117,7 @@
 
 	function exportToExcel() {
 		console.log('Exporting to Excel...');
+		// TODO: Implement Excel export with decrypted data
 	}
 
 	function openManualEntry() {
@@ -67,6 +126,16 @@
 
 	function closeManualEntry() {
 		showManualEntry = false;
+	}
+
+	function viewUserData(user: UserDisplay) {
+		if (!keyUploaded) {
+			alert('Bitte laden Sie zuerst den privaten SchlÃ¼ssel hoch');
+			return;
+		}
+		// TODO: Implement decryption and display
+		console.log('View data for:', user);
+		alert('EntschlÃ¼sselung wird noch implementiert');
 	}
 </script>
 
@@ -94,340 +163,370 @@
 	</div>
 
 	<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-		<!-- Statistics Cards -->
-		<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-			<!-- Total Users -->
-			<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Total Users</p>
-						<p class="mt-2 text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
-					</div>
-					<div class="rounded-lg bg-blue-50 p-3">
-						<AccountGroup class="h-6 w-6 text-blue-600" />
-					</div>
-				</div>
+		<!-- Error Display -->
+		{#if error}
+			<div class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+				<p class="text-sm text-red-800">{error}</p>
 			</div>
+		{/if}
 
-			<!-- Submitted -->
-			<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Submitted</p>
-						<p class="mt-2 text-3xl font-bold text-green-600">{stats.submitted}</p>
-					</div>
-					<div class="rounded-lg bg-green-50 p-3">
-						<CheckCircle class="h-6 w-6 text-green-600" />
-					</div>
-				</div>
-			</div>
-
-			<!-- Pending -->
-			<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Pending</p>
-						<p class="mt-2 text-3xl font-bold text-orange-600">{stats.pending}</p>
-					</div>
-					<div class="rounded-lg bg-orange-50 p-3">
-						<ClockOutline class="h-6 w-6 text-orange-600" />
-					</div>
-				</div>
-			</div>
-
-			<!-- Submission Rate -->
-			<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Submission Rate</p>
-						<p class="mt-2 text-3xl font-bold text-purple-600">{stats.submissionRate}%</p>
-					</div>
-					<div class="rounded-lg bg-purple-50 p-3">
-						<TrendingUp class="h-6 w-6 text-purple-600" />
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-			<!-- Main Content Area -->
-			<div class="space-y-6 lg:col-span-2">
-				<!-- Private Key Upload -->
-				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-					<div class="mb-4 flex items-center gap-2">
-						<KeyVariant class="h-5 w-5 text-gray-700" />
-						<h2 class="text-lg font-semibold text-gray-900">Private Key</h2>
-					</div>
-
+		<!-- Loading State -->
+		{#if isLoading}
+			<div class="flex items-center justify-center py-12">
+				<div class="text-center">
 					<div
-						class="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
-						on:drop={handleKeyDrop}
-						on:dragover={preventDefaults}
-						on:dragenter={preventDefaults}
-						role="region"
-						aria-label="Private key file drop zone to locally decrypt data"
-					>
-						<input
-							type="file"
-							id="keyFileInput"
-							accept=".pem,.key"
-							class="hidden"
-							on:change={handleKeyUpload}
-						/>
+						class="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"
+					></div>
+					<p class="text-gray-600">Lade Daten...</p>
+				</div>
+			</div>
+		{:else}
+			<!-- Statistics Cards -->
+			<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
+				<!-- Total Users -->
+				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-600">Total Users</p>
+							<p class="mt-2 text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
+						</div>
+						<div class="rounded-lg bg-blue-50 p-3">
+							<AccountGroup class="h-6 w-6 text-blue-600" />
+						</div>
+					</div>
+				</div>
 
-						{#if keyUploaded && keyFile}
-							<div class="flex flex-col items-center">
-								<div class="mb-3 rounded-full bg-green-50 p-3">
-									<CheckCircle class="h-8 w-8 text-green-600" />
+				<!-- Submitted -->
+				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-600">Submitted</p>
+							<p class="mt-2 text-3xl font-bold text-green-600">{stats.submitted}</p>
+						</div>
+						<div class="rounded-lg bg-green-50 p-3">
+							<CheckCircle class="h-6 w-6 text-green-600" />
+						</div>
+					</div>
+				</div>
+
+				<!-- Pending -->
+				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-600">Pending</p>
+							<p class="mt-2 text-3xl font-bold text-orange-600">{stats.pending}</p>
+						</div>
+						<div class="rounded-lg bg-orange-50 p-3">
+							<ClockOutline class="h-6 w-6 text-orange-600" />
+						</div>
+					</div>
+				</div>
+
+				<!-- Submission Rate -->
+				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-600">Submission Rate</p>
+							<p class="mt-2 text-3xl font-bold text-purple-600">{stats.submissionRate}%</p>
+						</div>
+						<div class="rounded-lg bg-purple-50 p-3">
+							<TrendingUp class="h-6 w-6 text-purple-600" />
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+				<!-- Main Content Area -->
+				<div class="space-y-6 lg:col-span-2">
+					<!-- Private Key Upload -->
+					<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+						<div class="mb-4 flex items-center gap-2">
+							<KeyVariant class="h-5 w-5 text-gray-700" />
+							<h2 class="text-lg font-semibold text-gray-900">Private Key</h2>
+						</div>
+
+						<div
+							class="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
+							on:drop={handleKeyDrop}
+							on:dragover={preventDefaults}
+							on:dragenter={preventDefaults}
+							role="region"
+							aria-label="Private key file drop zone to locally decrypt data"
+						>
+							<input
+								type="file"
+								id="keyFileInput"
+								accept=".pem,.key"
+								class="hidden"
+								on:change={handleKeyUpload}
+							/>
+
+							{#if keyUploaded && keyFile}
+								<div class="flex flex-col items-center">
+									<div class="mb-3 rounded-full bg-green-50 p-3">
+										<CheckCircle class="h-8 w-8 text-green-600" />
+									</div>
+									<p class="text-sm font-medium text-gray-900">{keyFile.name}</p>
+									<p class="mt-1 text-xs text-gray-500">Private key loaded successfully</p>
+									<button
+										type="button"
+										class="mt-4 px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+										on:click={() => {
+											keyUploaded = false;
+											keyFile = null;
+										}}
+									>
+										Remove
+									</button>
 								</div>
-								<p class="text-sm font-medium text-gray-900">{keyFile.name}</p>
-								<p class="mt-1 text-xs text-gray-500">Private key loaded successfully</p>
-								<button
-									type="button"
-									class="mt-4 px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-									on:click={() => {
-										keyUploaded = false;
-										keyFile = null;
-									}}
-								>
-									Remove
-								</button>
+							{:else}
+								<div class="flex flex-col items-center">
+									<Upload class="mb-3 h-12 w-12 text-gray-400" />
+									<p class="mb-1 text-sm font-medium text-gray-900">
+										Drop your private key file here
+									</p>
+									<p class="mb-4 text-xs text-gray-500">or</p>
+									<label
+										for="keyFileInput"
+										class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+									>
+										Browse Files
+									</label>
+									<p class="mt-2 text-xs text-gray-400">Accepts .pem or .key files</p>
+								</div>
+							{/if}
+						</div>
+
+						{#if keyUploaded}
+							<div class="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+								<p class="text-sm text-green-800">
+									âœ" Key loaded. You can now view and decrypt user data.
+								</p>
 							</div>
 						{:else}
-							<div class="flex flex-col items-center">
-								<Upload class="mb-3 h-12 w-12 text-gray-400" />
-								<p class="mb-1 text-sm font-medium text-gray-900">
-									Drop your private key file here
+							<div class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+								<p class="text-sm text-yellow-800">
+									âš Upload your private key to decrypt and view submission data.
 								</p>
-								<p class="mb-4 text-xs text-gray-500">or</p>
-								<label
-									for="keyFileInput"
-									class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-								>
-									Browse Files
-								</label>
-								<p class="mt-2 text-xs text-gray-400">Accepts .pem or .key files</p>
 							</div>
 						{/if}
 					</div>
 
-					{#if keyUploaded}
-						<div class="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-							<p class="text-sm text-green-800">
-								✓ Key loaded. You can now view and decrypt user data.
-							</p>
+					<!-- User Submissions Table -->
+					<div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+						<div class="border-b border-gray-200 p-6">
+							<div class="mb-4 flex items-center justify-between">
+								<h2 class="text-lg font-semibold text-gray-900">User Submissions</h2>
+								<div class="flex items-center gap-3">
+									<div class="relative">
+										<Magnify
+											class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400"
+										/>
+										<input
+											type="text"
+											bind:value={searchQuery}
+											placeholder="Search users..."
+											class="rounded-lg border border-gray-300 py-2 pr-4 pl-10 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+								</div>
+							</div>
 						</div>
-					{:else}
-						<div class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-							<p class="text-sm text-yellow-800">
-								⚠ Upload your private key to decrypt and view submission data.
-							</p>
+
+						<div class="overflow-x-auto">
+							<table class="w-full">
+								<thead class="border-b border-gray-200 bg-gray-50">
+									<tr>
+										<th
+											class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+										>
+											User
+										</th>
+										<th
+											class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+										>
+											Status
+										</th>
+										<th
+											class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+										>
+											Encryption
+										</th>
+										<th
+											class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+										>
+											Actions
+										</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-gray-200 bg-white">
+									{#if filteredUsers.length === 0}
+										<tr>
+											<td colspan="4" class="px-6 py-8 text-center text-gray-500">
+												{#if users.length === 0}
+													Keine Einreichungen fÃ¼r diesen Monat gefunden
+												{:else}
+													Keine Benutzer gefunden fÃ¼r "{searchQuery}"
+												{/if}
+											</td>
+										</tr>
+									{:else}
+										{#each filteredUsers as user}
+											<tr class="transition-colors hover:bg-gray-50">
+												<td class="px-6 py-4 whitespace-nowrap">
+													<div class="flex items-center">
+														<div
+															class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 font-semibold text-white"
+														>
+															{user.name.charAt(0).toUpperCase()}
+														</div>
+														<div class="ml-3">
+															<p class="text-sm font-medium text-gray-900">{user.name}</p>
+															<p class="text-xs text-gray-500">ID: {user.id}</p>
+														</div>
+													</div>
+												</td>
+												<td class="px-6 py-4 whitespace-nowrap">
+													{#if user.submitted && user.hasData}
+														<span
+															class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
+														>
+															<CheckCircle class="mr-1 h-3 w-3" />
+															Submitted
+														</span>
+													{:else}
+														<span
+															class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
+														>
+															<ClockOutline class="mr-1 h-3 w-3" />
+															Pending
+														</span>
+													{/if}
+												</td>
+												<td class="px-6 py-4 whitespace-nowrap">
+													{#if user.encrypted}
+														<span
+															class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800"
+															title="Data is encrypted"
+														>
+															<Lock class="mr-1 h-3 w-3" />
+															Encrypted
+														</span>
+													{:else}
+														<span class="text-xs text-gray-400">No data</span>
+													{/if}
+												</td>
+												<td class="px-6 py-4 text-sm whitespace-nowrap">
+													{#if user.submitted && user.hasData && keyUploaded}
+														<button
+															type="button"
+															class="font-medium text-blue-600 hover:text-blue-800"
+															on:click={() => viewUserData(user)}
+														>
+															View Data
+														</button>
+													{:else if user.submitted && user.hasData && !keyUploaded}
+														<span class="text-gray-400">Upload key first</span>
+													{:else}
+														<button
+															type="button"
+															class="font-medium text-gray-600 hover:text-gray-800"
+															on:click={openManualEntry}
+														>
+															Enter Manually
+														</button>
+													{/if}
+												</td>
+											</tr>
+										{/each}
+									{/if}
+								</tbody>
+							</table>
 						</div>
-					{/if}
+					</div>
 				</div>
 
-				<!-- User Submissions Table -->
-				<div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-					<div class="border-b border-gray-200 p-6">
-						<div class="mb-4 flex items-center justify-between">
-							<h2 class="text-lg font-semibold text-gray-900">User Submissions</h2>
-							<div class="flex items-center gap-3">
-								<div class="relative">
-									<Magnify
-										class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400"
-									/>
-									<input
-										type="text"
-										bind:value={searchQuery}
-										placeholder="Search users..."
-										class="rounded-lg border border-gray-300 py-2 pr-4 pl-10 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-									/>
+				<!-- Sidebar Actions -->
+				<div class="space-y-6">
+					<!-- Quick Actions -->
+					<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+						<h3 class="mb-4 text-lg font-semibold text-gray-900">Quick Actions</h3>
+						<div class="space-y-3">
+							<button
+								type="button"
+								class="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+								on:click={openManualEntry}
+							>
+								<Plus class="h-5 w-5" />
+								Manual Entry
+							</button>
+
+							<button
+								type="button"
+								class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700"
+								on:click={exportToExcel}
+								disabled={!keyUploaded || users.length === 0}
+								class:opacity-50={!keyUploaded || users.length === 0}
+								class:cursor-not-allowed={!keyUploaded || users.length === 0}
+							>
+								<Download class="h-5 w-5" />
+								Export to Excel
+							</button>
+						</div>
+
+						{#if !keyUploaded}
+							<div class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+								<p class="text-xs text-yellow-800">Upload private key to enable export</p>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Monthly Overview -->
+					<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+						<h3 class="mb-4 text-lg font-semibold text-gray-900">Monthly Overview</h3>
+						<div class="space-y-4">
+							<div>
+								<div class="mb-2 flex justify-between text-sm">
+									<span class="text-gray-600">Completion Progress</span>
+									<span class="font-medium text-gray-900">{stats.submissionRate}%</span>
+								</div>
+								<div class="h-2.5 w-full rounded-full bg-gray-200">
+									<div
+										class="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
+										style="width: {stats.submissionRate}%"
+									></div>
+								</div>
+							</div>
+
+							<div class="border-t border-gray-200 pt-4">
+								<div class="mb-2 flex items-center justify-between">
+									<span class="text-sm text-gray-600">Encrypted Submissions</span>
+									<span class="text-sm font-medium text-gray-900">{stats.submitted}</span>
+								</div>
+								<div class="flex items-center justify-between">
+									<span class="text-sm text-gray-600">Paper Submissions</span>
+									<span class="text-sm font-medium text-gray-900">0</span>
 								</div>
 							</div>
 						</div>
 					</div>
 
-					<div class="overflow-x-auto">
-						<table class="w-full">
-							<thead class="border-b border-gray-200 bg-gray-50">
-								<tr>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-									>
-										User
-									</th>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-									>
-										Status
-									</th>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-									>
-										Submission Date
-									</th>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-									>
-										Actions
-									</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-gray-200 bg-white">
-								{#each users as user}
-									<tr class="transition-colors hover:bg-gray-50">
-										<td class="px-6 py-4 whitespace-nowrap">
-											<div class="flex items-center">
-												<div
-													class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 font-semibold text-white"
-												>
-													{user.name.charAt(0)}
-												</div>
-												<div class="ml-3">
-													<p class="text-sm font-medium text-gray-900">{user.name}</p>
-													<p class="text-xs text-gray-500">ID: {user.id}</p>
-												</div>
-											</div>
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap">
-											{#if user.submitted}
-												<span
-													class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
-												>
-													<CheckCircle class="mr-1 h-3 w-3" />
-													Submitted
-												</span>
-											{:else}
-												<span
-													class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-												>
-													<ClockOutline class="mr-1 h-3 w-3" />
-													Pending
-												</span>
-											{/if}
-										</td>
-										<td class="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
-											{user.date || 'Not submitted'}
-										</td>
-										<td class="px-6 py-4 text-sm whitespace-nowrap">
-											{#if user.submitted && keyUploaded}
-												<button type="button" class="font-medium text-blue-600 hover:text-blue-800">
-													View Data
-												</button>
-											{:else if !user.submitted}
-												<button
-													type="button"
-													class="font-medium text-gray-600 hover:text-gray-800"
-													on:click={openManualEntry}
-												>
-													Enter Manually
-												</button>
-											{:else}
-												<span class="text-gray-400">Upload key first</span>
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+					<!-- Data Status Info -->
+					<div class="rounded-xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
+						<h3 class="mb-2 flex items-center gap-2 text-sm font-semibold text-blue-900">
+							<Lock class="h-4 w-4" />
+							Encryption Status
+						</h3>
+						<p class="text-xs text-blue-800">
+							All user data is encrypted. To view or export data, you must upload the admin private
+							key. The decryption happens locally in your browser - the server never sees the
+							unencrypted data.
+						</p>
 					</div>
 				</div>
 			</div>
-
-			<!-- Sidebar Actions -->
-			<div class="space-y-6">
-				<!-- Quick Actions -->
-				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-					<h3 class="mb-4 text-lg font-semibold text-gray-900">Quick Actions</h3>
-					<div class="space-y-3">
-						<button
-							type="button"
-							class="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-							on:click={openManualEntry}
-						>
-							<Plus class="h-5 w-5" />
-							Manual Entry
-						</button>
-
-						<button
-							type="button"
-							class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700"
-							on:click={exportToExcel}
-							disabled={!keyUploaded}
-							class:opacity-50={!keyUploaded}
-							class:cursor-not-allowed={!keyUploaded}
-						>
-							<Download class="h-5 w-5" />
-							Export to Excel
-						</button>
-					</div>
-
-					{#if !keyUploaded}
-						<div class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-							<p class="text-xs text-yellow-800">Upload private key to enable export</p>
-						</div>
-					{/if}
-				</div>
-
-				<!-- Monthly Overview -->
-				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-					<h3 class="mb-4 text-lg font-semibold text-gray-900">Monthly Overview</h3>
-					<div class="space-y-4">
-						<div>
-							<div class="mb-2 flex justify-between text-sm">
-								<span class="text-gray-600">Completion Progress</span>
-								<span class="font-medium text-gray-900">{stats.submissionRate}%</span>
-							</div>
-							<div class="h-2.5 w-full rounded-full bg-gray-200">
-								<div
-									class="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
-									style="width: {stats.submissionRate}%"
-								></div>
-							</div>
-						</div>
-
-						<div class="border-t border-gray-200 pt-4">
-							<div class="mb-2 flex items-center justify-between">
-								<span class="text-sm text-gray-600">Encrypted Submissions</span>
-								<span class="text-sm font-medium text-gray-900">{stats.submitted}</span>
-							</div>
-							<div class="flex items-center justify-between">
-								<span class="text-sm text-gray-600">Paper Submissions</span>
-								<span class="text-sm font-medium text-gray-900">0</span>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<!-- Recent Activity -->
-				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-					<h3 class="mb-4 text-lg font-semibold text-gray-900">Recent Activity</h3>
-					<div class="space-y-3">
-						<div class="flex items-start gap-3">
-							<div class="mt-2 h-2 w-2 rounded-full bg-green-500"></div>
-							<div class="flex-1">
-								<p class="text-sm text-gray-900">Michael Wolf submitted</p>
-								<p class="text-xs text-gray-500">2 hours ago</p>
-							</div>
-						</div>
-						<div class="flex items-start gap-3">
-							<div class="mt-2 h-2 w-2 rounded-full bg-green-500"></div>
-							<div class="flex-1">
-								<p class="text-sm text-gray-900">Max Müller submitted</p>
-								<p class="text-xs text-gray-500">5 hours ago</p>
-							</div>
-						</div>
-						<div class="flex items-start gap-3">
-							<div class="mt-2 h-2 w-2 rounded-full bg-green-500"></div>
-							<div class="flex-1">
-								<p class="text-sm text-gray-900">Anna Schmidt submitted</p>
-								<p class="text-xs text-gray-500">1 day ago</p>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
+		{/if}
 	</div>
 </div>
 
@@ -449,21 +548,6 @@
 			</div>
 
 			<div class="space-y-4 p-6">
-				<div>
-					<label for="userSelect" class="mb-2 block text-sm font-medium text-gray-700"
-						>Select User</label
-					>
-					<select
-						id="userSelect"
-						class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-					>
-						<option value="">Choose a user...</option>
-						{#each users.filter((u) => !u.submitted) as user}
-							<option value={user.id}>{user.name}</option>
-						{/each}
-					</select>
-				</div>
-
 				<div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
 					<p class="text-sm text-blue-800">
 						Enter data for users who submitted on paper. This data will be encrypted with the public
@@ -497,6 +581,3 @@
 	</div>
 {/if}
 
-<style>
-	/* Additional custom styles if needed */
-</style>

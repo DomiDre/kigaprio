@@ -6,7 +6,7 @@ interface AuthState {
 	isAuthenticated: boolean;
 	userId?: string;
 	username?: string;
-	role?: string;
+	isAdmin?: boolean;
 }
 
 function createAuthStore() {
@@ -92,7 +92,8 @@ function createAuthStore() {
 				set({
 					isAuthenticated: true,
 					userId: data['user_id'],
-					username: data['username']
+					username: data['username'],
+					isAdmin: data['is_admin']
 				});
 				sessionStorage.setItem('was_authenticated', 'true');
 				return true;
@@ -119,5 +120,5 @@ export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticat
 export const currentUser = derived(authStore, ($auth) => ({
 	userId: $auth.userId,
 	username: $auth.username,
-	role: $auth.role
+	isAdmin: $auth.isAdmin
 }));
