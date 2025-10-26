@@ -17,7 +17,8 @@
 	import { apiService } from '$lib/services/api';
 	import { cryptoService } from '$lib/services/crypto';
 	import DecryptedDataModal from '$lib/components/DecryptedDataModal.svelte';
-	import type { DecryptedData, Stats, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
+	import type { DecryptedData, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
+	import { dayKeys, dayLabels, priorityColors } from '$lib/config/priorities';
 
 	// State
 	let selectedMonth = $state('2025-10');
@@ -64,18 +65,6 @@
 	// Track if initial fetch is done
 	let initialFetchDone = $state(false);
 
-	// Priority colors
-	const priorityColors: Record<number, string> = {
-		1: 'bg-red-500 text-white',
-		2: 'bg-orange-500 text-white',
-		3: 'bg-yellow-500 text-white',
-		4: 'bg-green-500 text-white',
-		5: 'bg-blue-500 text-white'
-	};
-
-	const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-	const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-
 	// Build overview data structure using $derived
 	let overviewData = $derived.by(() => {
 		console.log('Building overview data, decryptedUsers size:', decryptedUsers.size);
@@ -83,14 +72,14 @@
 
 		const data: any[] = [];
 
-		decryptedUsers.forEach((userData, username) => {
+		decryptedUsers.forEach((userData) => {
 			const weeks = userData.priorities?.weeks || [];
 
 			data.push({
 				userName: userData.name,
 				weeks: weeks.map((week: any) => ({
 					weekNumber: week.weekNumber,
-					priorities: dayNames.map((day) => week[day] || null)
+					priorities: dayKeys.map((day) => week[day] || null)
 				}))
 			});
 		});
@@ -123,12 +112,12 @@
 			weeks.forEach((week: any) => {
 				if (!stats[week.weekNumber]) {
 					stats[week.weekNumber] = {};
-					dayNames.forEach((day) => {
+					dayKeys.forEach((day) => {
 						stats[week.weekNumber][day] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 					});
 				}
 
-				dayNames.forEach((day) => {
+				dayKeys.forEach((day) => {
 					const priority = week[day];
 					if (priority) {
 						stats[week.weekNumber][day][priority]++;
@@ -609,7 +598,11 @@
 								</div>
 								{#each [1, 2, 3, 4, 5] as priority}
 									<div class="flex items-center gap-2">
-										<div class="h-4 w-4 rounded {priorityColors[priority]}"></div>
+										<div
+											class="h-4 w-4 rounded {priorityColors[
+												priority as 1 | 2 | 3 | 4 | 5
+											]} text-white"
+										></div>
 										<span class="text-xs text-gray-600 dark:text-gray-400">{priority}</span>
 									</div>
 								{/each}
@@ -668,7 +661,7 @@
 															{#if priority}
 																<div
 																	class="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold {priorityColors[
-																		priority
+																		priority as 1 | 2 | 3 | 4 | 5
 																	]}"
 																>
 																	{priority}
@@ -711,7 +704,7 @@
 												Week {weekNum}
 											</div>
 											<div class="grid grid-cols-5 gap-2">
-												{#each dayNames as day, dayIndex}
+												{#each dayKeys as day, dayIndex}
 													{@const dayStat = demandStats[weekNum]?.[day]}
 													<div
 														class="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-600 dark:bg-gray-800"
@@ -726,7 +719,11 @@
 																{#each [1, 2, 3, 4, 5] as priority}
 																	{#if dayStat[priority] > 0}
 																		<div class="flex items-center gap-1 text-xs">
-																			<div class="h-3 w-3 rounded {priorityColors[priority]}"></div>
+																			<div
+																				class="h-3 w-3 rounded {priorityColors[
+																					priority as 1 | 2 | 3 | 4 | 5
+																				]}"
+																			></div>
 																			<span class="text-gray-700 dark:text-gray-300"
 																				>{dayStat[priority]}</span
 																			>
