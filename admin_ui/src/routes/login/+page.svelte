@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { authStore, isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
@@ -23,7 +23,7 @@
 
 		try {
 			await apiService.login(username, password, keepLoggedIn);
-			goto('/dashboard');
+			if (await authStore.verifyAuth()) goto('/dashboard');
 		} catch (err) {
 			error = (err as Error).message;
 		} finally {

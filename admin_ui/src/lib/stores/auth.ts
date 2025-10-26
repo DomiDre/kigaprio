@@ -88,6 +88,11 @@ function createAuthStore() {
 
 			try {
 				const data = await apiService.verify();
+				if (!data["is_admin"]) {
+					console.info("No access rights")
+					await authStore.clearAuth(false);
+					return false;
+				}
 
 				set({
 					isAuthenticated: true,
