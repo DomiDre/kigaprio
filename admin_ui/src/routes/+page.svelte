@@ -8,7 +8,7 @@
 		// Redirect based on authentication status
 		const unsubscribe = authStore.subscribe(($auth) => {
 			if ($auth.isAuthenticated) {
-				goto('/priorities');
+				goto('/dashboard');
 			} else {
 				goto('/login');
 			}

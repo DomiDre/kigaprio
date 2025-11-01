@@ -107,6 +107,24 @@ services:
     secrets:
       - redis_pass
 
+  admin:
+    build:
+      context: ./admin_ui
+      dockerfile: Dockerfile
+      target: development
+    image: kigaprio-admin:dev
+    volumes:
+      # Mount entire frontend directory for hot reload
+      - ./admin_ui:/app
+      - /app/node_modules  # Exclude node_modules from host mount
+    environment:
+      - NODE_ENV=development
+      - USE_DEV_HTTPS=false
+    ports:
+      - "5174:5173"  # Vite dev server
+    depends_on:
+      backend:
+        condition: service_healthy
 
 secrets:
   admin_public_key:
