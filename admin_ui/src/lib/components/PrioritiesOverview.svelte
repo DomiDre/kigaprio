@@ -2,18 +2,47 @@
 	import ChevronDown from 'virtual:icons/mdi/chevron-down';
 	import ChevronUp from 'virtual:icons/mdi/chevron-up';
 	import { dayKeys, dayLabels, priorityColors } from '$lib/config/priorities';
+	import type { SvelteMap } from 'svelte/reactivity';
 
 	interface Props {
 		showOverview: boolean;
-		decryptedUsersCount: number;
+		decryptedUsers: SvelteMap<string, { name: string; userData: any; priorities: any }>;
 		overviewData: any[];
 		allWeeks: number[];
-		demandStats: Record<number, Record<string, Record<number, number>>>;
 		onToggle: () => void;
 	}
 
-	let { showOverview, decryptedUsersCount, overviewData, allWeeks, demandStats, onToggle }: Props =
-		$props();
+	let { showOverview, decryptedUsers, overviewData, allWeeks, onToggle }: Props = $props();
+
+	let decryptedUsersCount = $derived.by(() => {
+		return decryptedUsers.size;
+	});
+
+	// Calculate demand statistics
+	let demandStats = $derived.by(() => {
+		const stats: Record<number, Record<string, Record<number, number>>> = {};
+
+		decryptedUsers.forEach((userData) => {
+			const weeks = userData.priorities?.weeks || [];
+			weeks.forEach((week: any) => {
+				if (!stats[week.weekNumber]) {
+					stats[week.weekNumber] = {};
+					dayKeys.forEach((day) => {
+						stats[week.weekNumber][day] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+					});
+				}
+
+				dayKeys.forEach((day) => {
+					const priority = week[day];
+					if (priority) {
+						stats[week.weekNumber][day][priority]++;
+					}
+				});
+			});
+		});
+
+		return stats;
+	});
 </script>
 
 <div
@@ -73,7 +102,7 @@
 											colspan="5"
 										>
 											<div
-												class="whitespace-nowrap text-xs font-semibold text-gray-700 dark:text-gray-300"
+												class="text-xs font-semibold whitespace-nowrap text-gray-700 dark:text-gray-300"
 											>
 												Week {weekNum}
 											</div>

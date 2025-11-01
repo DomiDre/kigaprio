@@ -17,6 +17,12 @@
 	import { dayKeys } from '$lib/config/priorities';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+	// Fetch data on mount
+	onMount(() => {
+		fetchUserSubmissions();
+		initialFetchDone = true;
+	});
+
 	// State
 	let selectedMonth = $state('2025-10');
 	let keyUploaded = $state(false);
@@ -35,9 +41,7 @@
 	let isDecryptingAll = $state(false);
 	let showDecryptedModal = $state(false);
 	let decryptedData = $state<DecryptedData | null>(null);
-	let decryptedUsers = $state(
-		new SvelteMap<string, { name: string; userData: any; priorities: any }>()
-	);
+	let decryptedUsers = $state(Map<string, { name: string; userData: any; priorities: any }>);
 
 	// Data
 	let userSubmissions = $state<UserPriorityRecord[]>([]);
@@ -99,38 +103,21 @@
 		return Array.from(weekSet).sort((a, b) => a - b);
 	});
 
-	// Calculate demand statistics
-	let demandStats = $derived.by(() => {
-		const stats: Record<number, Record<string, Record<number, number>>> = {};
-
-		decryptedUsers.forEach((userData) => {
-			const weeks = userData.priorities?.weeks || [];
-			weeks.forEach((week: any) => {
-				if (!stats[week.weekNumber]) {
-					stats[week.weekNumber] = {};
-					dayKeys.forEach((day) => {
-						stats[week.weekNumber][day] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-					});
-				}
-
-				dayKeys.forEach((day) => {
-					const priority = week[day];
-					if (priority) {
-						stats[week.weekNumber][day][priority]++;
-					}
-				});
-			});
-		});
-
-		return stats;
-	});
-
 	// Filter users based on search query using $derived
 	let filteredUsers = $derived.by(() => {
 		return users.filter((user) => {
 			const displayName = getDisplayName(user.name);
 			return displayName.toLowerCase().includes(searchQuery.toLowerCase());
 		});
+	});
+
+	// Watch for month changes using $effect
+	$effect(() => {
+		if (initialFetchDone && selectedMonth) {
+			decryptedUsers = new SvelteMap();
+			showOverview = false;
+			fetchUserSubmissions();
+		}
 	});
 
 	// Fetch user submissions from API
@@ -220,21 +207,6 @@
 		return decryptedUsers.has(userName);
 	}
 
-	// Fetch data on mount
-	onMount(() => {
-		fetchUserSubmissions();
-		initialFetchDone = true;
-	});
-
-	// Watch for month changes using $effect
-	$effect(() => {
-		if (initialFetchDone && selectedMonth) {
-			decryptedUsers = new SvelteMap();
-			showOverview = false;
-			fetchUserSubmissions();
-		}
-	});
-
 	async function handleKeyUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
@@ -306,6 +278,8 @@
 			}
 		}
 	}
+
+	/// Callback function when key is removed -> clear all data
 	function removeKey() {
 		keyUploaded = false;
 		keyFile = null;
@@ -317,6 +291,7 @@
 		showOverview = false;
 	}
 
+	/// Callback function on authentication with YubiKey -> toggle decrypt
 	async function handleYubiKeyAuth() {
 		isDecrypting = true;
 		decryptionError = '';
@@ -340,6 +315,7 @@
 		}
 	}
 
+	/// Callback function when view of specific user is requested
 	async function viewUserData(user: UserDisplay) {
 		if (!keyUploaded) {
 			decryptionError = 'Bitte authentifizieren Sie sich zuerst';
@@ -395,6 +371,7 @@
 			isDecrypting = false;
 		}
 	}
+
 	function closeDecryptedModal() {
 		showDecryptedModal = false;
 		decryptedData = null;
@@ -516,10 +493,9 @@
 			{#if keyUploaded && decryptedUsers.size > 0}
 				<PrioritiesOverview
 					{showOverview}
-					decryptedUsersCount={decryptedUsers.size}
+					{decryptedUsers}
 					{overviewData}
 					{allWeeks}
-					{demandStats}
 					onToggle={() => (showOverview = !showOverview)}
 				/>
 			{/if}
@@ -584,4 +560,3 @@
 {#if showManualEntry}
 	<ManualEntryModal onClose={closeManualEntry} />
 {/if}
-

@@ -264,9 +264,7 @@
 						>
 							Browse Files
 						</label>
-						<p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-							Accepts .pem or .key files
-						</p>
+						<p class="mt-2 text-xs text-gray-400 dark:text-gray-500">Accepts .pem or .key files</p>
 					</div>
 				{/if}
 			</div>
@@ -300,9 +298,7 @@
 				<div class="flex items-start gap-2">
 					<Alert class="h-5 w-5 text-red-600 dark:text-red-400" />
 					<div>
-						<p class="text-sm font-medium text-red-900 dark:text-red-300">
-							WebAuthn Not Supported
-						</p>
+						<p class="text-sm font-medium text-red-900 dark:text-red-300">WebAuthn Not Supported</p>
 						<p class="text-sm text-red-800 dark:text-red-400">
 							Your browser doesn't support WebAuthn/FIDO2. Please use Chrome, Firefox, Safari, or
 							Edge.
@@ -388,7 +384,9 @@
 						</div>
 						<div>
 							<p class="font-medium text-gray-900 dark:text-white">YubiKey Authenticated</p>
-							<p class="text-sm text-gray-600 dark:text-gray-400">Session active (15 min timeout)</p>
+							<p class="text-sm text-gray-600 dark:text-gray-400">
+								Session active (15 min timeout)
+							</p>
 						</div>
 					</div>
 					<button

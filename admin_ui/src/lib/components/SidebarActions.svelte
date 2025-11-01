@@ -106,8 +106,8 @@
 			Encryption Status
 		</h3>
 		<p class="text-xs text-purple-800 dark:text-purple-400">
-			All user data is encrypted. Upload the admin private key to decrypt and view the
-			priorities overview table.
+			All user data is encrypted. Upload the admin private key to decrypt and view the priorities
+			overview table.
 		</p>
 	</div>
 </div>

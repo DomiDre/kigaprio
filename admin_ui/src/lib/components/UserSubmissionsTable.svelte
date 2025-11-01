@@ -41,7 +41,7 @@
 			<div class="flex items-center gap-3">
 				<div class="relative">
 					<Magnify
-						class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400"
+						class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400"
 					/>
 					<input
 						type="text"
@@ -57,27 +57,25 @@
 
 	<div class="overflow-x-auto">
 		<table class="w-full">
-			<thead
-				class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50"
-			>
+			<thead class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
 				<tr>
 					<th
-						class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+						class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
 					>
 						User
 					</th>
 					<th
-						class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+						class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
 					>
 						Status
 					</th>
 					<th
-						class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+						class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
 					>
 						Encryption
 					</th>
 					<th
-						class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+						class="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
 					>
 						Actions
 					</th>
@@ -99,7 +97,7 @@
 						{@const displayName = getDisplayName(user.name)}
 						{@const userDecrypted = isDecrypted(user.name)}
 						<tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
-							<td class="whitespace-nowrap px-6 py-4">
+							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="flex items-center">
 									<div
 										class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-blue-600 font-semibold text-white"
@@ -117,7 +115,7 @@
 									</div>
 								</div>
 							</td>
-							<td class="whitespace-nowrap px-6 py-4">
+							<td class="px-6 py-4 whitespace-nowrap">
 								{#if user.submitted && user.hasData}
 									<span
 										class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
@@ -134,7 +132,7 @@
 									</span>
 								{/if}
 							</td>
-							<td class="whitespace-nowrap px-6 py-4">
+							<td class="px-6 py-4 whitespace-nowrap">
 								{#if user.encrypted}
 									{#if userDecrypted}
 										<span
@@ -157,7 +155,7 @@
 									<span class="text-xs text-gray-400">No data</span>
 								{/if}
 							</td>
-							<td class="whitespace-nowrap px-6 py-4 text-sm">
+							<td class="px-6 py-4 text-sm whitespace-nowrap">
 								{#if user.submitted && user.hasData && keyUploaded}
 									<button
 										type="button"

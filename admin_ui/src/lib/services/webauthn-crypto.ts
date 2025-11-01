@@ -1,16 +1,16 @@
 /**
  * Browser-Native YubiKey Authentication Service
- * 
+ *
  * Uses WebAuthn/FIDO2 (built into all modern browsers) to authenticate with YubiKey
  * and derive encryption keys. NO INSTALLATION REQUIRED.
- * 
+ *
  * Security Model:
  * 1. Admin registers YubiKey → generates FIDO2 credential
  * 2. Admin's private key PEM is encrypted with key derived from credential
  * 3. Encrypted PEM stored in localStorage (safe - it's encrypted!)
  * 4. On login: YubiKey authentication → derive decryption key → decrypt PEM
  * 5. Decrypted PEM only in memory during session
- * 
+ *
  * Benefits:
  * - No software installation needed
  * - Works on internet-restricted devices
@@ -45,11 +45,7 @@ export class WebAuthnCryptoService {
 	 * Check if WebAuthn is supported in this browser
 	 */
 	isWebAuthnSupported(): boolean {
-		return !!(
-			window.PublicKeyCredential &&
-			navigator.credentials &&
-			navigator.credentials.create
-		);
+		return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 	}
 
 	/**
@@ -78,10 +74,10 @@ export class WebAuthnCryptoService {
 
 	/**
 	 * Register YubiKey and encrypt admin private key
-	 * 
+	 *
 	 * This only needs to be done ONCE per admin device.
 	 * The encrypted key is stored in localStorage.
-	 * 
+	 *
 	 * @param privateKeyPEM - Admin's RSA private key in PEM format
 	 * @param passphrase - Optional passphrase if PEM is encrypted
 	 */
@@ -101,7 +97,7 @@ export class WebAuthnCryptoService {
 		// Verify it's a valid private key
 		try {
 			forge.pki.privateKeyFromPem(cleanPEM);
-		} catch (error) {
+		} catch {
 			throw new Error('Invalid private key format');
 		}
 
@@ -163,7 +159,7 @@ export class WebAuthnCryptoService {
 
 	/**
 	 * Authenticate with YubiKey and unlock the private key
-	 * 
+	 *
 	 * This is called each session (after browser restart, tab close, etc.)
 	 * Requires physical YubiKey touch.
 	 */

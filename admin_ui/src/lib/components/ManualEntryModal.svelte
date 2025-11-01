@@ -8,7 +8,7 @@
 	let { onClose }: Props = $props();
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+<div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
 	<div
 		class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl dark:bg-gray-800"
 	>
