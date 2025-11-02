@@ -184,6 +184,7 @@ init-admin-key:
 # Initialize pocketbase directories for storage
 pocketbase-init: init-secrets
     ./pocketbase/init.sh
+    docker compose -f docker-compose.dev.yml run --rm backend uv run src/kigaprio/scripts/initialize_pocketbase.py
 
 services-init:
     #!/usr/bin/env bash
