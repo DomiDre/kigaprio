@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from kigaprio.models.priorities import WeekPriority
+
 
 class UpdateMagicWordRequest(BaseModel):
     new_magic_word: str = Field(..., min_length=4)
@@ -45,3 +47,12 @@ class ReminderResponse(BaseModel):
     sent: int
     failed: int
     details: list[dict[str, Any]]
+
+
+class ManualPriorityRequest(BaseModel):
+    """Request model for manual priority entry"""
+
+    identifier: str  # participant number, initials, etc.
+    month: str  # YYYY-MM format
+    weeks: list[WeekPriority]
+
