@@ -147,6 +147,12 @@ export class ApiService {
 		});
 	}
 
+	async getManualSubmissions(month: string) {
+		return this.requestJson(`/admin/manual-entries/${month}`, {
+			method: 'GET'
+		});
+	}
+
 	async submitManualPriority(identifier: string, month: string, weeks: WeekPriority[]) {
 
 		return this.requestJson('/admin/manual-priority', {
