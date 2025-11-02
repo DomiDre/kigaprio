@@ -41,7 +41,7 @@
 	let isDecryptingAll = $state(false);
 	let showDecryptedModal = $state(false);
 	let decryptedData = $state<DecryptedData | null>(null);
-	let decryptedUsers = $state(Map<string, { name: string; userData: any; priorities: any }>);
+	let decryptedUsers = $state(new SvelteMap<string, DecryptedData>());
 
 	// Data
 	let userSubmissions = $state<UserPriorityRecord[]>([]);
@@ -80,7 +80,7 @@
 			const weeks = userData.priorities?.weeks || [];
 
 			data.push({
-				userName: userData.name,
+				userName: userData.userName,
 				weeks: weeks.map((week: any) => ({
 					weekNumber: week.weekNumber,
 					priorities: dayKeys.map((day) => week[day] || null)
@@ -158,10 +158,7 @@
 		isDecryptingAll = true;
 		decryptionError = '';
 
-		const newDecryptedUsers = new SvelteMap<
-			string,
-			{ name: string; userData: any; priorities: any }
-		>();
+		const newDecryptedUsers = new SvelteMap<string, DecryptedData>();
 
 		try {
 			for (const user of users) {
@@ -177,7 +174,7 @@
 						);
 
 						newDecryptedUsers.set(user.name, {
-							name: result.userData.name || user.name,
+							userName: result.userData.name || user.name,
 							userData: result.userData,
 							priorities: result.priorities
 						});
@@ -200,7 +197,7 @@
 	// Get decrypted name for display
 	function getDisplayName(userName: string): string {
 		const decrypted = decryptedUsers.get(userName);
-		return decrypted?.name || userName;
+		return decrypted?.userName || userName;
 	}
 
 	function isDecrypted(userName: string): boolean {
@@ -324,11 +321,7 @@
 
 		const cached = decryptedUsers.get(user.name);
 		if (cached) {
-			decryptedData = {
-				userName: cached.name,
-				userData: cached.userData,
-				priorities: cached.priorities
-			};
+			decryptedData = cached;
 			showDecryptedModal = true;
 			return;
 		}
@@ -352,7 +345,7 @@
 			);
 
 			decryptedUsers.set(user.name, {
-				name: result.userData.name || user.name,
+				userName: result.userData.name || user.name,
 				userData: result.userData,
 				priorities: result.priorities
 			});

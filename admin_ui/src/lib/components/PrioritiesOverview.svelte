@@ -3,10 +3,11 @@
 	import ChevronUp from 'virtual:icons/mdi/chevron-up';
 	import { dayKeys, dayLabels, priorityColors } from '$lib/config/priorities';
 	import type { SvelteMap } from 'svelte/reactivity';
+	import type { DecryptedData } from '$lib/types/dashboard';
 
 	interface Props {
 		showOverview: boolean;
-		decryptedUsers: SvelteMap<string, { name: string; userData: any; priorities: any }>;
+		decryptedUsers: SvelteMap<string, DecryptedData>;
 		overviewData: any[];
 		allWeeks: number[];
 		onToggle: () => void;
