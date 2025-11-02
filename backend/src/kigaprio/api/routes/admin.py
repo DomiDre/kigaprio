@@ -1,3 +1,5 @@
+import uuid
+
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException
@@ -126,7 +128,13 @@ async def get_user_submissions(
             return []
 
         # Get unique user IDs from priorities
-        user_ids = list({p["userId"] for p in priorities_data if ("userId" in p and p["userId"] != '')})
+        user_ids = list(
+            {
+                p["userId"]
+                for p in priorities_data
+                if ("userId" in p and p["userId"] != "")
+            }
+        )
 
         if not user_ids:
             return []
@@ -276,7 +284,6 @@ async def create_manual_priority(
         )
 
     async with httpx.AsyncClient() as client:
-
         # Check if entry already exists for this identifier + month
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
@@ -295,7 +302,10 @@ async def create_manual_priority(
         # Encrypt the weeks data using admin's DEK
         try:
             encrypted_data = EncryptionManager.encrypt_fields(
-                {"weeks": [week.model_dump() for week in request.weeks]},
+                {
+                    "weeks": [week.model_dump() for week in request.weeks],
+                    "name": identifier,
+                },
                 dek,
             )
         except Exception as e:
@@ -308,7 +318,7 @@ async def create_manual_priority(
         priority_data = {
             "userId": None,
             "month": request.month,
-            "identifier": identifier,
+            "identifier": uuid.uuid4().hex,
             "encrypted_fields": encrypted_data,
         }
 

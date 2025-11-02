@@ -1,6 +1,7 @@
 import { authStore } from '$lib/stores/auth';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
+import type { WeekPriority } from '$lib/types/priorities';
 
 export class ApiService {
 	public baseUrl: string;
@@ -143,6 +144,18 @@ export class ApiService {
 	async getUserSubmissions(month: string) {
 		return this.requestJson(`/admin/users/${month}`, {
 			method: 'GET'
+		});
+	}
+
+	async submitManualPriority(identifier: string, month: string, weeks: WeekPriority[]) {
+
+		return this.requestJson('/admin/manual-priority', {
+			method: 'POST',
+			body: JSON.stringify({
+				identifier,
+				month,
+				weeks
+			})
 		});
 	}
 }

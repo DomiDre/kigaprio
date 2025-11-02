@@ -16,6 +16,7 @@
 	import type { DecryptedData, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
 	import { dayKeys } from '$lib/config/priorities';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import type { WeekPriority } from '$lib/types/priorities';
 
 	// Fetch data on mount
 	onMount(() => {
@@ -398,6 +399,39 @@
 			isRefreshing = false;
 		}
 	}
+
+	// Add handler function:
+	async function handleManualSubmit(
+		event: CustomEvent<{
+			identifier: string;
+			month: string;
+			weeks: WeekPriority[];
+		}>
+	) {
+		// isSubmittingManual = true;
+		// manualEntryError = '';
+
+		try {
+			const result = await apiService.submitManualPriority(
+				event.detail.identifier,
+				event.detail.month,
+				event.detail.weeks
+			);
+
+			// Show success message
+			alert(`Erfolgreich gespeichert: ${result.message}`);
+
+			// Close modal
+			showManualEntry = false;
+
+			// Optional: Refresh the data if you're showing it in the dashboard
+			// await refreshData();
+		} catch (err) {
+			// manualEntryError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
+		} finally {
+			// isSubmittingManual = false;
+		}
+	}
 </script>
 
 <div
@@ -551,5 +585,11 @@
 {/if}
 
 {#if showManualEntry}
-	<ManualEntryModal onClose={closeManualEntry} />
+	<ManualEntryModal
+		on:close={() => {
+			showManualEntry = false;
+			// manualEntryError = '';
+		}}
+		on:submit={handleManualSubmit}
+	/>
 {/if}
