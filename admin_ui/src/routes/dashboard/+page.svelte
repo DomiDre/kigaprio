@@ -17,6 +17,7 @@
 	import { dayKeys } from '$lib/config/priorities';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { WeekPriority } from '$lib/types/priorities';
+	import { formatMonthForAPI, getMonthOptions } from '$lib/utils/dateHelpers';
 
 	// Fetch data on mount
 	onMount(() => {
@@ -24,8 +25,11 @@
 		initialFetchDone = true;
 	});
 
+	// consts
+	const monthOptions = getMonthOptions();
+
 	// State
-	let selectedMonth = $state('2025-10');
+	let selectedMonth = $state(monthOptions[0]);
 	let keyUploaded = $state(false);
 	let showManualEntry = $state(false);
 	let searchQuery = $state('');
@@ -127,7 +131,8 @@
 		error = '';
 
 		try {
-			const data = await apiService.getUserSubmissions(selectedMonth);
+			const apiMonth = formatMonthForAPI(selectedMonth);
+			const data = await apiService.getUserSubmissions(apiMonth);
 			userSubmissions = data;
 
 			users = userSubmissions.map((submission, index) => ({
@@ -452,9 +457,9 @@
 						bind:value={selectedMonth}
 						class="rounded-lg border border-gray-300 px-4 py-2 shadow-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 					>
-						<option value="2025-10">October 2025</option>
-						<option value="2025-09">September 2025</option>
-						<option value="2025-08">August 2025</option>
+						{#each monthOptions as month (month)}
+							<option value={month}>{month}</option>
+						{/each}
 					</select>
 
 					<button
