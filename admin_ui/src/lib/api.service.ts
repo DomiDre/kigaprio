@@ -2,12 +2,13 @@ import { authStore } from '$lib/auth.stores';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
 import type { WeekPriority } from '$lib/priorities.types';
+import { env } from '$env/dynamic/public';
 
 export class ApiService {
 	public baseUrl: string;
 
 	constructor() {
-		this.baseUrl = import.meta.env.BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:8000/api/v1' : 'http://backend:8000');
+		this.baseUrl = import.meta.env.DEV ? 'http://localhost:8000/api/v1' : env.PUBLIC_BACKEND_URL || '/api/v1';
 	}
 
 	async healthCheck(): Promise<boolean> {
