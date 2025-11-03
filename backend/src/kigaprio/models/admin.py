@@ -29,6 +29,13 @@ class MonthStatsResponse(BaseModel):
     weeklyCompletion: list[dict[str, Any]]
 
 
+class ManualPriorityRecordForAdmin(BaseModel):
+    adminWrappedDek: str
+    identifier: str
+    month: str
+    prioritiesEncryptedFields: str
+
+
 class UserPriorityRecordForAdmin(BaseModel):
     adminWrappedDek: str
     userName: str
@@ -55,4 +62,3 @@ class ManualPriorityRequest(BaseModel):
     identifier: str  # participant number, initials, etc.
     month: str  # YYYY-MM format
     weeks: list[WeekPriority]
-

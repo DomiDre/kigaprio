@@ -5,6 +5,7 @@ import redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from kigaprio.models.admin import (
+    ManualPriorityRecordForAdmin,
     ManualPriorityRequest,
     UpdateMagicWordRequest,
     UserPriorityRecordForAdmin,
@@ -110,7 +111,7 @@ async def get_user_submissions(
         priorities_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f"month='{month}'",
+                "filter": f"manual = false && month='{month}' && identifier = null",
                 "perPage": 500,
             },
             headers={"Authorization": f"Bearer {token}"},
@@ -234,7 +235,7 @@ async def get_user_for_admin(
 async def create_manual_priority(
     request: ManualPriorityRequest,
     token: str = Depends(get_current_token),
-    _: SessionInfo = Depends(require_admin),
+    auth_data: SessionInfo = Depends(require_admin),
     dek: bytes = Depends(get_current_dek),  # Admin's DEK for encryption
 ):
     """
@@ -316,10 +317,11 @@ async def create_manual_priority(
 
         # Create priority record
         priority_data = {
-            "userId": None,
+            "userId": auth_data.id,
             "month": request.month,
             "identifier": uuid.uuid4().hex,
             "encrypted_fields": encrypted_data,
+            "manual": True,
         }
 
         if existing_id:
@@ -371,7 +373,7 @@ async def get_manual_entries(
         response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f'userId = null && month="{month}" && identifier!=null',
+                "filter": f'manual = true && month="{month}" && identifier!=null',
                 "perPage": 500,
             },
             headers={"Authorization": f"Bearer {token}"},
@@ -383,22 +385,66 @@ async def get_manual_entries(
                 detail="Fehler beim Abrufen der manuellen Einträge",
             )
 
-        items = response.json().get("items", [])
+        priorities_data = response.json().get("items", [])
 
-        # Return list of manual entries with identifier
-        manual_entries = []
-        for item in items:
-            manual_entries.append(
-                {
-                    "identifier": item.get("identifier"),
-                    "month": item.get("month"),
-                    "encrypted_fields": item.get("encrypted_fields"),
-                    "created": item.get("created"),
-                    "updated": item.get("updated"),
-                }
+        if not priorities_data:
+            # No submissions for this month
+            return []
+
+        # Get unique user IDs from priorities
+        user_ids = list(
+            {
+                p["userId"]
+                for p in priorities_data
+                if ("userId" in p and p["userId"] != "")
+            }
+        )
+
+        if not user_ids:
+            return []
+
+        # Fetch only the users who have submissions
+        # Build filter for multiple user IDs: id="id1" || id="id2" || ...
+        user_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+        users_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/users/records",
+            params={"filter": user_filter, "perPage": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if users_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen der Benutzer"
             )
 
-        return manual_entries
+        users_data = users_response.json().get("items", [])
+
+        # Create lookup dict for users
+        users_by_id: dict[str, UsersResponse] = {
+            user["id"]: UsersResponse(**user) for user in users_data
+        }
+
+        # Build user submission list
+        manual_submissions = []
+        for priority_data in priorities_data:
+            priority = PriorityRecord(**priority_data)
+            user_id = priority.userId
+
+            if user_id not in users_by_id:
+                # User not found (shouldn't happen, but handle gracefully)
+                continue
+
+            user = users_by_id[user_id]
+            manual_submissions.append(
+                ManualPriorityRecordForAdmin(
+                    adminWrappedDek=user.admin_wrapped_dek,
+                    identifier=priority.identifier,
+                    month=priority.month,
+                    prioritiesEncryptedFields=priority.encrypted_fields,
+                )
+            )
+
+        return manual_submissions
 
 
 @router.delete("/manual-entry/{month}/{identifier}")

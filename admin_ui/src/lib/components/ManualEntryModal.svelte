@@ -121,15 +121,15 @@
 			<div class="priorities-grid">
 				<div class="grid-header">
 					<div class="week-label">Woche</div>
-					{#each days as day}
+					{#each days as day, i (i)}
 						<div class="day-label">{dayLabels[day]}</div>
 					{/each}
 				</div>
 
-				{#each weeks as week, weekIndex}
+				{#each weeks as week, weekIndex (weekIndex)}
 					<div class="grid-row">
 						<div class="week-number">KW {week.weekNumber}</div>
-						{#each days as day}
+						{#each days as day, i (i)}
 							<div class="priority-cell">
 								<input
 									type="number"

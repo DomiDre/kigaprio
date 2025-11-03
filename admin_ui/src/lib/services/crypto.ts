@@ -242,59 +242,95 @@ export class CryptoService {
 	}
 
 	/**
-	 * Decrypts complete user data including metadata and priority records.
+	 * Decrypts user data and/or priority records.
 	 *
-	 * This high-level method orchestrates the full decryption process:
-	 * 1. Decrypt the RSA-wrapped DEK
-	 * 2. Decrypt user fields (name, email, etc.)
-	 * 3. Decrypt priority data (weekly schedules)
+	 * This high-level method orchestrates the decryption process:
+	 * 1. Decrypt the DEK (either from RSA-wrapped DEK or use provided DEK)
+	 * 2. Decrypt user fields if provided (name, email, etc.)
+	 * 3. Decrypt priority data if provided (weekly schedules)
 	 *
 	 * All operations are performed client-side; the server does not see decrypted data.
 	 *
-	 * @param adminWrappedDek - Base64-encoded RSA-encrypted DEK
-	 * @param userEncryptedFields - Base64-encoded AES-encrypted user information
-	 * @param prioritiesEncryptedFields - Base64-encoded AES-encrypted priority data
-	 * @returns Object containing decrypted user data and priorities
-	 * @throws {Error} If any decryption step fails
+	 * @param options - Decryption options object
+	 * @param options.adminWrappedDek - Base64-encoded RSA-encrypted DEK (required if dek not provided)
+	 * @param options.dek - Pre-decrypted DEK as Uint8Array (required if adminWrappedDek not provided)
+	 * @param options.userEncryptedFields - Base64-encoded AES-encrypted user information (optional)
+	 * @param options.prioritiesEncryptedFields - Base64-encoded AES-encrypted priority data (optional)
+	 * @returns Object containing decrypted user data and/or priorities
+	 * @throws {Error} If any decryption step fails or if neither adminWrappedDek nor dek provided
 	 *
 	 * @example
-	 * ```typescript
-	 * const { userData, priorities } = await cryptoService.decryptUserData(
-	 *   user.adminWrappedDek,
-	 *   user.userEncryptedFields,
-	 *   user.prioritiesEncryptedFields
-	 * );
+	 * // Regular user with RSA-wrapped DEK
+	 * const { userData, priorities } = await cryptoService.decryptUserData({
+	 *   adminWrappedDek: user.adminWrappedDek,
+	 *   userEncryptedFields: user.userEncryptedFields,
+	 *   prioritiesEncryptedFields: user.prioritiesEncryptedFields
+	 * });
 	 *
-	 * console.log(userData.name);
-	 * console.log(priorities.weeks[0].monday);
-	 * ```
+	 * @example
+	 * // Manual entry with priorities only
+	 * const { priorities } = await cryptoService.decryptUserData({
+	 *   adminWrappedDek: adminWrappedDek,
+	 *   prioritiesEncryptedFields: manualEntry.encrypted_fields
+	 * });
+	 *
+	 * @example
+	 * // With pre-decrypted DEK (e.g., from WebAuthn session)
+	 * const { userData, priorities } = await cryptoService.decryptUserData({
+	 *   dek: sessionDek,
+	 *   prioritiesEncryptedFields: entry.encrypted_fields
+	 * });
 	 */
-	async decryptUserData(
-		adminWrappedDek: string,
-		userEncryptedFields: string,
-		prioritiesEncryptedFields: string
-	): Promise<{
-		userData: DecryptedUserData;
-		priorities: DecryptedPriorities;
+	async decryptUserData(options: {
+		adminWrappedDek?: string;
+		dek?: Uint8Array<ArrayBuffer>;
+		userEncryptedFields?: string;
+		prioritiesEncryptedFields?: string;
+	}): Promise<{
+		userData?: DecryptedUserData;
+		priorities?: DecryptedPriorities;
 	}> {
-		// Step 1: Decrypt the DEK using RSA private key
-		const dek = await this.decryptDEK(adminWrappedDek);
+		const {
+			adminWrappedDek,
+			dek: providedDek,
+			userEncryptedFields,
+			prioritiesEncryptedFields
+		} = options;
 
-		// Step 2: Decrypt user fields using the DEK
-		const userData = (await this.decryptFields(userEncryptedFields, dek)) as DecryptedUserData;
+		// Validate inputs
+		if (!adminWrappedDek && !providedDek) {
+			throw new Error('Either adminWrappedDek or dek must be provided');
+		}
 
-		// Step 3: Decrypt priorities using the DEK
-		const priorities = (await this.decryptFields(
-			prioritiesEncryptedFields,
-			dek
-		)) as DecryptedPriorities;
+		if (!userEncryptedFields && !prioritiesEncryptedFields) {
+			throw new Error(
+				'At least one of userEncryptedFields or prioritiesEncryptedFields must be provided'
+			);
+		}
+
+		// Step 1: Get the DEK (either decrypt from RSA or use provided)
+		const dek = providedDek ?? (await this.decryptDEK(adminWrappedDek!));
+
+		// Step 2: Decrypt user fields if provided
+		let userData: DecryptedUserData | undefined;
+		if (userEncryptedFields) {
+			userData = (await this.decryptFields(userEncryptedFields, dek)) as DecryptedUserData;
+		}
+
+		// Step 3: Decrypt priorities if provided
+		let priorities: DecryptedPriorities | undefined;
+		if (prioritiesEncryptedFields) {
+			priorities = (await this.decryptFields(
+				prioritiesEncryptedFields,
+				dek
+			)) as DecryptedPriorities;
+		}
 
 		return {
 			userData,
 			priorities
 		};
 	}
-
 	/**
 	 * Clears the loaded private key from memory.
 	 *

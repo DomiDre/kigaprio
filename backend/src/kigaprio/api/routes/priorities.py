@@ -226,12 +226,13 @@ async def save_priority(
                     detail="VerschlÃ¼sselung der Daten fehlgeschlagen",
                 ) from e
 
-            # Create encrypted record (identifier remains null for regular users)
+            # Create encrypted record
             encrypted_priority = {
                 "userId": user_id,
                 "month": month,
                 "encrypted_fields": encrypted_data,
-                "identifier": None,  # Regular users always have identifier=null
+                "identifier": None,
+                "manual": False,
             }
 
             track_priority_submission(month)

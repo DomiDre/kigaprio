@@ -13,7 +13,7 @@
 	import ManualEntryModal from '$lib/components/ManualEntryModal.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
-	import type { DecryptedData, UserDisplay, UserPriorityRecord } from '$lib/types/dashboard';
+	import type { DecryptedData, UserDisplay } from '$lib/types/dashboard';
 	import { dayKeys } from '$lib/config/priorities';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { WeekPriority } from '$lib/types/priorities';
@@ -46,10 +46,9 @@
 	let isDecryptingAll = $state(false);
 	let showDecryptedModal = $state(false);
 	let decryptedData = $state<DecryptedData | null>(null);
-	let decryptedUsers = $state(new SvelteMap<string, DecryptedData>());
+	let decryptedUsers = new SvelteMap<string, DecryptedData>();
 
 	// Data
-	let userSubmissions = $state<UserPriorityRecord[]>([]);
 	let users = $state<UserDisplay[]>([]);
 
 	// Passphrase state
@@ -119,7 +118,7 @@
 	// Watch for month changes using $effect
 	$effect(() => {
 		if (initialFetchDone && selectedMonth) {
-			decryptedUsers = new SvelteMap();
+			decryptedUsers.clear();
 			showOverview = false;
 			fetchUserSubmissions();
 		}
@@ -132,19 +131,40 @@
 
 		try {
 			const apiMonth = formatMonthForAPI(selectedMonth);
-			const data = await apiService.getUserSubmissions(apiMonth);
-			userSubmissions = data;
+			const [userSubmissions, manualEntriesData] = await Promise.all([
+				apiService.getUserSubmissions(apiMonth),
+				apiService.getManualSubmissions(apiMonth)
+			]);
 
-			users = userSubmissions.map((submission, index) => ({
+			// Transform regular user submissions into display format
+			const regularUsers = userSubmissions.map((submission: any, index: number) => ({
 				id: index + 1,
 				name: submission.userName,
 				submitted: true,
 				encrypted: true,
 				hasData: !!submission.prioritiesEncryptedFields,
+				isManual: false,
 				adminWrappedDek: submission.adminWrappedDek,
 				userEncryptedFields: submission.userEncryptedFields,
 				prioritiesEncryptedFields: submission.prioritiesEncryptedFields
 			}));
+
+			// Transform manual entries into display format
+			const manualUsers = manualEntriesData.map((entry: any, index: number) => ({
+				id: regularUsers.length + index + 1,
+				name: `Manual: ${entry.identifier.substring(0, 8)}`,
+				submitted: true,
+				encrypted: true,
+				hasData: !!entry.prioritiesEncryptedFields,
+				isManual: true,
+				identifier: entry.identifier,
+				adminWrappedDek: entry.adminWrappedDek,
+				userEncryptedFields: null,
+				prioritiesEncryptedFields: entry.prioritiesEncryptedFields
+			}));
+
+			// Combine both types
+			users = [...regularUsers, ...manualUsers];
 
 			if (keyUploaded) {
 				await decryptAllUsers();
@@ -164,33 +184,58 @@
 		isDecryptingAll = true;
 		decryptionError = '';
 
-		const newDecryptedUsers = new SvelteMap<string, DecryptedData>();
+		decryptedUsers.clear();
 
 		try {
 			for (const user of users) {
-				if (user.adminWrappedDek && user.userEncryptedFields && user.prioritiesEncryptedFields) {
+				// Use the appropriate service based on auth mode
+				const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
+
+				// Handle regular user submissions
+				if (
+					!user.isManual &&
+					user.adminWrappedDek &&
+					user.userEncryptedFields &&
+					user.prioritiesEncryptedFields
+				) {
 					try {
-						// Use the appropriate service based on auth mode
-						const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
+						const result = await service.decryptUserData({
+							adminWrappedDek: user.adminWrappedDek,
+							userEncryptedFields: user.userEncryptedFields,
+							prioritiesEncryptedFields: user.prioritiesEncryptedFields
+						});
 
-						const result = await service.decryptUserData(
-							user.adminWrappedDek,
-							user.userEncryptedFields,
-							user.prioritiesEncryptedFields
-						);
-
-						newDecryptedUsers.set(user.name, {
-							userName: result.userData.name || user.name,
-							userData: result.userData,
-							priorities: result.priorities
+						decryptedUsers.set(user.name, {
+							userName: result.userData?.name || user.name,
+							userData: result.userData!,
+							priorities: result.priorities!
 						});
 					} catch (err) {
 						console.error(`Failed to decrypt data for ${user.name}:`, err);
 					}
 				}
+				// Handle manual entries (no userEncryptedFields, username in priorities.name)
+				else if (user.isManual && user.adminWrappedDek && user.prioritiesEncryptedFields) {
+					try {
+						const result = await service.decryptUserData({
+							adminWrappedDek: user.adminWrappedDek,
+							prioritiesEncryptedFields: user.prioritiesEncryptedFields
+						});
+
+						// Extract username from priorities.name
+						const userName = (result.priorities as any)?.name || user.identifier || user.name;
+
+						decryptedUsers.set(user.name, {
+							userName: userName,
+							userData: { name: userName }, // Create minimal userData object
+							priorities: result.priorities!
+						});
+					} catch (err) {
+						console.error(`Failed to decrypt manual entry ${user.name}:`, err);
+					}
+				}
 			}
 
-			decryptedUsers = newDecryptedUsers;
 			showOverview = true;
 		} catch (err) {
 			console.error('Error during batch decryption:', err);
@@ -199,7 +244,6 @@
 			isDecryptingAll = false;
 		}
 	}
-
 	// Get decrypted name for display
 	function getDisplayName(userName: string): string {
 		const decrypted = decryptedUsers.get(userName);
@@ -290,7 +334,7 @@
 		cryptoService.clearKey();
 		webAuthnCryptoService.clearKey();
 		decryptionError = '';
-		decryptedUsers = new SvelteMap();
+		decryptedUsers.clear();
 		showOverview = false;
 	}
 
@@ -344,23 +388,22 @@
 			// Use the appropriate service based on auth mode
 			const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
 
-			const result = await service.decryptUserData(
-				user.adminWrappedDek,
-				user.userEncryptedFields,
-				user.prioritiesEncryptedFields
-			);
+			const result = await service.decryptUserData({
+				adminWrappedDek: user.adminWrappedDek,
+				userEncryptedFields: user.userEncryptedFields,
+				prioritiesEncryptedFields: user.prioritiesEncryptedFields
+			});
 
 			decryptedUsers.set(user.name, {
-				userName: result.userData.name || user.name,
-				userData: result.userData,
-				priorities: result.priorities
+				userName: result.userData?.name || user.name,
+				userData: result.userData!,
+				priorities: result.priorities!
 			});
-			decryptedUsers = decryptedUsers;
 
 			decryptedData = {
-				userName: result.userData.name || user.name,
-				userData: result.userData,
-				priorities: result.priorities
+				userName: result.userData?.name || user.name,
+				userData: result.userData!,
+				priorities: result.priorities!
 			};
 			showDecryptedModal = true;
 		} catch (err) {
@@ -382,10 +425,6 @@
 
 	function openManualEntry() {
 		showManualEntry = true;
-	}
-
-	function closeManualEntry() {
-		showManualEntry = false;
 	}
 
 	async function handleRefresh() {
@@ -431,7 +470,7 @@
 
 			// Optional: Refresh the data if you're showing it in the dashboard
 			// await refreshData();
-		} catch (err) {
+		} catch {
 			// manualEntryError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
 		} finally {
 			// isSubmittingManual = false;

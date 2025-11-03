@@ -154,7 +154,6 @@ export class ApiService {
 	}
 
 	async submitManualPriority(identifier: string, month: string, weeks: WeekPriority[]) {
-
 		return this.requestJson('/admin/manual-priority', {
 			method: 'POST',
 			body: JSON.stringify({

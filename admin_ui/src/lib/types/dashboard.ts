@@ -22,6 +22,8 @@ export interface UserDisplay {
 	submitted: boolean;
 	encrypted: boolean;
 	hasData: boolean;
+	isManual: boolean;
+	identifier?: string;
 	adminWrappedDek?: string;
 	userEncryptedFields?: string;
 	prioritiesEncryptedFields?: string;

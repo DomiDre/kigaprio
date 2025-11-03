@@ -29,12 +29,13 @@ try:
     response_body = pb_response.json()
     token = response_body["token"]
 
-    success = asyncio.run(create_or_update_magic_word(
-        initial_magic_word, token, redis_client, superuser_login
-    ))
+    success = asyncio.run(
+        create_or_update_magic_word(
+            initial_magic_word, token, redis_client, superuser_login
+        )
+    )
 except Exception:
     sys.exit("Failed to login as superuser")
-
 
 
 try:
@@ -51,4 +52,3 @@ try:
 
 except Exception:
     sys.exit("Failed to setup service account")
-

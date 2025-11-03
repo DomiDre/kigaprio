@@ -374,22 +374,51 @@ export class WebAuthnCryptoService {
 	/**
 	 * Decrypt complete user data
 	 */
-	async decryptUserData(
-		adminWrappedDek: string,
-		userEncryptedFields: string,
-		prioritiesEncryptedFields: string
-	): Promise<{
-		userData: DecryptedUserData;
-		priorities: DecryptedPriorities;
+	async decryptUserData(options: {
+		adminWrappedDek?: string;
+		dek?: Uint8Array<ArrayBuffer>;
+		userEncryptedFields?: string;
+		prioritiesEncryptedFields?: string;
+	}): Promise<{
+		userData?: DecryptedUserData;
+		priorities?: DecryptedPriorities;
 	}> {
-		const dek = await this.decryptDEK(adminWrappedDek);
-		const userData = (await this.decryptFields(userEncryptedFields, dek)) as DecryptedUserData;
-		const priorities = (await this.decryptFields(
-			prioritiesEncryptedFields,
-			dek
-		)) as DecryptedPriorities;
+		const {
+			adminWrappedDek,
+			dek: providedDek,
+			userEncryptedFields,
+			prioritiesEncryptedFields
+		} = options;
 
-		return { userData, priorities };
+		// Validate inputs
+		if (!adminWrappedDek && !providedDek) {
+			throw new Error('Either adminWrappedDek or dek must be provided');
+		}
+
+		if (!userEncryptedFields && !prioritiesEncryptedFields) {
+			throw new Error(
+				'At least one of userEncryptedFields or prioritiesEncryptedFields must be provided'
+			);
+		}
+		const dek = providedDek ?? (await this.decryptDEK(adminWrappedDek!));
+		let userData: DecryptedUserData | undefined;
+		if (userEncryptedFields) {
+			userData = (await this.decryptFields(userEncryptedFields, dek)) as DecryptedUserData;
+		}
+
+		// Step 3: Decrypt priorities if provided
+		let priorities: DecryptedPriorities | undefined;
+		if (prioritiesEncryptedFields) {
+			priorities = (await this.decryptFields(
+				prioritiesEncryptedFields,
+				dek
+			)) as DecryptedPriorities;
+		}
+
+		return {
+			userData,
+			priorities
+		};
 	}
 
 	/**
