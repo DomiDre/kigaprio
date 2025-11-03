@@ -18,7 +18,7 @@
  * - Physical YubiKey required for access
  * - IT-friendly (no admin rights needed)
  */
-import type { DecryptedPriorities, DecryptedUserData } from '$lib/types/dashboard';
+import type { DecryptedPriorities, DecryptedUserData } from '$lib/dashboard.types';
 import forge from 'node-forge';
 
 const RP_ID = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
@@ -221,7 +221,7 @@ export class WebAuthnCryptoService {
 	 * Derive encryption key from WebAuthn credential
 	 * Uses HKDF with credential ID as input key material
 	 */
-	private async deriveKeyFromCredential(credentialId: Uint8Array): Promise<CryptoKey> {
+	private async deriveKeyFromCredential(credentialId: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
 		// Import credential ID as base key
 		const baseKey = await crypto.subtle.importKey('raw', credentialId, 'HKDF', false, [
 			'deriveKey'
@@ -312,7 +312,7 @@ export class WebAuthnCryptoService {
 	/**
 	 * Decrypt a DEK using the loaded private key
 	 */
-	async decryptDEK(adminWrappedDek: string): Promise<Uint8Array> {
+	async decryptDEK(adminWrappedDek: string): Promise<Uint8Array<ArrayBuffer>> {
 		if (!this.forgePrivateKey) {
 			throw new Error('Not authenticated. Please authenticate with YubiKey first.');
 		}
@@ -336,7 +336,7 @@ export class WebAuthnCryptoService {
 	/**
 	 * Decrypt data encrypted with AES-256-GCM
 	 */
-	async decryptData(encryptedData: string, dek: Uint8Array): Promise<string> {
+	async decryptData(encryptedData: string, dek: Uint8Array<ArrayBuffer>): Promise<string> {
 		try {
 			const encrypted = Uint8Array.from(atob(encryptedData), (c) => c.charCodeAt(0));
 			const nonce = encrypted.slice(0, 12);
@@ -366,7 +366,7 @@ export class WebAuthnCryptoService {
 	/**
 	 * Decrypt JSON fields
 	 */
-	async decryptFields(encryptedJson: string, dek: Uint8Array): Promise<unknown> {
+	async decryptFields(encryptedJson: string, dek: Uint8Array<ArrayBuffer>): Promise<unknown> {
 		const jsonString = await this.decryptData(encryptedJson, dek);
 		return JSON.parse(jsonString);
 	}

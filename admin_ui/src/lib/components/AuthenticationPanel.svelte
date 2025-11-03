@@ -6,7 +6,7 @@
 	import Fingerprint from 'virtual:icons/mdi/fingerprint';
 	import SecurityIcon from 'virtual:icons/mdi/security';
 	import Alert from 'virtual:icons/mdi/alert';
-	import { webAuthnCryptoService } from '$lib/services/webauthn-crypto';
+	import { webAuthnCryptoService } from '$lib/webauthn-crypto.service';
 
 	interface Props {
 		keyUploaded: boolean;

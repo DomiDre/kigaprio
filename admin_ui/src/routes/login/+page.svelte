@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { authStore, isAuthenticated } from '$lib/stores/auth';
-	import { apiService } from '$lib/services/api';
+	import { authStore, isAuthenticated } from '$lib/auth.stores';
+	import { apiService } from '$lib/api.service';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
 

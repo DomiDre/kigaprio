@@ -3,8 +3,8 @@
 	import Account from 'virtual:icons/mdi/account';
 	import Calendar from 'virtual:icons/mdi/calendar';
 	import Information from 'virtual:icons/mdi/information';
-	import type { DecryptedPriorities, DecryptedUserData } from '$lib/types/dashboard';
-	import type { DayName } from '$lib/types/priorities';
+	import type { DecryptedPriorities, DecryptedUserData } from '$lib/dashboard.types';
+	import type { DayName } from '$lib/priorities.types';
 
 	interface Props {
 		userName: string;

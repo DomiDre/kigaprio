@@ -3,7 +3,7 @@
 	import CheckCircle from 'virtual:icons/mdi/check-circle';
 	import ClockOutline from 'virtual:icons/mdi/clock-outline';
 	import Lock from 'virtual:icons/mdi/lock';
-	import type { UserDisplay } from '$lib/types/dashboard';
+	import type { UserDisplay } from '$lib/dashboard.types';
 
 	interface Props {
 		filteredUsers: UserDisplay[];

@@ -17,7 +17,7 @@
  * - Data Encryption: AES-GCM with 12-byte nonces and 128-bit authentication tags
  * - Encoding: Base64 encoding of nonce + ciphertext
  */
-import type { DecryptedPriorities, DecryptedUserData } from '$lib/types/dashboard';
+import type { DecryptedPriorities, DecryptedUserData } from '$lib/dashboard.types';
 import forge from 'node-forge';
 
 /**

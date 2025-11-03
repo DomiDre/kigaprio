@@ -1,9 +1,9 @@
 <script lang="ts">
 	import ChevronDown from 'virtual:icons/mdi/chevron-down';
 	import ChevronUp from 'virtual:icons/mdi/chevron-up';
-	import { dayKeys, dayLabels, priorityColors } from '$lib/config/priorities';
+	import { dayKeys, dayLabels, priorityColors } from '$lib/priorities.config';
 	import type { SvelteMap } from 'svelte/reactivity';
-	import type { DecryptedData } from '$lib/types/dashboard';
+	import type { DecryptedData } from '$lib/dashboard.types';
 
 	interface Props {
 		showOverview: boolean;

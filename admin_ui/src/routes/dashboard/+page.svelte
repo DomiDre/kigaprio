@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import Refresh from 'virtual:icons/mdi/refresh';
-	import { apiService } from '$lib/services/api';
-	import { cryptoService } from '$lib/services/crypto';
-	import { webAuthnCryptoService } from '$lib/services/webauthn-crypto';
+	import { apiService } from '$lib/api.service';
+	import { cryptoService } from '$lib/crypto.service';
+	import { webAuthnCryptoService } from '$lib/webauthn-crypto.service';
 	import DecryptedDataModal from '$lib/components/DecryptedDataModal.svelte';
 	import StatsCards from '$lib/components/StatsCards.svelte';
 	import AuthenticationPanel from '$lib/components/AuthenticationPanel.svelte';
@@ -13,11 +13,11 @@
 	import ManualEntryModal from '$lib/components/ManualEntryModal.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
-	import type { DecryptedData, UserDisplay } from '$lib/types/dashboard';
-	import { dayKeys } from '$lib/config/priorities';
+	import type { DecryptedData, UserDisplay } from '$lib/dashboard.types';
+	import { dayKeys } from '$lib/priorities.config';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import type { WeekPriority } from '$lib/types/priorities';
-	import { formatMonthForAPI, getMonthOptions } from '$lib/utils/dateHelpers';
+	import type { WeekPriority } from '$lib/priorities.types';
+	import { formatMonthForAPI, getMonthOptions } from '$lib/dateHelpers.utils';
 
 	// Fetch data on mount
 	onMount(() => {

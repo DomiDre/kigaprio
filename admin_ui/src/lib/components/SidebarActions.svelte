@@ -2,7 +2,7 @@
 	import Plus from 'virtual:icons/mdi/plus';
 	import Download from 'virtual:icons/mdi/download';
 	import Lock from 'virtual:icons/mdi/lock';
-	import type { Stats } from '$lib/types/dashboard';
+	import type { Stats } from '$lib/dashboard.types';
 
 	interface Props {
 		keyUploaded: boolean;

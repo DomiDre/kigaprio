@@ -3,7 +3,7 @@
 	import CheckCircle from 'virtual:icons/mdi/check-circle';
 	import ClockOutline from 'virtual:icons/mdi/clock-outline';
 	import TrendingUp from 'virtual:icons/mdi/trending-up';
-	import type { Stats } from '$lib/types/dashboard';
+	import type { Stats } from '$lib/dashboard.types';
 
 	interface Props {
 		stats: Stats;

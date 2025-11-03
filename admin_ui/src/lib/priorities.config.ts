@@ -1,4 +1,4 @@
-import type { DayName } from '$lib/types/priorities.ts';
+import type { DayName } from '$lib/priorities.types';
 
 // Priority configuration with proper typing
 export const priorityColors: Record<1 | 2 | 3 | 4 | 5, string> = {
