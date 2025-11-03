@@ -14,6 +14,7 @@ services:
       - DEBUG=false
       - REDIS_URL=redis://redis:6379
       - POCKETBASE_URL=http://pocketbase:8090
+      - CORS_ORIGINS=https://admin.kiga.dhjd.de,https://kiga.dhjd.de
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kigaprio-backend.rule=Host(`kiga.dhjd.de`)"
@@ -132,6 +133,7 @@ services:
     image: kigaprio-admin
     environment:
       - NODE_ENV=production
+      - PUBLIC_BACKEND_URL=https://kiga.dhjd.de
     expose:
       - 3000
     depends_on:
