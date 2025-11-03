@@ -446,20 +446,20 @@
 
 	// Add handler function:
 	async function handleManualSubmit(
-		event: CustomEvent<{
+		data: {
 			identifier: string;
 			month: string;
 			weeks: WeekPriority[];
-		}>
+		}
 	) {
 		// isSubmittingManual = true;
 		// manualEntryError = '';
 
 		try {
 			const result = await apiService.submitManualPriority(
-				event.detail.identifier,
-				event.detail.month,
-				event.detail.weeks
+				data.identifier,
+				data.month,
+				data.weeks
 			);
 
 			// Show success message
@@ -630,10 +630,10 @@
 
 {#if showManualEntry}
 	<ManualEntryModal
-		on:close={() => {
+		onClose={() => {
 			showManualEntry = false;
 			// manualEntryError = '';
 		}}
-		on:submit={handleManualSubmit}
+		onSubmit={handleManualSubmit}
 	/>
 {/if}

@@ -1,24 +1,37 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-	import type { Priority } from './priorities';
-	import type { WeekPriority } from './dashboard';
+	import Close from 'virtual:icons/mdi/close';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 
-	const dispatch = createEventDispatcher<{
-		close: void;
-		submit: { identifier: string; month: string; weeks: WeekPriority[] };
-	}>();
+	type Priority = 1 | 2 | 3 | 4 | 5 | null;
 
-	let identifier = '';
-	let month = '';
-	let error = '';
+	interface WeekPriority {
+		weekNumber: number;
+		monday: Priority;
+		tuesday: Priority;
+		wednesday: Priority;
+		thursday: Priority;
+		friday: Priority;
+	}
+
+	interface Props {
+		onClose: () => void;
+		onSubmit: (data: { identifier: string; month: string; weeks: WeekPriority[] }) => void;
+	}
+
+	let { onClose, onSubmit }: Props = $props();
+
+	let identifier = $state('');
+	let month = $state('');
+	let error = $state('');
 
 	// Initialize 4 weeks of priorities
-	let weeks: WeekPriority[] = [
+	let weeks = $state<WeekPriority[]>([
 		{ weekNumber: 1, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null },
 		{ weekNumber: 2, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null },
 		{ weekNumber: 3, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null },
 		{ weekNumber: 4, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null }
-	];
+	]);
 
 	const days: Array<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'> = [
 		'monday',
@@ -36,6 +49,50 @@
 		friday: 'Fr'
 	};
 
+	// Set default month to current month
+	const now = new Date();
+	month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+	// Store references to all input elements for auto-focus
+	let inputRefs: Map<string, HTMLInputElement> = new Map();
+
+	function getInputKey(weekIndex: number, dayIndex: number): string {
+		return `${weekIndex}-${dayIndex}`;
+	}
+
+	// Custom action to register input refs
+	function registerInput(node: HTMLInputElement, key: string) {
+		inputRefs.set(key, node);
+		return {
+			destroy() {
+				inputRefs.delete(key);
+			}
+		};
+	}
+
+	function focusNextInput(weekIndex: number, dayIndex: number) {
+		// Calculate next input position
+		let nextWeekIndex = weekIndex;
+		let nextDayIndex = dayIndex + 1;
+
+		// Move to next week if we're at the last day
+		if (nextDayIndex >= days.length) {
+			nextWeekIndex++;
+			nextDayIndex = 0;
+		}
+
+		// Focus next input if it exists
+		if (nextWeekIndex < weeks.length) {
+			const nextKey = getInputKey(nextWeekIndex, nextDayIndex);
+			const nextInput = inputRefs.get(nextKey);
+			if (nextInput) {
+				nextInput.focus();
+				// Select the content if there is any
+				nextInput.select();
+			}
+		}
+	}
+
 	function validatePriority(value: string): Priority {
 		if (value === '' || value === null) return null;
 		const num = parseInt(value, 10);
@@ -43,13 +100,61 @@
 		return null;
 	}
 
+	// Get which day uses a specific priority in a week
+	function getDayUsingPriority(
+		weekIndex: number,
+		priority: Priority
+	): 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | null {
+		if (priority === null) return null;
+		const week = weeks[weekIndex];
+		return days.find((day) => week[day] === priority) || null;
+	}
+
 	function handlePriorityInput(
 		weekIndex: number,
 		day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday',
+		dayIndex: number,
 		event: Event
 	) {
 		const target = event.target as HTMLInputElement;
-		weeks[weekIndex][day] = validatePriority(target.value);
+		const newPriority = validatePriority(target.value);
+
+		if (newPriority === null) {
+			weeks[weekIndex][day] = null;
+			error = '';
+			return;
+		}
+
+		// Check if this priority is already used in the same week
+		const dayUsingPriority = getDayUsingPriority(weekIndex, newPriority);
+
+		if (dayUsingPriority && dayUsingPriority !== day) {
+			error = `Priorität ${newPriority} wird bereits für ${dayLabels[dayUsingPriority]} verwendet. Jede Priorität kann nur einmal pro Woche vergeben werden.`;
+			target.value = weeks[weekIndex][day]?.toString() ?? '';
+			return;
+		}
+
+		weeks[weekIndex][day] = newPriority;
+		error = '';
+
+		// Auto-focus next input
+		focusNextInput(weekIndex, dayIndex);
+	}
+
+	function validateWeeks(): boolean {
+		// Check each week for duplicate priorities
+		for (let i = 0; i < weeks.length; i++) {
+			const week = weeks[i];
+			const priorities = days.map((day) => week[day]).filter((p) => p !== null);
+
+			// Check for duplicates
+			const uniquePriorities = new Set(priorities);
+			if (priorities.length !== uniquePriorities.size) {
+				error = `Woche ${i + 1}: Jede Priorität darf nur einmal pro Woche vergeben werden`;
+				return false;
+			}
+		}
+		return true;
 	}
 
 	function handleSubmit() {
@@ -78,67 +183,134 @@
 			return;
 		}
 
-		dispatch('submit', { identifier, month, weeks });
+		// Validate no duplicate priorities per week
+		if (!validateWeeks()) {
+			return;
+		}
+		console.log(identifier, month, weeks);
+
+		onSubmit({ identifier, month, weeks });
 	}
 
-	// Set default month to current month
-	const now = new Date();
-	month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			onClose();
+		}
+	}
+
+	function handleStopPropagation(event: Event) {
+		event.stopPropagation();
+	}
 </script>
 
-<div class="modal-backdrop" on:click={() => dispatch('close')} on:keydown={() => {}}>
-	<div class="modal-content" on:click|stopPropagation on:keydown={() => {}}>
-		<div class="modal-header">
-			<h2>Manuelle Prioritäten-Eingabe</h2>
-			<button class="close-btn" on:click={() => dispatch('close')}>&times;</button>
+<svelte:window on:keydown={handleKeydown} />
+
+<div
+	class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+	transition:fade={{ duration: 200 }}
+	onclick={onClose}
+	onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}
+	role="button"
+	tabindex="-1"
+>
+	<div
+		class="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-800"
+		transition:scale={{ duration: 300, easing: cubicOut, start: 0.9 }}
+		onclick={handleStopPropagation}
+		onkeydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				handleStopPropagation(e);
+			}
+		}}
+		role="dialog"
+		aria-modal="true"
+		tabindex="0"
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+			<h2 class="text-2xl font-bold text-gray-800 dark:text-white">
+				Manuelle Prioritäten-Eingabe
+			</h2>
+			<button
+				onclick={onClose}
+				class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+				aria-label="Schließen"
+			>
+				<Close class="h-6 w-6" />
+			</button>
 		</div>
 
-		<div class="modal-body">
-			<div class="form-section">
-				<div class="form-row">
-					<div class="form-group">
-						<label for="identifier">Kennung (z.B. Teilnehmernummer):</label>
+		<!-- Body -->
+		<div class="p-6">
+			<!-- Form Section -->
+			<div class="mb-6">
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div class="flex flex-col gap-2">
+						<label
+							for="identifier"
+							class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+						>
+							Kennung (z.B. Teilnehmernummer):
+						</label>
 						<input
 							id="identifier"
 							type="text"
 							bind:value={identifier}
 							placeholder="123 oder ABC"
-							class="form-input"
+							class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
 						/>
 					</div>
 
-					<div class="form-group">
-						<label for="month">Monat:</label>
-						<input id="month" type="month" bind:value={month} class="form-input" />
+					<div class="flex flex-col gap-2">
+						<label for="month" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+							Monat:
+						</label>
+						<input
+							id="month"
+							type="month"
+							bind:value={month}
+							class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+						/>
 					</div>
 				</div>
 
 				{#if error}
-					<div class="error-message">{error}</div>
+					<div
+						class="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200"
+						transition:scale={{ duration: 200 }}
+					>
+						{error}
+					</div>
 				{/if}
 			</div>
 
-			<div class="priorities-grid">
-				<div class="grid-header">
-					<div class="week-label">Woche</div>
-					{#each days as day, i (i)}
-						<div class="day-label">{dayLabels[day]}</div>
+			<!-- Priorities Grid -->
+			<div class="mb-4 rounded-xl bg-gray-50 p-4 dark:bg-gray-900/50">
+				<!-- Grid Header -->
+				<div class="mb-3 grid grid-cols-[80px_repeat(5,1fr)] gap-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-400">
+					<div>Woche</div>
+					{#each days as day (day)}
+						<div>{dayLabels[day]}</div>
 					{/each}
 				</div>
 
+				<!-- Grid Rows -->
 				{#each weeks as week, weekIndex (weekIndex)}
-					<div class="grid-row">
-						<div class="week-number">KW {week.weekNumber}</div>
-						{#each days as day, i (i)}
-							<div class="priority-cell">
+					<div class="mb-2 grid grid-cols-[80px_repeat(5,1fr)] items-center gap-2">
+						<div class="text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+							KW {week.weekNumber}
+						</div>
+						{#each days as day, dayIndex (day)}
+							<div class="flex justify-center">
 								<input
 									type="number"
 									min="1"
 									max="5"
 									value={week[day] ?? ''}
-									on:input={(e) => handlePriorityInput(weekIndex, day, e)}
+									oninput={(e) => handlePriorityInput(weekIndex, day, dayIndex, e)}
 									placeholder="-"
-									class="priority-input"
+									use:registerInput={getInputKey(weekIndex, dayIndex)}
+									class="w-full max-w-[60px] rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 transition-colors placeholder:text-gray-300 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-600 dark:focus:border-purple-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 								/>
 							</div>
 						{/each}
@@ -146,268 +318,27 @@
 				{/each}
 			</div>
 
-			<div class="help-text">
-				<strong>Hinweis:</strong> Geben Sie Prioritäten von 1-5 ein (1 = höchste Priorität). Leer lassen
-				= keine Angabe.
+			<!-- Help Text -->
+			<div class="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+				<strong>Hinweis:</strong> Geben Sie Prioritäten von 1-5 ein (1 = höchste Priorität). Jede
+				Priorität darf nur einmal pro Woche vergeben werden. Leer lassen = keine Angabe.
 			</div>
 		</div>
 
-		<div class="modal-footer">
-			<button class="btn btn-secondary" on:click={() => dispatch('close')}>Abbrechen</button>
-			<button class="btn btn-primary" on:click={handleSubmit}>Speichern</button>
+		<!-- Footer -->
+		<div class="flex justify-end gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
+			<button
+				onclick={onClose}
+				class="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+			>
+				Abbrechen
+			</button>
+			<button
+				onclick={handleSubmit}
+				class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+			>
+				Speichern
+			</button>
 		</div>
 	</div>
 </div>
-
-<style>
-	.modal-backdrop {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		background: rgba(0, 0, 0, 0.5);
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		z-index: 1000;
-	}
-
-	.modal-content {
-		background: white;
-		border-radius: 12px;
-		width: 90%;
-		max-width: 800px;
-		max-height: 90vh;
-		overflow-y: auto;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-	}
-
-	.modal-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 1.5rem;
-		border-bottom: 1px solid #e5e7eb;
-	}
-
-	.modal-header h2 {
-		margin: 0;
-		font-size: 1.5rem;
-		color: #1f2937;
-	}
-
-	.close-btn {
-		background: none;
-		border: none;
-		font-size: 2rem;
-		color: #6b7280;
-		cursor: pointer;
-		padding: 0;
-		width: 32px;
-		height: 32px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 4px;
-		transition: background-color 0.2s;
-	}
-
-	.close-btn:hover {
-		background-color: #f3f4f6;
-	}
-
-	.modal-body {
-		padding: 1.5rem;
-	}
-
-	.form-section {
-		margin-bottom: 2rem;
-	}
-
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	.form-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.form-group label {
-		font-weight: 600;
-		color: #374151;
-		font-size: 0.875rem;
-	}
-
-	.form-input {
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 1rem;
-	}
-
-	.form-input:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-
-	.error-message {
-		margin-top: 1rem;
-		padding: 0.75rem;
-		background-color: #fef2f2;
-		border: 1px solid #fecaca;
-		border-radius: 6px;
-		color: #991b1b;
-		font-size: 0.875rem;
-	}
-
-	.priorities-grid {
-		background: #f9fafb;
-		border-radius: 8px;
-		padding: 1rem;
-		margin-bottom: 1rem;
-	}
-
-	.grid-header {
-		display: grid;
-		grid-template-columns: 80px repeat(5, 1fr);
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
-		font-weight: 600;
-		color: #6b7280;
-		font-size: 0.875rem;
-	}
-
-	.week-label,
-	.day-label {
-		text-align: center;
-	}
-
-	.grid-row {
-		display: grid;
-		grid-template-columns: 80px repeat(5, 1fr);
-		gap: 0.5rem;
-		margin-bottom: 0.5rem;
-		align-items: center;
-	}
-
-	.week-number {
-		font-weight: 600;
-		color: #374151;
-		text-align: center;
-		font-size: 0.875rem;
-	}
-
-	.priority-cell {
-		display: flex;
-		justify-content: center;
-	}
-
-	.priority-input {
-		width: 100%;
-		max-width: 60px;
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		text-align: center;
-		font-size: 1rem;
-		font-weight: 600;
-	}
-
-	.priority-input:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-
-	.priority-input::placeholder {
-		color: #d1d5db;
-	}
-
-	/* Remove spinner buttons on number input */
-	.priority-input::-webkit-inner-spin-button,
-	.priority-input::-webkit-outer-spin-button {
-		-webkit-appearance: none;
-		margin: 0;
-	}
-
-	.priority-input[type='number'] {
-		-moz-appearance: textfield;
-	}
-
-	.help-text {
-		padding: 0.75rem;
-		background-color: #eff6ff;
-		border-radius: 6px;
-		color: #1e40af;
-		font-size: 0.875rem;
-	}
-
-	.modal-footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.75rem;
-		padding: 1.5rem;
-		border-top: 1px solid #e5e7eb;
-	}
-
-	.btn {
-		padding: 0.625rem 1.25rem;
-		border-radius: 6px;
-		font-weight: 600;
-		font-size: 0.875rem;
-		cursor: pointer;
-		border: none;
-		transition: all 0.2s;
-	}
-
-	.btn-secondary {
-		background-color: #f3f4f6;
-		color: #374151;
-	}
-
-	.btn-secondary:hover {
-		background-color: #e5e7eb;
-	}
-
-	.btn-primary {
-		background-color: #3b82f6;
-		color: white;
-	}
-
-	.btn-primary:hover {
-		background-color: #2563eb;
-	}
-
-	@media (max-width: 640px) {
-		.modal-content {
-			width: 95%;
-			max-height: 95vh;
-		}
-
-		.form-row {
-			grid-template-columns: 1fr;
-		}
-
-		.grid-header,
-		.grid-row {
-			grid-template-columns: 60px repeat(5, 1fr);
-			gap: 0.25rem;
-		}
-
-		.priority-input {
-			max-width: 50px;
-			padding: 0.375rem;
-			font-size: 0.875rem;
-		}
-
-		.modal-header h2 {
-			font-size: 1.25rem;
-		}
-	}
-</style>
