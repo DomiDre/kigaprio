@@ -17,9 +17,14 @@
 	interface Props {
 		onClose: () => void;
 		onSubmit: (data: { identifier: string; month: string; weeks: WeekPriority[] }) => void;
+		onSubmitAndContinue: (data: {
+			identifier: string;
+			month: string;
+			weeks: WeekPriority[];
+		}) => void;
 	}
 
-	let { onClose, onSubmit }: Props = $props();
+	let { onClose, onSubmit, onSubmitAndContinue }: Props = $props();
 
 	let identifier = $state('');
 	let month = $state('');
@@ -87,7 +92,6 @@
 			const nextInput = inputRefs.get(nextKey);
 			if (nextInput) {
 				nextInput.focus();
-				// Select the content if there is any
 				nextInput.select();
 			}
 		}
@@ -100,7 +104,6 @@
 		return null;
 	}
 
-	// Get which day uses a specific priority in a week
 	function getDayUsingPriority(
 		weekIndex: number,
 		priority: Priority
@@ -125,7 +128,6 @@
 			return;
 		}
 
-		// Check if this priority is already used in the same week
 		const dayUsingPriority = getDayUsingPriority(weekIndex, newPriority);
 
 		if (dayUsingPriority && dayUsingPriority !== day) {
@@ -136,19 +138,15 @@
 
 		weeks[weekIndex][day] = newPriority;
 		error = '';
-
-		// Auto-focus next input
 		focusNextInput(weekIndex, dayIndex);
 	}
 
 	function validateWeeks(): boolean {
-		// Check each week for duplicate priorities
 		for (let i = 0; i < weeks.length; i++) {
 			const week = weeks[i];
 			const priorities = days.map((day) => week[day]).filter((p) => p !== null);
-
-			// Check for duplicates
 			const uniquePriorities = new Set(priorities);
+
 			if (priorities.length !== uniquePriorities.size) {
 				error = `Woche ${i + 1}: Jede Priorität darf nur einmal pro Woche vergeben werden`;
 				return false;
@@ -157,39 +155,53 @@
 		return true;
 	}
 
-	function handleSubmit() {
+	function validateForm(): boolean {
 		error = '';
 
-		// Validate identifier
 		if (!identifier.trim()) {
 			error = 'Bitte geben Sie eine Kennung ein (z.B. Teilnehmernummer)';
-			return;
+			return false;
 		}
 
-		// Validate month format (YYYY-MM)
 		const monthRegex = /^\d{4}-\d{2}$/;
 		if (!monthRegex.test(month)) {
 			error = 'Bitte geben Sie einen gültigen Monat ein (Format: YYYY-MM)';
-			return;
+			return false;
 		}
 
-		// Check if at least one priority is set
 		const hasAnyPriority = weeks.some((week) =>
 			days.some((day) => week[day] !== null && week[day] !== undefined)
 		);
 
 		if (!hasAnyPriority) {
 			error = 'Bitte geben Sie mindestens eine Priorität ein';
-			return;
+			return false;
 		}
 
-		// Validate no duplicate priorities per week
-		if (!validateWeeks()) {
-			return;
-		}
-		console.log(identifier, month, weeks);
+		return validateWeeks();
+	}
 
+	function resetForm() {
+		identifier = '';
+		weeks = [
+			{ weekNumber: 1, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null },
+			{ weekNumber: 2, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null },
+			{ weekNumber: 3, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null },
+			{ weekNumber: 4, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null }
+		];
+		error = '';
+	}
+
+	function handleSubmit() {
+		if (!validateForm()) return;
 		onSubmit({ identifier, month, weeks });
+	}
+
+	function handleSubmitAndContinue() {
+		if (!validateForm()) return;
+		onSubmitAndContinue({ identifier, month, weeks });
+		resetForm();
+		setTimeout(() => document.getElementById('identifier')?.focus(), 100);
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -206,7 +218,7 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+	class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4"
 	transition:fade={{ duration: 200 }}
 	onclick={onClose}
 	onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}
@@ -227,10 +239,10 @@
 		tabindex="0"
 	>
 		<!-- Header -->
-		<div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
-			<h2 class="text-2xl font-bold text-gray-800 dark:text-white">
-				Manuelle Prioritäten-Eingabe
-			</h2>
+		<div
+			class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700"
+		>
+			<h2 class="text-2xl font-bold text-gray-800 dark:text-white">Manuelle Prioritäten-Eingabe</h2>
 			<button
 				onclick={onClose}
 				class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
@@ -244,34 +256,17 @@
 		<div class="p-6">
 			<!-- Form Section -->
 			<div class="mb-6">
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div class="flex flex-col gap-2">
-						<label
-							for="identifier"
-							class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-						>
-							Kennung (z.B. Teilnehmernummer):
-						</label>
-						<input
-							id="identifier"
-							type="text"
-							bind:value={identifier}
-							placeholder="123 oder ABC"
-							class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-						/>
-					</div>
-
-					<div class="flex flex-col gap-2">
-						<label for="month" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-							Monat:
-						</label>
-						<input
-							id="month"
-							type="month"
-							bind:value={month}
-							class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-						/>
-					</div>
+				<div class="flex flex-col gap-2">
+					<label for="identifier" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+						Kennung (z.B. Teilnehmernummer):
+					</label>
+					<input
+						id="identifier"
+						type="text"
+						bind:value={identifier}
+						placeholder="123 oder ABC"
+						class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+					/>
 				</div>
 
 				{#if error}
@@ -287,7 +282,9 @@
 			<!-- Priorities Grid -->
 			<div class="mb-4 rounded-xl bg-gray-50 p-4 dark:bg-gray-900/50">
 				<!-- Grid Header -->
-				<div class="mb-3 grid grid-cols-[80px_repeat(5,1fr)] gap-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-400">
+				<div
+					class="mb-3 grid grid-cols-[80px_repeat(5,1fr)] gap-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-400"
+				>
 					<div>Woche</div>
 					{#each days as day (day)}
 						<div>{dayLabels[day]}</div>
@@ -310,7 +307,7 @@
 									oninput={(e) => handlePriorityInput(weekIndex, day, dayIndex, e)}
 									placeholder="-"
 									use:registerInput={getInputKey(weekIndex, dayIndex)}
-									class="w-full max-w-[60px] rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 transition-colors placeholder:text-gray-300 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-600 dark:focus:border-purple-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+									class="w-full max-w-[60px] [appearance:textfield] rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 transition-colors placeholder:text-gray-300 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-600 dark:focus:border-purple-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 								/>
 							</div>
 						{/each}
@@ -319,26 +316,49 @@
 			</div>
 
 			<!-- Help Text -->
-			<div class="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-				<strong>Hinweis:</strong> Geben Sie Prioritäten von 1-5 ein (1 = höchste Priorität). Jede
-				Priorität darf nur einmal pro Woche vergeben werden. Leer lassen = keine Angabe.
+			<div
+				class="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-200"
+			>
+				<strong>Hinweis:</strong> Geben Sie Prioritäten von 1-5 ein (1 = höchste Priorität). Jede Priorität
+				darf nur einmal pro Woche vergeben werden. Leer lassen = keine Angabe.
+			</div>
+
+			<!-- Month input moved here for natural tab order -->
+			<div class="mt-4 flex flex-col gap-2">
+				<label for="month" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+					Monat:
+				</label>
+				<input
+					id="month"
+					type="month"
+					bind:value={month}
+					class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+				/>
 			</div>
 		</div>
 
 		<!-- Footer -->
-		<div class="flex justify-end gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
+		<div class="flex justify-between gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
 			<button
 				onclick={onClose}
 				class="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
 			>
 				Abbrechen
 			</button>
-			<button
-				onclick={handleSubmit}
-				class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-			>
-				Speichern
-			</button>
+			<div class="flex gap-3">
+				<button
+					onclick={handleSubmitAndContinue}
+					class="rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+				>
+					Speichern & Weiter
+				</button>
+				<button
+					onclick={handleSubmit}
+					class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+				>
+					Speichern
+				</button>
+			</div>
 		</div>
 	</div>
 </div>

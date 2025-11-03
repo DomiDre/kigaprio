@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { scale } from 'svelte/transition';
 	import Refresh from 'virtual:icons/mdi/refresh';
 	import { apiService } from '$lib/api.service';
 	import { cryptoService } from '$lib/crypto.service';
@@ -40,6 +41,8 @@
 	let decryptionError = $state('');
 	let showOverview = $state(false);
 	let authMode: 'file' | 'webauthn' | null = $state(null);
+	let showSuccessToast = $state(false);
+	let successMessage = $state('');
 
 	// Decryption state
 	let isDecrypting = $state(false);
@@ -444,36 +447,55 @@
 		}
 	}
 
-	// Add handler function:
-	async function handleManualSubmit(
-		data: {
-			identifier: string;
-			month: string;
-			weeks: WeekPriority[];
-		}
-	) {
-		// isSubmittingManual = true;
-		// manualEntryError = '';
-
+	async function handleManualSubmit(data: {
+		identifier: string;
+		month: string;
+		weeks: WeekPriority[];
+	}) {
 		try {
-			const result = await apiService.submitManualPriority(
-				data.identifier,
-				data.month,
-				data.weeks
-			);
+			const result = await apiService.submitManualPriority(data.identifier, data.month, data.weeks);
 
-			// Show success message
-			alert(`Erfolgreich gespeichert: ${result.message}`);
+			// Show success toast
+			successMessage = result.message || 'Erfolgreich gespeichert!';
+			showSuccessToast = true;
+
+			// Auto-dismiss after 3 seconds
+			setTimeout(() => {
+				showSuccessToast = false;
+			}, 3000);
 
 			// Close modal
 			showManualEntry = false;
 
-			// Optional: Refresh the data if you're showing it in the dashboard
-			// await refreshData();
-		} catch {
-			// manualEntryError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
-		} finally {
-			// isSubmittingManual = false;
+			// Refresh data to show new entry
+			await fetchUserSubmissions();
+		} catch (err) {
+			decryptionError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
+		}
+	}
+	async function handleManualSubmitAndContinue(data: {
+		identifier: string;
+		month: string;
+		weeks: WeekPriority[];
+	}) {
+		try {
+			const result = await apiService.submitManualPriority(data.identifier, data.month, data.weeks);
+
+			// Show success toast
+			successMessage = result.message || 'Erfolgreich gespeichert!';
+			showSuccessToast = true;
+
+			// Auto-dismiss after 3 seconds
+			setTimeout(() => {
+				showSuccessToast = false;
+			}, 3000);
+
+			// DON'T close modal - let user continue entering
+
+			// Refresh data to show new entry
+			await fetchUserSubmissions();
+		} catch (err) {
+			decryptionError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
 		}
 	}
 </script>
@@ -635,5 +657,19 @@
 			// manualEntryError = '';
 		}}
 		onSubmit={handleManualSubmit}
+		onSubmitAndContinue={handleManualSubmitAndContinue}
 	/>
+{/if}
+
+<!-- Success Toast Notification -->
+{#if showSuccessToast}
+	<div
+		class="fixed right-6 bottom-6 z-50 flex items-center gap-3 rounded-lg bg-green-600 px-6 py-4 text-white shadow-2xl dark:bg-green-500"
+		transition:scale={{ duration: 200, start: 0.8 }}
+	>
+		<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+		</svg>
+		<span class="font-medium">{successMessage}</span>
+	</div>
 {/if}
