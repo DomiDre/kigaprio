@@ -1,12 +1,12 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
-import { apiService } from '$lib/services/api';
+import { apiService } from '$lib/api.service';
 
 interface AuthState {
 	isAuthenticated: boolean;
 	userId?: string;
 	username?: string;
-	role?: string;
+	isAdmin?: boolean;
 }
 
 function createAuthStore() {
@@ -88,16 +88,22 @@ function createAuthStore() {
 
 			try {
 				const data = await apiService.verify();
+				if (!data['is_admin']) {
+					console.info('No access rights');
+					await authStore.clearAuth(false);
+					return false;
+				}
 
 				set({
 					isAuthenticated: true,
 					userId: data['user_id'],
-					username: data['username']
+					username: data['username'],
+					isAdmin: data['is_admin']
 				});
 				sessionStorage.setItem('was_authenticated', 'true');
 				return true;
-			} catch (error) {
-				console.error('Auth verification failed:', error);
+			} catch {
+				console.info('Auth verification failed - user is not logged in.');
 				// Don't call logout endpoint on failed verification (already logged out)
 				await authStore.clearAuth(false);
 				return false;
@@ -119,5 +125,5 @@ export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticat
 export const currentUser = derived(authStore, ($auth) => ({
 	userId: $auth.userId,
 	username: $auth.username,
-	role: $auth.role
+	isAdmin: $auth.isAdmin
 }));

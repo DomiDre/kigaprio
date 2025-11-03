@@ -40,7 +40,7 @@ async def get_user_priorities(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": f'userId = "{user_id}"',
+                    "filter": f'userId = "{user_id}" && identifier = null',
                     "sort": "-month",
                     "perPage": 100,  # Get all records
                 },
@@ -49,7 +49,7 @@ async def get_user_priorities(
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Fehler beim Abrufen der Prioritäten",
+                    detail="Fehler beim Abrufen der PrioritÃ¤ten",
                 )
 
             data = response.json()
@@ -105,20 +105,20 @@ async def get_priority(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                    "filter": f'userId = "{user_id}" && month = "{month}" && identifier = null',
                 },
             )
 
             if response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
-                    detail="Priorität nicht gefunden",
+                    detail="PrioritÃ¤t nicht gefunden",
                 )
 
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Fehler beim Abrufen der Priorität",
+                    detail="Fehler beim Abrufen der PrioritÃ¤t",
                 )
 
             items = response.json()["items"]
@@ -132,7 +132,7 @@ async def get_priority(
             if encrypted_record.userId != user_id:
                 raise HTTPException(
                     status_code=403,
-                    detail="Keine Berechtigung für diese Priorität",
+                    detail="Keine Berechtigung fÃ¼r diese PrioritÃ¤t",
                 )
 
             track_data_operation("read", "priorities")
@@ -196,12 +196,12 @@ async def save_priority(
 
     try:
         async with httpx.AsyncClient() as client:
-            # Check if record already exists for this month
+            # Check if record already exists for this month (for regular users, identifier is null)
             check_response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                    "filter": f'userId = "{user_id}" && month = "{month}" && identifier = null',
                 },
             )
 
@@ -223,7 +223,7 @@ async def save_priority(
                 track_encryption_error("encrypt")
                 raise HTTPException(
                     status_code=500,
-                    detail="Verschlüsselung der Daten fehlgeschlagen",
+                    detail="VerschlÃ¼sselung der Daten fehlgeschlagen",
                 ) from e
 
             # Create encrypted record
@@ -231,6 +231,8 @@ async def save_priority(
                 "userId": user_id,
                 "month": month,
                 "encrypted_fields": encrypted_data,
+                "identifier": None,
+                "manual": False,
             }
 
             track_priority_submission(month)
@@ -241,7 +243,7 @@ async def save_priority(
                     headers={"Authorization": f"Bearer {token}"},
                     json=encrypted_priority,
                 )
-                message = "Priorität gespeichert"
+                message = "PrioritÃ¤t gespeichert"
             else:
                 track_data_operation("create", "priorities")
                 response = await client.post(
@@ -249,7 +251,7 @@ async def save_priority(
                     headers={"Authorization": f"Bearer {token}"},
                     json=encrypted_priority,
                 )
-                message = "Priorität erstellt"
+                message = "PrioritÃ¤t erstellt"
 
             if response.status_code not in [200, 201]:
                 error_data = response.json()
@@ -283,37 +285,37 @@ async def delete_priority(
 
     try:
         async with httpx.AsyncClient() as client:
-            # Find record in database
+            # Find record in database (regular users have identifier=null)
             check_response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/priorities/records",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
-                    "filter": f'userId = "{user_id}" && month = "{month}"',
+                    "filter": f'userId = "{user_id}" && month = "{month}" && identifier = null',
                 },
             )
 
             if check_response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
-                    detail="Priorität nicht gefunden",
+                    detail="PrioritÃ¤t nicht gefunden",
                 )
 
             if check_response.status_code != 200:
                 raise HTTPException(
                     status_code=400,
-                    detail="Fehler bei dem Versuch die Priorität zu löschen.",
+                    detail="Fehler bei dem Versuch die PrioritÃ¤t zu lÃ¶schen.",
                 )
 
             items = check_response.json()["items"]
             if len(items) == 0:
                 raise HTTPException(
-                    status_code=400, detail="Priorität gefunden aber leer"
+                    status_code=400, detail="PrioritÃ¤t gefunden aber leer"
                 )
             record = items[0]
             if record["userId"] != user_id:
                 raise HTTPException(
                     status_code=403,
-                    detail="Keine Berechtigung für diese Priorität",
+                    detail="Keine Berechtigung fÃ¼r diese PrioritÃ¤t",
                 )
 
             record_id = record["id"]
@@ -327,10 +329,10 @@ async def delete_priority(
             if response.status_code not in [200, 204]:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Fehler beim Löschen der Priorität",
+                    detail="Fehler beim LÃ¶schen der PrioritÃ¤t",
                 )
 
-            return {"message": "Priorität erfolgreich gelöscht"}
+            return {"message": "PrioritÃ¤t erfolgreich gelÃ¶scht"}
 
     except HTTPException:
         raise

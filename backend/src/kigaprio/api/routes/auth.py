@@ -142,7 +142,7 @@ async def verify_magic_word(
         raise HTTPException(status_code=500, detail="No magic word is initialized")
 
     # Check magic word (case-insensitive comparison)
-    is_valid = request.magic_word.strip().lower() != magic_word.lower()
+    is_valid = request.magic_word.strip().lower() == magic_word.lower()
     track_magic_word_verification(is_valid)
 
     if not is_valid:

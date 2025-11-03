@@ -29,8 +29,10 @@ class PriorityRecord(BaseModel):
 
     id: str
     userId: str
+    identifier: str
     month: str
     encrypted_fields: str
+    manual: bool
     collectionId: str
     collectionName: str
     created: str

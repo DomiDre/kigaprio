@@ -90,8 +90,12 @@ format-backend:
 format-frontend:
     docker compose -f docker-compose.dev.yml run --rm frontend npm run format
 
+# Format admin ui code
+format-admin:
+    docker compose -f docker-compose.dev.yml run --rm admin npm run format
+    
 # Format all code
-format: format-backend format-frontend
+format: format-backend format-frontend format-admin
 
 # Lint backend code
 lint-backend:
@@ -102,8 +106,12 @@ lint-backend:
 lint-frontend:
     docker compose -f docker-compose.dev.yml run --rm frontend npm run lint
 
+# Lint admin ui code  
+lint-admin:
+    docker compose -f docker-compose.dev.yml run --rm admin npm run lint
+    
 # Lint all code
-lint: lint-backend lint-frontend
+lint: lint-backend lint-frontend lint-admin
 
 # Clean up Docker system
 clean:
@@ -176,6 +184,7 @@ init-admin-key:
 # Initialize pocketbase directories for storage
 pocketbase-init: init-secrets
     ./pocketbase/init.sh
+    docker compose -f docker-compose.dev.yml run --rm backend uv run src/kigaprio/scripts/initialize_pocketbase.py
 
 services-init:
     #!/usr/bin/env bash

@@ -36,7 +36,8 @@ def setup_logging(log_level: str = "INFO") -> None:
     class HealthCheckFilter(logging.Filter):
         def filter(self, record):
             message = record.getMessage()
-            return "/api/v1/health" not in message
+            return "/api/v1/health" not in message and "/api/health" not in message
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
     logging.getLogger("gunicorn.access").addFilter(HealthCheckFilter())
+    logging.getLogger("httpx").addFilter(HealthCheckFilter())

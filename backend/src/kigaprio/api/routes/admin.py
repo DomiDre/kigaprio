@@ -1,20 +1,26 @@
+import uuid
+
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from kigaprio.models.admin import (
+    ManualPriorityRecordForAdmin,
+    ManualPriorityRequest,
     UpdateMagicWordRequest,
     UserPriorityRecordForAdmin,
 )
 from kigaprio.models.auth import SessionInfo
 from kigaprio.models.pocketbase_schemas import PriorityRecord, UsersResponse
+from kigaprio.models.priorities import validate_month_format_and_range
+from kigaprio.services.encryption import EncryptionManager
 from kigaprio.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
 )
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import get_current_token, require_admin
+from kigaprio.utils import get_current_dek, get_current_token, require_admin
 
 router = APIRouter()
 
@@ -95,13 +101,52 @@ async def get_user_submissions(
     """Get all user submissions for a specific month, data is still
     encrypted and needs to be decrypted locally using admin private key
     and respective admin_wrapped_deks
+
+    Note: This only returns regular user submissions (identifier = null).
+    Manual entries (with identifier set) are excluded.
     """
 
     async with httpx.AsyncClient() as client:
-        # Fetch regular users (not superusers)
+        # Fetch priorities for the month - only regular user submissions (identifier is null)
+        priorities_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={
+                "filter": f"manual = false && month='{month}' && identifier = null",
+                "perPage": 500,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if priorities_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen der PrioritÃ¤ten"
+            )
+
+        priorities_data = priorities_response.json().get("items", [])
+
+        if not priorities_data:
+            # No submissions for this month
+            return []
+
+        # Get unique user IDs from priorities
+        user_ids = list(
+            {
+                p["userId"]
+                for p in priorities_data
+                if ("userId" in p and p["userId"] != "")
+            }
+        )
+
+        if not user_ids:
+            return []
+
+        # Fetch only the users who have submissions
+        # Build filter for multiple user IDs: id="id1" || id="id2" || ...
+        user_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+
         users_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/users/records",
-            params={"perPage": 500},
+            params={"filter": user_filter, "perPage": 500},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -110,46 +155,24 @@ async def get_user_submissions(
                 status_code=500, detail="Fehler beim Abrufen der Benutzer"
             )
 
-        users: list[UsersResponse] = [
-            UsersResponse(**x) for x in users_response.json().get("items", [])
-        ]
+        users_data = users_response.json().get("items", [])
 
-        # Fetch priorities for the month (of all users)
-        priorities_response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={"filter": f"month='{month}'", "perPage": 500},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if priorities_response.status_code != 200:
-            raise HTTPException(
-                status_code=500, detail="Fehler beim Abrufen der Prioritäten"
-            )
-
-        priorities: list[PriorityRecord] = [
-            PriorityRecord(**x) for x in priorities_response.json().get("items", [])
-        ]
-
-        # Make priorities be lookupable by user
-        user_priorities: dict[str, PriorityRecord] = {}
-        for priority in priorities:
-            user_id = priority.userId
-            if user_id in user_priorities:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Ein Nutzer hat mehrere Prio Eintragungen für den Monat {month}. Dies sollte nicht passieren. Bitte melden zur Prüfung",
-                )
-            user_priorities[user_id] = priority
+        # Create lookup dict for users
+        users_by_id: dict[str, UsersResponse] = {
+            user["id"]: UsersResponse(**user) for user in users_data
+        }
 
         # Build user submission list
         user_submissions = []
-        for user in users:
-            user_id = user.id
-            if user_id not in user_priorities:
-                # user did not submit anything to priorities
+        for priority_data in priorities_data:
+            priority = PriorityRecord(**priority_data)
+            user_id = priority.userId
+
+            if user_id not in users_by_id:
+                # User not found (shouldn't happen, but handle gracefully)
                 continue
 
-            priority = user_priorities[user_id]
+            user = users_by_id[user_id]
 
             user_submissions.append(
                 UserPriorityRecordForAdmin(
@@ -206,3 +229,272 @@ async def get_user_for_admin(
         "encrypted_fields": user_record.encrypted_fields,
         "created": user_record.created,
     }
+
+
+@router.post("/manual-priority")
+async def create_manual_priority(
+    request: ManualPriorityRequest,
+    token: str = Depends(get_current_token),
+    auth_data: SessionInfo = Depends(require_admin),
+    dek: bytes = Depends(get_current_dek),  # Admin's DEK for encryption
+):
+    """
+    Admin endpoint to manually enter priorities from paper submissions.
+
+    Creates or updates a priority record with a specific identifier.
+    All manual entries use the same userId (manual-submissions user) but
+    are differentiated by the identifier field.
+
+    Args:
+        request: Contains identifier, month, and weeks data
+        token: Admin auth token
+        dek: Admin's Data Encryption Key
+
+    Returns:
+        Success message with created/updated record info
+    """
+
+    # Validate month format
+    try:
+        validate_month_format_and_range(request.month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # Validate and clean identifier
+    identifier = request.identifier.strip()
+    if not identifier:
+        raise HTTPException(
+            status_code=422,
+            detail="Identifier darf nicht leer sein",
+        )
+
+    # Validate that we have at least some priority data
+    has_any_priority = any(
+        week.monday is not None
+        or week.tuesday is not None
+        or week.wednesday is not None
+        or week.thursday is not None
+        or week.friday is not None
+        for week in request.weeks
+    )
+
+    if not has_any_priority:
+        raise HTTPException(
+            status_code=422,
+            detail="Bitte geben Sie mindestens eine Priorität ein",
+        )
+
+    async with httpx.AsyncClient() as client:
+        # Check if entry already exists for this identifier + month
+        check_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={
+                "filter": f'userId = null && month="{request.month}" && identifier="{identifier}"'
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        existing_id = None
+        if check_response.status_code == 200:
+            items = check_response.json().get("items", [])
+            if len(items) > 0:
+                existing_id = items[0]["id"]
+
+        # Encrypt the weeks data using admin's DEK
+        try:
+            encrypted_data = EncryptionManager.encrypt_fields(
+                {
+                    "weeks": [week.model_dump() for week in request.weeks],
+                    "name": identifier,
+                },
+                dek,
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Verschlüsselung fehlgeschlagen: {str(e)}",
+            ) from e
+
+        # Create priority record
+        priority_data = {
+            "userId": auth_data.id,
+            "month": request.month,
+            "identifier": uuid.uuid4().hex,
+            "encrypted_fields": encrypted_data,
+            "manual": True,
+        }
+
+        if existing_id:
+            print(existing_id)
+            # Update existing entry
+            response = await client.patch(
+                f"{POCKETBASE_URL}/api/collections/priorities/records/{existing_id}",
+                json=priority_data,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            message = f"Manuelle Priorität für Kennung '{identifier}' aktualisiert"
+        else:
+            # Create new entry
+            response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/priorities/records",
+                json=priority_data,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            message = f"Manuelle Priorität für Kennung '{identifier}' erstellt"
+
+        if response.status_code not in [200, 201]:
+            error_data = response.json()
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=error_data.get("message", "Fehler beim Speichern"),
+            )
+
+        return {
+            "success": True,
+            "message": message,
+            "identifier": identifier,
+            "month": request.month,
+        }
+
+
+@router.get("/manual-entries/{month}")
+async def get_manual_entries(
+    month: str,
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+):
+    """
+    Get all manual entries for a specific month.
+
+    Returns encrypted data that must be decrypted client-side by admin.
+    """
+    async with httpx.AsyncClient() as client:
+        # Fetch manual entries (where identifier is NOT null)
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={
+                "filter": f'manual = true && month="{month}" && identifier!=null',
+                "perPage": 500,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen der manuellen Einträge",
+            )
+
+        priorities_data = response.json().get("items", [])
+
+        if not priorities_data:
+            # No submissions for this month
+            return []
+
+        # Get unique user IDs from priorities
+        user_ids = list(
+            {
+                p["userId"]
+                for p in priorities_data
+                if ("userId" in p and p["userId"] != "")
+            }
+        )
+
+        if not user_ids:
+            return []
+
+        # Fetch only the users who have submissions
+        # Build filter for multiple user IDs: id="id1" || id="id2" || ...
+        user_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+        users_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/users/records",
+            params={"filter": user_filter, "perPage": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if users_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen der Benutzer"
+            )
+
+        users_data = users_response.json().get("items", [])
+
+        # Create lookup dict for users
+        users_by_id: dict[str, UsersResponse] = {
+            user["id"]: UsersResponse(**user) for user in users_data
+        }
+
+        # Build user submission list
+        manual_submissions = []
+        for priority_data in priorities_data:
+            priority = PriorityRecord(**priority_data)
+            user_id = priority.userId
+
+            if user_id not in users_by_id:
+                # User not found (shouldn't happen, but handle gracefully)
+                continue
+
+            user = users_by_id[user_id]
+            manual_submissions.append(
+                ManualPriorityRecordForAdmin(
+                    adminWrappedDek=user.admin_wrapped_dek,
+                    identifier=priority.identifier,
+                    month=priority.month,
+                    prioritiesEncryptedFields=priority.encrypted_fields,
+                )
+            )
+
+        return manual_submissions
+
+
+@router.delete("/manual-entry/{month}/{identifier}")
+async def delete_manual_entry(
+    month: str,
+    identifier: str,
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+):
+    """
+    Delete a specific manual entry by month and identifier.
+    """
+    async with httpx.AsyncClient() as client:
+        # Find the entry
+        check_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records",
+            params={
+                "filter": f'userId = null && month="{month}" && identifier="{identifier}"'
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if check_response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Suchen des Eintrags",
+            )
+
+        items = check_response.json().get("items", [])
+        if len(items) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Manueller Eintrag nicht gefunden (Monat: {month}, Kennung: {identifier})",
+            )
+
+        record_id = items[0]["id"]
+
+        # Delete the entry
+        delete_response = await client.delete(
+            f"{POCKETBASE_URL}/api/collections/priorities/records/{record_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if delete_response.status_code not in [200, 204]:
+            raise HTTPException(
+                status_code=delete_response.status_code,
+                detail="Fehler beim Löschen des Eintrags",
+            )
+
+        return {
+            "success": True,
+            "message": f"Manueller Eintrag gelöscht (Kennung: {identifier})",
+        }
