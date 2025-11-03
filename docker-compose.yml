@@ -132,6 +132,7 @@ services:
     image: kigaprio-admin
     environment:
       - NODE_ENV=production
+      - BACKEND_URL=https://kiga.dhjd.de
     expose:
       - 3000
     depends_on:
