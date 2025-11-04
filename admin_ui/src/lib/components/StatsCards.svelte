@@ -39,7 +39,8 @@
 	>
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Eingereicht</p>
+				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Eingetragen</p>
+
 				<p class="mt-1 text-2xl font-bold text-green-600 sm:mt-2 sm:text-3xl dark:text-green-400">
 					{stats.submitted}
 				</p>

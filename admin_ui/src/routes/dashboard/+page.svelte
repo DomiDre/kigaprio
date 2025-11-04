@@ -22,6 +22,7 @@
 
 	// Daten beim Laden abrufen
 	onMount(() => {
+		fetchTotalUsers();
 		fetchUserSubmissions();
 		initialFetchDone = true;
 	});
@@ -53,6 +54,7 @@
 
 	// Daten
 	let users = $state<UserDisplay[]>([]);
+	let totalRegisteredUsers = $state(0);
 
 	// Passphrase-Zustand
 	let passphraseInput = $state('');
@@ -64,14 +66,16 @@
 
 	// Statistiken reaktiv mit $derived berechnen
 	let stats = $derived.by(() => {
-		const totalUsers = users.length;
-		const submitted = users.filter((u) => u.submitted && u.hasData).length;
-		const pending = totalUsers - submitted;
-		const submissionRate = totalUsers > 0 ? Math.round((submitted / totalUsers) * 100) : 0;
+		const submitted = users.filter((u) => u.submitted && u.hasData && !u.isManual).length;
+		const manualSubmitted = users.filter((u) => u.submitted && u.hasData && u.isManual).length;
+		const pending = totalRegisteredUsers - submitted;
+		const submissionRate =
+			totalRegisteredUsers > 0 ? Math.round((submitted / totalRegisteredUsers) * 100) : 0;
+		const sumSubmit = submitted + manualSubmitted;
 
 		return {
-			totalUsers,
-			submitted,
+			totalUsers: totalRegisteredUsers,
+			submitted: sumSubmit,
 			pending,
 			submissionRate
 		};
@@ -128,6 +132,16 @@
 	});
 
 	// Benutzerübermittlungen von der API abrufen
+	// Gesamtzahl registrierter Benutzer abrufen
+	async function fetchTotalUsers() {
+		try {
+			const data = await apiService.getTotalUsers();
+			totalRegisteredUsers = data.totalUsers;
+		} catch (err) {
+			console.error('Fehler beim Abrufen der Benutzerzahl:', err);
+		}
+	}
+
 	async function fetchUserSubmissions() {
 		isLoading = true;
 		error = '';
@@ -438,7 +452,7 @@
 		decryptionError = '';
 
 		try {
-			await fetchUserSubmissions();
+			await Promise.all([fetchTotalUsers(), fetchUserSubmissions()]);
 		} catch (err) {
 			error = 'Fehler beim Aktualisieren der Daten';
 			console.error('Aktualisierungsfehler:', err);
