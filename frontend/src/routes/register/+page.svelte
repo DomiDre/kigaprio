@@ -1,7 +1,7 @@
 <!-- src/routes/register/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { authStore, isAuthenticated } from '$lib/stores/auth';
 	import { apiService } from '$lib/services/api';
 
 	let username = $state('');
@@ -78,7 +78,7 @@
 				registration_token: registrationToken,
 				keep_logged_in: keepLoggedIn
 			});
-			goto('/');
+			if (await authStore.verifyAuth()) goto('/priorities');
 		} catch (err) {
 			error = (err as Error).message;
 			// If token expired, reset to magic word step
