@@ -2,6 +2,7 @@
 	import Close from 'virtual:icons/mdi/close';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	type Priority = 1 | 2 | 3 | 4 | 5 | null;
 
@@ -67,7 +68,7 @@
 	month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
 	// Store references to all input elements for auto-focus
-	let inputRefs: Map<string, HTMLInputElement> = new Map();
+	let inputRefs: SvelteMap<string, HTMLInputElement> = new SvelteMap();
 
 	function getInputKey(weekIndex: number, dayIndex: number): string {
 		return `${weekIndex}-${dayIndex}`;

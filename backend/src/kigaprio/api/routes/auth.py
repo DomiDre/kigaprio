@@ -169,7 +169,9 @@ async def verify_magic_word(
 
 @router.post("/register")
 async def register_user(
-    request: RegisterRequest, response: Response, redis_client: redis.Redis = Depends(get_redis)
+    request: RegisterRequest,
+    response: Response,
+    redis_client: redis.Redis = Depends(get_redis),
 ):
     """Register a new user with magic word token verification."""
     # Verify registration token
@@ -267,7 +269,6 @@ async def register_user(
 
             user_data = auth_response.json()
 
-
             # Authenticate the newly created user
             auth_response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
@@ -279,8 +280,7 @@ async def register_user(
 
             if auth_response.status_code != 200:
                 raise HTTPException(
-                    status_code=500,
-                    detail="User created but auto-login failed"
+                    status_code=500, detail="User created but auto-login failed"
                 )
 
             auth_data = auth_response.json()
@@ -292,7 +292,7 @@ async def register_user(
                 "user_id": auth_data["record"]["id"],
                 "username": auth_data["record"]["username"],
                 "role": auth_data["record"]["role"],
-                "is_admin": auth_data["record"]["role"] == "admin"
+                "is_admin": auth_data["record"]["role"] == "admin",
             }
 
             # Determine session duration
@@ -303,11 +303,7 @@ async def register_user(
                 session_ttl = 8 * 3600  # 8 hours
                 cookie_max_age = 8 * 3600
 
-            redis_client.setex(
-                session_key,
-                session_ttl,
-                json.dumps(session_info)
-            )
+            redis_client.setex(session_key, session_ttl, json.dumps(session_info))
 
             # Set auth cookies
             set_auth_cookies(response, token, dek, cookie_max_age)
