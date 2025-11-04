@@ -1,6 +1,6 @@
 import { SvelteDate } from 'svelte/reactivity';
-import type { WeekData } from '$lib/types/priorities';
-import { monthNames } from '$lib/config/priorities';
+import type { WeekData } from '$lib/priorities.types';
+import { monthNames } from '$lib/priorities.config';
 
 export function getWeeksForMonth(year: number, month: number): WeekData[] {
 	const weeks: WeekData[] = [];

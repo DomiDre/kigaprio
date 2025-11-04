@@ -1,4 +1,4 @@
-import { authStore } from '$lib/stores/auth';
+import { authStore } from '$lib/auth.store';
 import { get } from 'svelte/store';
 import { browser } from '$app/environment';
 

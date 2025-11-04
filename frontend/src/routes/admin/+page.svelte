@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { apiService } from '$lib/services/api';
-	import { getMonthOptions } from '$lib/utils/dateHelpers';
+	import { apiService } from '$lib/api.service';
+	import { getMonthOptions } from '$lib/dateHelpers.utils';
 
 	// Types
 	type UserSubmission = {

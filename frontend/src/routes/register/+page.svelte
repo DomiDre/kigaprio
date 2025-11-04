@@ -1,8 +1,8 @@
 <!-- src/routes/register/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { authStore, isAuthenticated } from '$lib/stores/auth';
-	import { apiService } from '$lib/services/api';
+	import { authStore, isAuthenticated } from '$lib/auth.store';
+	import { apiService } from '$lib/api.service';
 
 	let username = $state('');
 	let password = $state('');

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { WeekData } from '$lib/types/priorities';
-	import { getWeekStatus } from '$lib/utils/dateHelpers';
+	import type { WeekData } from '$lib/priorities.types';
+	import { getWeekStatus } from '$lib/dateHelpers.utils';
 
 	export let weeks: WeekData[];
 	export let activeWeekIndex: number;

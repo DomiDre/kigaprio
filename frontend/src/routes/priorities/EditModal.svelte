@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { WeekData, Priority, DayName } from '$lib/types/priorities';
+	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { dayKeys, dayNames } from '$lib/config/priorities';
+	import { dayKeys, dayNames } from '$lib/priorities.config';
 
 	type Props = {
 		editingWeek: WeekData;

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { WeekData, Priority, DayName } from '$lib/types/priorities';
-	import { dayNames, dayKeys } from '$lib/config/priorities';
+	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
+	import { dayNames, dayKeys } from '$lib/priorities.config';
 	import { scale } from 'svelte/transition';
-	import { isWeekComplete } from '$lib/utils/dateHelpers';
+	import { isWeekComplete } from '$lib/dateHelpers.utils';
 
 	type Props = {
 		week: WeekData;
@@ -14,21 +14,19 @@
 
 	let { week, weekIndex, selectPriority, saveWeek, getDayDates }: Props = $props();
 
-	let saving = $state(false);
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
+	let isSaveInFlight = false;
 
 	let weekCompleted = $derived(isWeekComplete(week));
 
 	async function handlePrioritySelect(dayKey: DayName, priority: Priority) {
-		if (saving) return;
-
 		const oldPriority = week[dayKey];
 
 		// Check if this priority is already used elsewhere
 		const dayUsingPriority = dayKeys.find((day) => day !== dayKey && week[day] === priority);
 
-		// Update the priority for the selected day
+		// Update the priority for the selected day (optimistic update)
 		selectPriority(weekIndex, dayKey, priority);
 
 		// If this priority was used elsewhere, swap the priorities
@@ -37,21 +35,27 @@
 		}
 
 		// Auto-save with debouncing
-		await autoSave();
+		autoSave();
 	}
 
-	async function autoSave() {
+	function autoSave() {
 		// Clear any pending save
 		if (saveTimeout) {
 			clearTimeout(saveTimeout);
 		}
 
-		// Show saving status immediately
+		// Show saving status immediately (but don't block UI)
 		saveStatus = 'saving';
-		saving = true;
 
-		// Debounce the actual save by 500ms
+		// Debounce the actual save by 800ms to allow rapid selections
 		saveTimeout = setTimeout(async () => {
+			// Prevent concurrent save requests
+			if (isSaveInFlight) {
+				return;
+			}
+
+			isSaveInFlight = true;
+
 			try {
 				await saveWeek(weekIndex);
 				saveStatus = 'saved';
@@ -73,9 +77,9 @@
 					}
 				}, 3000);
 			} finally {
-				saving = false;
+				isSaveInFlight = false;
 			}
-		}, 500);
+		}, 800);
 	}
 
 	function getCompletedDaysCount() {
@@ -227,7 +231,6 @@
 									? 'border border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 dark:border-orange-600 dark:bg-orange-900 dark:text-orange-400'
 									: 'border border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
 							onclick={() => handlePrioritySelect(dayKey, typedPriority)}
-							disabled={saving}
 							title={isUsedElsewhere ? `Tauschen mit ${usedByDayName}` : `Priorität ${priority}`}
 						>
 							{priority}

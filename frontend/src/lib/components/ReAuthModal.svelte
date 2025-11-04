@@ -1,6 +1,6 @@
 <script lang="ts">
 	// import { apiService } from '$lib/services/api';
-	import { authStore } from '$lib/stores/auth';
+	import { authStore } from '$lib/auth.store';
 	import { goto } from '$app/navigation';
 
 	export let isOpen = false;
