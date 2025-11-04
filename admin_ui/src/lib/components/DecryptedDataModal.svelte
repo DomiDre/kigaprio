@@ -141,8 +141,8 @@
 								</div>
 
 								<div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
-									{#each Object.entries(dayNames) as [dayLabel] (dayLabel)}
-										{@const priority = week[dayLabel as DayName]}
+									{#each Object.entries(dayNames) as [dayKey, dayLabel] (dayKey)}
+										{@const priority = week[dayKey as DayName]}
 										<div
 											class="rounded-lg border border-gray-200 bg-white p-2 text-center sm:p-3 dark:border-gray-700 dark:bg-gray-800"
 										>
@@ -191,26 +191,6 @@
 					</div>
 				</div>
 			{/if}
-
-			<!-- Security Notice -->
-			<div
-				class="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4 dark:border-blue-800 dark:bg-blue-900/20"
-			>
-				<div class="flex items-start gap-2">
-					<Information
-						class="h-4 w-4 flex-shrink-0 text-blue-600 sm:h-5 sm:w-5 dark:text-blue-400"
-					/>
-					<div class="min-w-0 flex-1">
-						<p class="text-xs font-medium text-blue-900 sm:text-sm dark:text-blue-300">
-							Datenschutzhinweis
-						</p>
-						<p class="text-xs text-blue-800 dark:text-blue-400">
-							Diese Daten wurden lokal in Ihrem Browser entschlüsselt. Der Server hat niemals
-							Zugriff auf die unverschlüsselten Daten.
-						</p>
-					</div>
-				</div>
-			</div>
 		</div>
 
 		<!-- Footer - Sticky -->
