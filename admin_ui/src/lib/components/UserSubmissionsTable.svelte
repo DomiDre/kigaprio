@@ -40,7 +40,7 @@
 	<div class="border-b border-gray-200 p-4 sm:p-6 dark:border-gray-700">
 		<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 			<h2 class="text-base font-semibold text-gray-900 sm:text-lg dark:text-white">
-				User Submissions
+				Einreichungen
 			</h2>
 			<div class="relative w-full sm:w-auto">
 				<Magnify
@@ -50,7 +50,7 @@
 					type="text"
 					value={searchQuery}
 					oninput={(e) => onSearchChange((e.target as HTMLInputElement).value)}
-					placeholder="Search users..."
+					placeholder="Benutzer suchen..."
 					class="w-full rounded-lg border border-gray-300 py-2 pr-4 pl-10 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500 sm:w-64 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 				/>
 			</div>
@@ -124,14 +124,14 @@
 										class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
 									>
 										<CheckCircle class="mr-1 h-3 w-3" />
-										Submitted
+										Eingereicht
 									</span>
 								{:else}
 									<span
 										class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
 									>
 										<ClockOutline class="mr-1 h-3 w-3" />
-										Pending
+										In Bearbeitung
 									</span>
 								{/if}
 							</td>
@@ -143,7 +143,7 @@
 											title="Decrypted locally"
 										>
 											<CheckCircle class="mr-1 h-3 w-3" />
-											Decrypted
+											Entschlüsselt
 										</span>
 									{:else}
 										<span
@@ -151,11 +151,11 @@
 											title="Data is encrypted"
 										>
 											<Lock class="mr-1 h-3 w-3" />
-											Encrypted
+											Verschlüsselt
 										</span>
 									{/if}
 								{:else}
-									<span class="text-xs text-gray-400">No data</span>
+									<span class="text-xs text-gray-400">Keine Daten</span>
 								{/if}
 							</td>
 							<td class="px-6 py-4 text-sm whitespace-nowrap">
@@ -168,15 +168,13 @@
 									>
 										{isDecrypting ? 'Entschlüsseln...' : 'View Data'}
 									</button>
-								{:else if user.submitted && user.hasData && !keyUploaded}
-									<span class="text-gray-400 dark:text-gray-500">Upload key first</span>
-								{:else}
+								{:else if user.submitted && user.hasData && !keyUploaded}{:else}
 									<button
 										type="button"
 										class="font-medium text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 										onclick={onManualEntry}
 									>
-										Enter Manually
+										Manuell eingeben
 									</button>
 								{/if}
 							</td>
@@ -227,14 +225,14 @@
 								class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
 							>
 								<CheckCircle class="mr-1 h-3 w-3" />
-								Submitted
+								Eingereicht
 							</span>
 						{:else}
 							<span
 								class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
 							>
 								<ClockOutline class="mr-1 h-3 w-3" />
-								Pending
+								In Bearbeitung
 							</span>
 						{/if}
 
@@ -244,14 +242,14 @@
 									class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
 								>
 									<CheckCircle class="mr-1 h-3 w-3" />
-									Decrypted
+									Entschlüsselt
 								</span>
 							{:else}
 								<span
 									class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
 								>
 									<Lock class="mr-1 h-3 w-3" />
-									Encrypted
+									Verschlüsselt
 								</span>
 							{/if}
 						{/if}
@@ -269,22 +267,14 @@
 								<Eye class="h-4 w-4" />
 								{isDecrypting ? 'Entschlüsseln...' : 'View Data'}
 							</button>
-						{:else if user.submitted && user.hasData && !keyUploaded}
-							<button
-								type="button"
-								class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 dark:border-gray-600 dark:text-gray-400"
-								disabled
-							>
-								Upload key first
-							</button>
-						{:else}
+						{:else if user.submitted && user.hasData && !keyUploaded}{:else}
 							<button
 								type="button"
 								class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors active:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700"
 								onclick={onManualEntry}
 							>
 								<Pencil class="h-4 w-4" />
-								Enter Manually
+								Manuell eingeben
 							</button>
 						{/if}
 					</div>

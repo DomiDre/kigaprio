@@ -53,12 +53,12 @@
 		<button type="button" class="flex w-full items-center justify-between" onclick={onToggle}>
 			<div class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
 				<h2 class="text-base font-semibold text-gray-900 sm:text-lg dark:text-white">
-					Priorities Overview
+					Prioritäten Übersicht
 				</h2>
 				<span
 					class="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 sm:px-3 sm:py-1 dark:bg-purple-900/30 dark:text-purple-400"
 				>
-					{decryptedUsersCount} users
+					{decryptedUsersCount} Nutzer
 				</span>
 			</div>
 			{#if showOverview}
@@ -75,7 +75,7 @@
 			<div class="mb-4 flex flex-wrap gap-2 sm:mb-6 sm:gap-4">
 				<div class="flex items-center gap-2">
 					<span class="text-xs font-medium text-gray-700 sm:text-sm dark:text-gray-300"
-						>Priority:</span
+						>Prioritäten:</span
 					>
 				</div>
 				{#each [1, 2, 3, 4, 5] as priority (priority)}
@@ -92,7 +92,7 @@
 
 			<!-- Mobile: Show scroll hint -->
 			<div class="mb-3 text-xs text-gray-500 sm:hidden dark:text-gray-400">
-				← Swipe to see all weeks →
+				← Wischen um alle Wochen zu sehen →
 			</div>
 
 			<!-- Table Container with improved mobile scrolling -->
@@ -107,7 +107,7 @@
 										<th
 											class="sticky left-0 z-20 min-w-[100px] bg-white px-2 py-2 text-left text-xs font-semibold text-gray-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] sm:min-w-[120px] sm:px-4 sm:py-3 sm:text-sm dark:bg-gray-800 dark:text-white dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]"
 										>
-											User
+											Benutzer
 										</th>
 										{#each allWeeks as weekNum, i (i)}
 											<th
@@ -194,7 +194,7 @@
 			<!-- Demand Statistics -->
 			<div class="mt-6 border-t border-gray-200 pt-4 sm:mt-8 sm:pt-6 dark:border-gray-700">
 				<h3 class="mb-3 text-xs font-semibold text-gray-900 sm:mb-4 sm:text-sm dark:text-white">
-					Demand per Day
+					Nachfrage pro Tag
 				</h3>
 				<div class="space-y-3 sm:space-y-4">
 					{#each allWeeks as weekNum, i (i)}
@@ -204,7 +204,7 @@
 							<div
 								class="mb-2 text-[10px] font-semibold text-gray-700 sm:text-xs dark:text-gray-300"
 							>
-								Week {weekNum}
+								Woche {weekNum}
 							</div>
 							<div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
 								{#each dayKeys as day, dayIndex (day)}

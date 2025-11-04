@@ -28,7 +28,7 @@
 				onclick={onManualEntry}
 			>
 				<Plus class="h-5 w-5" />
-				Manual Entry
+				Manuelle Eingabe
 			</button>
 
 			<button
@@ -38,7 +38,7 @@
 				disabled={!keyUploaded || stats.totalUsers === 0}
 			>
 				<Download class="h-5 w-5" />
-				Export to Excel
+				Excel Export
 			</button>
 		</div>
 
@@ -47,7 +47,7 @@
 				class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20"
 			>
 				<p class="text-xs text-yellow-800 dark:text-yellow-400">
-					Upload private key to enable export
+					Privaten Schlüssel hochladen um Export zu erlauben
 				</p>
 			</div>
 		{/if}
@@ -57,11 +57,11 @@
 	<div
 		class="rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-800"
 	>
-		<h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Monthly Overview</h3>
+		<h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Monatliche Übersicht</h3>
 		<div class="space-y-4">
 			<div>
 				<div class="mb-2 flex justify-between text-sm">
-					<span class="text-gray-600 dark:text-gray-300">Completion Progress</span>
+					<span class="text-gray-600 dark:text-gray-300">Vervollständigungs Fortschritt</span>
 					<span class="font-medium text-gray-900 dark:text-white">{stats.submissionRate}%</span>
 				</div>
 				<div class="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
@@ -74,18 +74,18 @@
 
 			<div class="border-t border-gray-200 pt-4 dark:border-gray-700">
 				<div class="mb-2 flex items-center justify-between">
-					<span class="text-sm text-gray-600 dark:text-gray-300">Encrypted Submissions</span>
+					<span class="text-sm text-gray-600 dark:text-gray-300">Nutzer Einreichungen</span>
 					<span class="text-sm font-medium text-gray-900 dark:text-white">{stats.submitted}</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-gray-600 dark:text-gray-300">Paper Submissions</span>
+					<span class="text-sm text-gray-600 dark:text-gray-300">Manuelle Einträge</span>
 					<span class="text-sm font-medium text-gray-900 dark:text-white">0</span>
 				</div>
 				{#if keyUploaded}
 					<div
 						class="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700"
 					>
-						<span class="text-sm text-gray-600 dark:text-gray-300">Decrypted</span>
+						<span class="text-sm text-gray-600 dark:text-gray-300">Entschlüsselt</span>
 						<span class="text-sm font-medium text-purple-600 dark:text-purple-400"
 							>{decryptedUsersCount}</span
 						>
@@ -93,21 +93,5 @@
 				{/if}
 			</div>
 		</div>
-	</div>
-
-	<!-- Data Status Info -->
-	<div
-		class="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 p-6 shadow-xl dark:border-purple-700 dark:from-purple-900/30 dark:to-blue-900/30"
-	>
-		<h3
-			class="mb-2 flex items-center gap-2 text-sm font-semibold text-purple-900 dark:text-purple-300"
-		>
-			<Lock class="h-4 w-4" />
-			Encryption Status
-		</h3>
-		<p class="text-xs text-purple-800 dark:text-purple-400">
-			All user data is encrypted. Upload the admin private key to decrypt and view the priorities
-			overview table.
-		</p>
 	</div>
 </div>

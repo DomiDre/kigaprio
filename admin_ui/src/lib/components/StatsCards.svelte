@@ -20,7 +20,7 @@
 	>
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Total Users</p>
+				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Anzahl Nutzer</p>
 				<p class="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl dark:text-white">
 					{stats.totalUsers}
 				</p>
@@ -39,7 +39,7 @@
 	>
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Submitted</p>
+				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Eingereicht</p>
 				<p class="mt-1 text-2xl font-bold text-green-600 sm:mt-2 sm:text-3xl dark:text-green-400">
 					{stats.submitted}
 				</p>
@@ -56,7 +56,7 @@
 	>
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Pending</p>
+				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Ausstehend</p>
 				<p class="mt-1 text-2xl font-bold text-orange-600 sm:mt-2 sm:text-3xl dark:text-orange-400">
 					{stats.pending}
 				</p>
@@ -73,9 +73,7 @@
 	>
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">
-					Submission Rate
-				</p>
+				<p class="text-xs font-medium text-gray-600 sm:text-sm dark:text-gray-300">Einreich Rate</p>
 				<p class="mt-1 text-2xl font-bold text-purple-600 sm:mt-2 sm:text-3xl dark:text-purple-400">
 					{stats.submissionRate}%
 				</p>
