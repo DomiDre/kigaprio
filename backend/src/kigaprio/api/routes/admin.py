@@ -92,6 +92,28 @@ async def update_magic_word(
     }
 
 
+@router.get("/total-users")
+async def get_total_users(
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+):
+    """Get total count of registered users in the system"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/users/records",
+            params={"perPage": 1},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen der Benutzerzahl"
+            )
+
+        data = response.json()
+        return {"totalUsers": data.get("totalItems", 0)}
+
+
 @router.get("/users/{month}")
 async def get_user_submissions(
     month: str,

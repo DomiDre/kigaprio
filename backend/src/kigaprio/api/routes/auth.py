@@ -169,7 +169,9 @@ async def verify_magic_word(
 
 @router.post("/register")
 async def register_user(
-    request: RegisterRequest, redis_client: redis.Redis = Depends(get_redis)
+    request: RegisterRequest,
+    response: Response,
+    redis_client: redis.Redis = Depends(get_redis),
 ):
     """Register a new user with magic word token verification."""
     # Verify registration token
@@ -226,7 +228,7 @@ async def register_user(
 
             service_token = auth_response.json()["token"]
 
-            response = await client.post(
+            auth_response = await client.post(
                 f"{POCKETBASE_URL}/api/collections/users/records",
                 headers={"Authorization": f"Bearer {service_token}"},
                 json={
@@ -241,10 +243,10 @@ async def register_user(
                 },
             )
 
-            registration_success = response.status_code == 200
+            registration_success = auth_response.status_code == 200
             track_user_registration(success=registration_success)
             if not registration_success:
-                error_data = response.json()
+                error_data = auth_response.json()
 
                 # Handle PocketBase validation errors
                 if "data" in error_data:
@@ -261,11 +263,51 @@ async def register_user(
                     raise HTTPException(status_code=400, detail=". ".join(errors))
 
                 raise HTTPException(
-                    status_code=response.status_code,
+                    status_code=auth_response.status_code,
                     detail=error_data.get("message", "Registrierung fehlgeschlagen"),
                 )
 
-            user_data = response.json()
+            user_data = auth_response.json()
+
+            # Authenticate the newly created user
+            auth_response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": request.identity,
+                    "password": request.password,
+                },
+            )
+
+            if auth_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500, detail="User created but auto-login failed"
+                )
+
+            auth_data = auth_response.json()
+            token = auth_data["token"]
+
+            # Store session in Redis
+            session_key = f"session:{token}"
+            session_info = {
+                "user_id": auth_data["record"]["id"],
+                "username": auth_data["record"]["username"],
+                "role": auth_data["record"]["role"],
+                "is_admin": auth_data["record"]["role"] == "admin",
+            }
+
+            # Determine session duration
+            if request.keep_logged_in:
+                session_ttl = 30 * 24 * 3600  # 30 days
+                cookie_max_age = 30 * 24 * 3600
+            else:
+                session_ttl = 8 * 3600  # 8 hours
+                cookie_max_age = 8 * 3600
+
+            redis_client.setex(session_key, session_ttl, json.dumps(session_info))
+
+            # Set auth cookies
+            set_auth_cookies(response, token, dek, cookie_max_age)
+
             return {
                 "success": True,
                 "message": "Registrierung erfolgreich",

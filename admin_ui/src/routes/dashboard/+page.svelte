@@ -20,16 +20,17 @@
 	import type { WeekPriority } from '$lib/priorities.types';
 	import { formatMonthForAPI, getMonthOptions } from '$lib/dateHelpers.utils';
 
-	// Fetch data on mount
+	// Daten beim Laden abrufen
 	onMount(() => {
+		fetchTotalUsers();
 		fetchUserSubmissions();
 		initialFetchDone = true;
 	});
 
-	// consts
+	// Konstanten
 	const monthOptions = getMonthOptions();
 
-	// State
+	// Zustand
 	let selectedMonth = $state(monthOptions[0]);
 	let keyUploaded = $state(false);
 	let showManualEntry = $state(false);
@@ -44,40 +45,43 @@
 	let showSuccessToast = $state(false);
 	let successMessage = $state('');
 
-	// Decryption state
+	// Entschlüsselungszustand
 	let isDecrypting = $state(false);
 	let isDecryptingAll = $state(false);
 	let showDecryptedModal = $state(false);
 	let decryptedData = $state<DecryptedData | null>(null);
 	let decryptedUsers = new SvelteMap<string, DecryptedData>();
 
-	// Data
+	// Daten
 	let users = $state<UserDisplay[]>([]);
+	let totalRegisteredUsers = $state(0);
 
-	// Passphrase state
+	// Passphrase-Zustand
 	let passphraseInput = $state('');
 	let showPassphrasePrompt = $state(false);
 	let pendingKeyFile = $state<File | null>(null);
 
-	// Track if initial fetch is done
+	// Verfolgen, ob der erste Abruf abgeschlossen ist
 	let initialFetchDone = $state(false);
 
-	// Calculate statistics reactively using $derived
+	// Statistiken reaktiv mit $derived berechnen
 	let stats = $derived.by(() => {
-		const totalUsers = users.length;
-		const submitted = users.filter((u) => u.submitted && u.hasData).length;
-		const pending = totalUsers - submitted;
-		const submissionRate = totalUsers > 0 ? Math.round((submitted / totalUsers) * 100) : 0;
+		const submitted = users.filter((u) => u.submitted && u.hasData && !u.isManual).length;
+		const manualSubmitted = users.filter((u) => u.submitted && u.hasData && u.isManual).length;
+		const pending = totalRegisteredUsers - submitted;
+		const submissionRate =
+			totalRegisteredUsers > 0 ? Math.round((submitted / totalRegisteredUsers) * 100) : 0;
+		const sumSubmit = submitted + manualSubmitted;
 
 		return {
-			totalUsers,
-			submitted,
+			totalUsers: totalRegisteredUsers,
+			submitted: sumSubmit,
 			pending,
 			submissionRate
 		};
 	});
 
-	// Build overview data structure using $derived
+	// Übersichtsdatenstruktur mit $derived erstellen
 	let overviewData = $derived.by(() => {
 		if (decryptedUsers.size === 0) return [];
 
@@ -98,7 +102,7 @@
 		return data.sort((a, b) => a.userName.localeCompare(b.userName));
 	});
 
-	// Get all unique weeks across all users
+	// Alle eindeutigen Wochen über alle Benutzer hinweg abrufen
 	let allWeeks = $derived.by(() => {
 		const weekSet = new SvelteSet<number>();
 		decryptedUsers.forEach((userData) => {
@@ -110,7 +114,7 @@
 		return Array.from(weekSet).sort((a, b) => a - b);
 	});
 
-	// Filter users based on search query using $derived
+	// Benutzer basierend auf Suchanfrage mit $derived filtern
 	let filteredUsers = $derived.by(() => {
 		return users.filter((user) => {
 			const displayName = getDisplayName(user.name);
@@ -118,7 +122,7 @@
 		});
 	});
 
-	// Watch for month changes using $effect
+	// Auf Monatsänderungen mit $effect reagieren
 	$effect(() => {
 		if (initialFetchDone && selectedMonth) {
 			decryptedUsers.clear();
@@ -127,7 +131,17 @@
 		}
 	});
 
-	// Fetch user submissions from API
+	// Benutzerübermittlungen von der API abrufen
+	// Gesamtzahl registrierter Benutzer abrufen
+	async function fetchTotalUsers() {
+		try {
+			const data = await apiService.getTotalUsers();
+			totalRegisteredUsers = data.totalUsers;
+		} catch (err) {
+			console.error('Fehler beim Abrufen der Benutzerzahl:', err);
+		}
+	}
+
 	async function fetchUserSubmissions() {
 		isLoading = true;
 		error = '';
@@ -139,7 +153,7 @@
 				apiService.getManualSubmissions(apiMonth)
 			]);
 
-			// Transform regular user submissions into display format
+			// Reguläre Benutzerübermittlungen in Anzeigeformat transformieren
 			const regularUsers = userSubmissions.map((submission: any, index: number) => ({
 				id: index + 1,
 				name: submission.userName,
@@ -152,10 +166,10 @@
 				prioritiesEncryptedFields: submission.prioritiesEncryptedFields
 			}));
 
-			// Transform manual entries into display format
+			// Manuelle Einträge in Anzeigeformat transformieren
 			const manualUsers = manualEntriesData.map((entry: any, index: number) => ({
 				id: regularUsers.length + index + 1,
-				name: `Manual: ${entry.identifier.substring(0, 8)}`,
+				name: `Manuell: ${entry.identifier.substring(0, 8)}`,
 				submitted: true,
 				encrypted: true,
 				hasData: !!entry.prioritiesEncryptedFields,
@@ -166,7 +180,7 @@
 				prioritiesEncryptedFields: entry.prioritiesEncryptedFields
 			}));
 
-			// Combine both types
+			// Beide Typen kombinieren
 			users = [...regularUsers, ...manualUsers];
 
 			if (keyUploaded) {
@@ -174,13 +188,13 @@
 			}
 		} catch (err) {
 			error = (err as Error).message;
-			console.error('Error fetching submissions:', err);
+			console.error('Fehler beim Abrufen der Übermittlungen:', err);
 		} finally {
 			isLoading = false;
 		}
 	}
 
-	// Decrypt all users' data automatically
+	// Alle Benutzerdaten automatisch entschlüsseln
 	async function decryptAllUsers() {
 		if (!keyUploaded || users.length === 0 || isDecryptingAll) return;
 
@@ -191,10 +205,10 @@
 
 		try {
 			for (const user of users) {
-				// Use the appropriate service based on auth mode
+				// Den entsprechenden Service basierend auf dem Authentifizierungsmodus verwenden
 				const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
 
-				// Handle regular user submissions
+				// Reguläre Benutzerübermittlungen verarbeiten
 				if (
 					!user.isManual &&
 					user.adminWrappedDek &&
@@ -214,10 +228,10 @@
 							priorities: result.priorities!
 						});
 					} catch (err) {
-						console.error(`Failed to decrypt data for ${user.name}:`, err);
+						console.error(`Fehler beim Entschlüsseln der Daten für ${user.name}:`, err);
 					}
 				}
-				// Handle manual entries (no userEncryptedFields, username in priorities.name)
+				// Manuelle Einträge verarbeiten (keine userEncryptedFields, Benutzername in priorities.name)
 				else if (user.isManual && user.adminWrappedDek && user.prioritiesEncryptedFields) {
 					try {
 						const result = await service.decryptUserData({
@@ -225,29 +239,29 @@
 							prioritiesEncryptedFields: user.prioritiesEncryptedFields
 						});
 
-						// Extract username from priorities.name
+						// Benutzernamen aus priorities.name extrahieren
 						const userName = (result.priorities as any)?.name || user.identifier || user.name;
 
 						decryptedUsers.set(user.name, {
 							userName: userName,
-							userData: { name: userName }, // Create minimal userData object
+							userData: { name: userName }, // Minimales userData-Objekt erstellen
 							priorities: result.priorities!
 						});
 					} catch (err) {
-						console.error(`Failed to decrypt manual entry ${user.name}:`, err);
+						console.error(`Fehler beim Entschlüsseln des manuellen Eintrags ${user.name}:`, err);
 					}
 				}
 			}
 
 			showOverview = true;
 		} catch (err) {
-			console.error('Error during batch decryption:', err);
+			console.error('Fehler während der Stapelentschlüsselung:', err);
 			decryptionError = 'Einige Daten konnten nicht entschlüsselt werden';
 		} finally {
 			isDecryptingAll = false;
 		}
 	}
-	// Get decrypted name for display
+	// Entschlüsselten Namen für die Anzeige abrufen
 	function getDisplayName(userName: string): string {
 		const decrypted = decryptedUsers.get(userName);
 		return decrypted?.userName || userName;
@@ -294,7 +308,7 @@
 			pendingKeyFile = null;
 			await decryptAllUsers();
 		} catch {
-			decryptionError = 'Incorrect passphrase or invalid key';
+			decryptionError = 'Falsche Passphrase oder ungültiger Schlüssel';
 		}
 	}
 
@@ -329,7 +343,7 @@
 		}
 	}
 
-	/// Callback function when key is removed -> clear all data
+	/// Callback-Funktion, wenn Schlüssel entfernt wird -> alle Daten löschen
 	function removeKey() {
 		keyUploaded = false;
 		keyFile = null;
@@ -341,7 +355,7 @@
 		showOverview = false;
 	}
 
-	/// Callback function on authentication with YubiKey -> toggle decrypt
+	/// Callback-Funktion bei Authentifizierung mit YubiKey -> Entschlüsselung umschalten
 	async function handleYubiKeyAuth() {
 		isDecrypting = true;
 		decryptionError = '';
@@ -355,7 +369,7 @@
 			const errorMsg = (err as Error).message;
 			if (errorMsg.includes('NotAllowedError')) {
 				decryptionError =
-					'YubiKey authentication cancelled. Please touch your YubiKey when prompted.';
+					'YubiKey-Authentifizierung abgebrochen. Bitte berühren Sie Ihren YubiKey bei Aufforderung.';
 			} else {
 				decryptionError = errorMsg;
 			}
@@ -365,7 +379,7 @@
 		}
 	}
 
-	/// Callback function when view of specific user is requested
+	/// Callback-Funktion, wenn die Ansicht eines bestimmten Benutzers angefordert wird
 	async function viewUserData(user: UserDisplay) {
 		if (!keyUploaded) {
 			decryptionError = 'Bitte authentifizieren Sie sich zuerst';
@@ -388,7 +402,7 @@
 		decryptionError = '';
 
 		try {
-			// Use the appropriate service based on auth mode
+			// Den entsprechenden Service basierend auf dem Authentifizierungsmodus verwenden
 			const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
 
 			const result = await service.decryptUserData({
@@ -410,7 +424,7 @@
 			};
 			showDecryptedModal = true;
 		} catch (err) {
-			console.error('Decryption error:', err);
+			console.error('Entschlüsselungsfehler:', err);
 			decryptionError = (err as Error).message;
 		} finally {
 			isDecrypting = false;
@@ -438,10 +452,10 @@
 		decryptionError = '';
 
 		try {
-			await fetchUserSubmissions();
+			await Promise.all([fetchTotalUsers(), fetchUserSubmissions()]);
 		} catch (err) {
 			error = 'Fehler beim Aktualisieren der Daten';
-			console.error('Refresh error:', err);
+			console.error('Aktualisierungsfehler:', err);
 		} finally {
 			isRefreshing = false;
 		}
@@ -455,19 +469,19 @@
 		try {
 			const result = await apiService.submitManualPriority(data.identifier, data.month, data.weeks);
 
-			// Show success toast
+			// Erfolgsbenachrichtigung anzeigen
 			successMessage = result.message || 'Erfolgreich gespeichert!';
 			showSuccessToast = true;
 
-			// Auto-dismiss after 3 seconds
+			// Automatisch nach 3 Sekunden ausblenden
 			setTimeout(() => {
 				showSuccessToast = false;
 			}, 3000);
 
-			// Close modal
+			// Modal schließen
 			showManualEntry = false;
 
-			// Refresh data to show new entry
+			// Daten aktualisieren, um neuen Eintrag anzuzeigen
 			await fetchUserSubmissions();
 		} catch (err) {
 			decryptionError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
@@ -481,18 +495,18 @@
 		try {
 			const result = await apiService.submitManualPriority(data.identifier, data.month, data.weeks);
 
-			// Show success toast
+			// Erfolgsbenachrichtigung anzeigen
 			successMessage = result.message || 'Erfolgreich gespeichert!';
 			showSuccessToast = true;
 
-			// Auto-dismiss after 3 seconds
+			// Automatisch nach 3 Sekunden ausblenden
 			setTimeout(() => {
 				showSuccessToast = false;
 			}, 3000);
 
-			// DON'T close modal - let user continue entering
+			// Modal NICHT schließen - Benutzer kann weiter eingeben
 
-			// Refresh data to show new entry
+			// Daten aktualisieren, um neuen Eintrag anzuzeigen
 			await fetchUserSubmissions();
 		} catch (err) {
 			decryptionError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
@@ -503,20 +517,22 @@
 <div
 	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 >
-	<!-- Header -->
+	<!-- Kopfzeile - Für Mobilgeräte optimiert -->
 	<div class="border-b bg-white shadow-md dark:bg-gray-800">
-		<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-			<div class="flex items-center justify-between">
+		<div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h1 class="text-3xl font-bold text-gray-800 dark:text-white">Admin Dashboard</h1>
-					<p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-						Manage user submissions and export data
+					<h1 class="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
+						Admin-Dashboard
+					</h1>
+					<p class="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-300">
+						Benutzerübermittlungen verwalten und Daten exportieren
 					</p>
 				</div>
-				<div class="flex items-center gap-4">
+				<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
 					<select
 						bind:value={selectedMonth}
-						class="rounded-lg border border-gray-300 px-4 py-2 shadow-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+						class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500 sm:w-auto dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 					>
 						{#each monthOptions as month (month)}
 							<option value={month}>{month}</option>
@@ -527,12 +543,12 @@
 						type="button"
 						onclick={handleRefresh}
 						disabled={isRefreshing || isLoading}
-						class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-						title="Refresh data"
+						class="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+						title="Daten aktualisieren"
 					>
 						<Refresh class="h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
-						<span class="hidden sm:inline">
-							{isRefreshing ? 'Refreshing...' : 'Refresh'}
+						<span>
+							{isRefreshing ? 'Aktualisiere...' : 'Aktualisieren'}
 						</span>
 					</button>
 				</div>
@@ -540,8 +556,8 @@
 		</div>
 	</div>
 
-	<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-		<!-- Error Messages -->
+	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+		<!-- Fehlermeldungen -->
 		{#if error}
 			<ErrorDisplay message={error} onClose={() => (error = '')} />
 		{/if}
@@ -554,7 +570,7 @@
 			/>
 		{/if}
 
-		<!-- Progress Indicators -->
+		<!-- Fortschrittsindikatoren -->
 		{#if isDecryptingAll}
 			<LoadingIndicator
 				message="Entschlüssele Benutzerdaten... ({decryptedUsers.size}/{users.length})"
@@ -568,7 +584,7 @@
 			/>
 		{/if}
 
-		<!-- Loading State -->
+		<!-- Ladezustand -->
 		{#if isLoading}
 			<div class="flex items-center justify-center py-12">
 				<div class="text-center">
@@ -579,10 +595,10 @@
 				</div>
 			</div>
 		{:else}
-			<!-- Statistics Cards -->
+			<!-- Statistikkarten -->
 			<StatsCards {stats} />
 
-			<!-- Priorities Overview Table -->
+			<!-- Prioritäten-Übersichtstabelle -->
 			{#if keyUploaded && decryptedUsers.size > 0}
 				<PrioritiesOverview
 					{showOverview}
@@ -593,10 +609,11 @@
 				/>
 			{/if}
 
-			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-				<!-- Main Content Area -->
+			<!-- Hauptlayout - Gestapelt auf Mobilgeräten, nebeneinander auf Desktop -->
+			<div class="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:gap-8">
+				<!-- Hauptinhaltsbereich (Volle Breite auf Mobilgeräten, 2/3 auf Desktop) -->
 				<div class="space-y-6 lg:col-span-2">
-					<!-- Private Key Upload -->
+					<!-- Privater Schlüssel-Upload -->
 					<AuthenticationPanel
 						{keyUploaded}
 						{keyFile}
@@ -612,7 +629,7 @@
 						onYubiKeyAuth={handleYubiKeyAuth}
 					/>
 
-					<!-- User Submissions Table -->
+					<!-- Benutzerübermittlungstabelle -->
 					<UserSubmissionsTable
 						{filteredUsers}
 						{searchQuery}
@@ -627,20 +644,22 @@
 					/>
 				</div>
 
-				<!-- Sidebar Actions -->
-				<SidebarActions
-					{keyUploaded}
-					{stats}
-					decryptedUsersCount={decryptedUsers.size}
-					onManualEntry={openManualEntry}
-					onExportExcel={exportToExcel}
-				/>
+				<!-- Seitenleisten-Aktionen (Volle Breite auf Mobilgeräten, 1/3 auf Desktop) -->
+				<div class="lg:col-span-1">
+					<SidebarActions
+						{keyUploaded}
+						{stats}
+						decryptedUsersCount={decryptedUsers.size}
+						onManualEntry={openManualEntry}
+						onExportExcel={exportToExcel}
+					/>
+				</div>
 			</div>
 		{/if}
 	</div>
 </div>
 
-<!-- Modals -->
+<!-- Modale Dialoge -->
 {#if showDecryptedModal && decryptedData}
 	<DecryptedDataModal
 		userName={decryptedData.userName}
@@ -654,14 +673,13 @@
 	<ManualEntryModal
 		onClose={() => {
 			showManualEntry = false;
-			// manualEntryError = '';
 		}}
 		onSubmit={handleManualSubmit}
 		onSubmitAndContinue={handleManualSubmitAndContinue}
 	/>
 {/if}
 
-<!-- Success Toast Notification -->
+<!-- Erfolgsbenachrichtigung (Toast) -->
 {#if showSuccessToast}
 	<div
 		class="fixed right-6 bottom-6 z-50 flex items-center gap-3 rounded-lg bg-green-600 px-6 py-4 text-white shadow-2xl dark:bg-green-500"

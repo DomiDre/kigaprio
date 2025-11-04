@@ -8,7 +8,11 @@ export class ApiService {
 	public baseUrl: string;
 
 	constructor() {
-		this.baseUrl = import.meta.env.DEV ? 'http://localhost:8000/api/v1' : `${env.PUBLIC_BACKEND_URL}/api/v1` || '/api/v1';
+		this.baseUrl = import.meta.env.DEV
+			? 'http://localhost:8000/api/v1'
+			: env.PUBLIC_BACKEND_URL
+				? `${env.PUBLIC_BACKEND_URL}/api/v1`
+				: '/api/v1';
 	}
 
 	async healthCheck(): Promise<boolean> {
@@ -139,6 +143,12 @@ export class ApiService {
 		return this.requestJson('/admin/update-magic-word', {
 			method: 'POST',
 			body: JSON.stringify({ new_magic_word: newMagicWord })
+		});
+	}
+
+	async getTotalUsers() {
+		return this.requestJson('/admin/total-users', {
+			method: 'GET'
 		});
 	}
 

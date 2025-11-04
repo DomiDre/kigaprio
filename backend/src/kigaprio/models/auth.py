@@ -25,6 +25,7 @@ class RegisterRequest(BaseModel):
     passwordConfirm: str
     name: str = Field(..., min_length=1)
     registration_token: str
+    keep_logged_in: bool = False
 
 
 class DatabaseLoginResponse(BaseModel):
