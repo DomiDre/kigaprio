@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { priorityColors, priorityLabels } from '$lib/config/priorities';
+	import { priorityColors, priorityLabels } from '$lib/priorities.config';
 </script>
 
 <div class="mb-6 rounded-xl bg-white p-4 shadow-lg dark:bg-gray-800">

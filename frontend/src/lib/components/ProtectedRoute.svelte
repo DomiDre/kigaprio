@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { isAuthenticated } from '$lib/auth.store';
 	import Loading from './Loading.svelte';
 
 	let { children } = $props();

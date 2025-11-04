@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { isAuthenticated, authStore } from '$lib/stores/auth';
-	import { apiService } from '$lib/services/api';
+	import { isAuthenticated, authStore } from '$lib/auth.store';
+	import { apiService } from '$lib/api.service';
 	import { goto } from '$app/navigation';
 	import Loading from '$lib/components/Loading.svelte';
-	import { getMonthOptions, parseMonthString, formatMonthForAPI } from '$lib/utils/dateHelpers';
-	import type { WeekData } from '$lib/types/priorities';
+	import { getMonthOptions, parseMonthString, formatMonthForAPI } from '$lib/dateHelpers.utils';
+	import type { WeekData } from '$lib/priorities.types';
 	import { SvelteDate } from 'svelte/reactivity';
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
 

@@ -1,7 +1,7 @@
-import { authStore } from '$lib/stores/auth';
+import { authStore } from '$lib/auth.store';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
-import type { PriorityResponse, WeekData } from '$lib/types/priorities';
+import type { PriorityResponse, WeekData } from '$lib/priorities.types';
 
 export class ApiService {
 	public baseUrl: string;

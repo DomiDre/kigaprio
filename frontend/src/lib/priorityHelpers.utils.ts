@@ -1,4 +1,4 @@
-import type { Priorities } from '$lib/types/priorities';
+import type { Priorities } from '$lib/priorities.types';
 
 export function validateWeekPriorities(priorities: Priorities): {
 	isValid: boolean;

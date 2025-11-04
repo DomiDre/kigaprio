@@ -1,6 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
-import { apiService } from '$lib/services/api';
+import { apiService } from '$lib/api.service';
 
 interface AuthState {
 	isAuthenticated: boolean;

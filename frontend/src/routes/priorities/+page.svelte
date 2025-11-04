@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { isAuthenticated, authStore } from '$lib/stores/auth';
-	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/types/priorities';
+	import { isAuthenticated, authStore } from '$lib/auth.store';
+	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/priorities.types';
 
 	// Import components
 	import Legend from '$lib/components/Legend.svelte';
@@ -21,10 +21,10 @@
 		parseMonthString,
 		getDayDates,
 		formatMonthForAPI
-	} from '$lib/utils/dateHelpers';
-	import { apiService } from '$lib/services/api';
+	} from '$lib/dateHelpers.utils';
+	import { apiService } from '$lib/api.service';
 	import Loading from '$lib/components/Loading.svelte';
-	import { dayKeys } from '$lib/config/priorities';
+	import { dayKeys } from '$lib/priorities.config';
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
 
 	// Component state

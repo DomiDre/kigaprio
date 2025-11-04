@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { WeekData, WeekPriority } from '$lib/types/priorities';
-	import { dayNames, priorityColors } from '$lib/config/priorities';
+	import type { WeekData, WeekPriority } from '$lib/priorities.types';
+	import { dayNames, priorityColors } from '$lib/priorities.config';
 
 	export let weeks: WeekData[];
 	export let openEditModal: (week: WeekData, index: number) => void;

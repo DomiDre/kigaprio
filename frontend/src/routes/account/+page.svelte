@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { isAuthenticated, authStore } from '$lib/stores/auth';
-	import { apiService } from '$lib/services/api';
+	import { isAuthenticated, authStore } from '$lib/auth.store';
+	import { apiService } from '$lib/api.service';
 	import Loading from '$lib/components/Loading.svelte';
 
 	// Component state
