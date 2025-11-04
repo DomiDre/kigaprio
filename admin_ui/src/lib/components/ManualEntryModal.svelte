@@ -54,6 +54,14 @@
 		friday: 'Fr'
 	};
 
+	const dayLabelsFull = {
+		monday: 'Montag',
+		tuesday: 'Dienstag',
+		wednesday: 'Mittwoch',
+		thursday: 'Donnerstag',
+		friday: 'Freitag'
+	};
+
 	// Set default month to current month
 	const now = new Date();
 	month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -131,7 +139,7 @@
 		const dayUsingPriority = getDayUsingPriority(weekIndex, newPriority);
 
 		if (dayUsingPriority && dayUsingPriority !== day) {
-			error = `Priorität ${newPriority} wird bereits für ${dayLabels[dayUsingPriority]} verwendet. Jede Priorität kann nur einmal pro Woche vergeben werden.`;
+			error = `Priorität ${newPriority} wird bereits für ${dayLabelsFull[dayUsingPriority]} verwendet. Jede Priorität kann nur einmal pro Woche vergeben werden.`;
 			target.value = weeks[weekIndex][day]?.toString() ?? '';
 			return;
 		}
@@ -217,8 +225,9 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
+<!-- Full screen on mobile, centered modal on desktop -->
 <div
-	class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4"
+	class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
 	transition:fade={{ duration: 200 }}
 	onclick={onClose}
 	onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}
@@ -226,7 +235,7 @@
 	tabindex="-1"
 >
 	<div
-		class="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-800"
+		class="flex h-[95vh] w-full max-w-4xl flex-col rounded-t-2xl bg-white shadow-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-2xl dark:bg-gray-800"
 		transition:scale={{ duration: 300, easing: cubicOut, start: 0.9 }}
 		onclick={handleStopPropagation}
 		onkeydown={(e) => {
@@ -238,24 +247,26 @@
 		aria-modal="true"
 		tabindex="0"
 	>
-		<!-- Header -->
+		<!-- Header - Sticky on mobile -->
 		<div
-			class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700"
+			class="flex items-center justify-between border-b border-gray-200 p-4 sm:p-6 dark:border-gray-700"
 		>
-			<h2 class="text-2xl font-bold text-gray-800 dark:text-white">Manuelle Prioritäten-Eingabe</h2>
+			<h2 class="text-lg font-bold text-gray-800 sm:text-2xl dark:text-white">
+				Manuelle Prioritäten-Eingabe
+			</h2>
 			<button
 				onclick={onClose}
 				class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 				aria-label="Schließen"
 			>
-				<Close class="h-6 w-6" />
+				<Close class="h-5 w-5 sm:h-6 sm:w-6" />
 			</button>
 		</div>
 
-		<!-- Body -->
-		<div class="p-6">
+		<!-- Body - Scrollable -->
+		<div class="flex-1 overflow-y-auto p-4 sm:p-6">
 			<!-- Form Section -->
-			<div class="mb-6">
+			<div class="mb-4 sm:mb-6">
 				<div class="flex flex-col gap-2">
 					<label for="identifier" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
 						Kennung (z.B. Teilnehmernummer):
@@ -265,7 +276,20 @@
 						type="text"
 						bind:value={identifier}
 						placeholder="123 oder ABC"
-						class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+						class="rounded-lg border border-gray-300 px-4 py-3 text-base text-gray-900 transition-colors focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none sm:py-2 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
+					/>
+				</div>
+
+				<!-- Month input for better tab order -->
+				<div class="mt-4 flex flex-col gap-2">
+					<label for="month" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+						Monat:
+					</label>
+					<input
+						id="month"
+						type="month"
+						bind:value={month}
+						class="rounded-lg border border-gray-300 px-4 py-3 text-base text-gray-900 transition-colors focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none sm:py-2 sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
 					/>
 				</div>
 
@@ -279,82 +303,109 @@
 				{/if}
 			</div>
 
-			<!-- Priorities Grid -->
-			<div class="mb-4 rounded-xl bg-gray-50 p-4 dark:bg-gray-900/50">
-				<!-- Grid Header -->
-				<div
-					class="mb-3 grid grid-cols-[80px_repeat(5,1fr)] gap-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-400"
-				>
-					<div>Woche</div>
-					{#each days as day (day)}
-						<div>{dayLabels[day]}</div>
+			<!-- Priorities Grid - Mobile optimized -->
+			<div class="mb-4 space-y-4 sm:rounded-xl sm:bg-gray-50 sm:p-4 dark:sm:bg-gray-900/50">
+				<!-- Desktop: Grid with header -->
+				<div class="hidden sm:block">
+					<div
+						class="mb-3 grid grid-cols-[80px_repeat(5,1fr)] gap-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-400"
+					>
+						<div>Woche</div>
+						{#each days as day (day)}
+							<div>{dayLabels[day]}</div>
+						{/each}
+					</div>
+
+					{#each weeks as week, weekIndex (weekIndex)}
+						<div class="mb-2 grid grid-cols-[80px_repeat(5,1fr)] items-center gap-2">
+							<div class="text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+								KW {week.weekNumber}
+							</div>
+							{#each days as day, dayIndex (day)}
+								<div class="flex justify-center">
+									<input
+										type="number"
+										min="1"
+										max="5"
+										value={week[day] ?? ''}
+										oninput={(e) => handlePriorityInput(weekIndex, day, dayIndex, e)}
+										placeholder="-"
+										use:registerInput={getInputKey(weekIndex, dayIndex)}
+										class="w-full max-w-[60px] [appearance:textfield] rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 transition-colors placeholder:text-gray-300 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-600 dark:focus:border-purple-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+									/>
+								</div>
+							{/each}
+						</div>
 					{/each}
 				</div>
 
-				<!-- Grid Rows -->
-				{#each weeks as week, weekIndex (weekIndex)}
-					<div class="mb-2 grid grid-cols-[80px_repeat(5,1fr)] items-center gap-2">
-						<div class="text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
-							KW {week.weekNumber}
-						</div>
-						{#each days as day, dayIndex (day)}
-							<div class="flex justify-center">
-								<input
-									type="number"
-									min="1"
-									max="5"
-									value={week[day] ?? ''}
-									oninput={(e) => handlePriorityInput(weekIndex, day, dayIndex, e)}
-									placeholder="-"
-									use:registerInput={getInputKey(weekIndex, dayIndex)}
-									class="w-full max-w-[60px] [appearance:textfield] rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 transition-colors placeholder:text-gray-300 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-600 dark:focus:border-purple-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-								/>
+				<!-- Mobile: Card-based layout -->
+				<div class="space-y-4 sm:hidden">
+					{#each weeks as week, weekIndex (weekIndex)}
+						<div
+							class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+						>
+							<div class="mb-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+								Kalenderwoche {week.weekNumber}
 							</div>
-						{/each}
-					</div>
-				{/each}
+
+							<div class="space-y-3">
+								{#each days as day, dayIndex (day)}
+									<div class="flex items-center gap-3">
+										<label
+											for="mobile-{weekIndex}-{dayIndex}"
+											class="w-24 text-sm font-medium text-gray-700 dark:text-gray-300"
+										>
+											{dayLabelsFull[day]}
+										</label>
+										<input
+											id="mobile-{weekIndex}-{dayIndex}"
+											type="number"
+											min="1"
+											max="5"
+											value={week[day] ?? ''}
+											oninput={(e) => handlePriorityInput(weekIndex, day, dayIndex, e)}
+											placeholder="1-5"
+											use:registerInput={getInputKey(weekIndex, dayIndex)}
+											class="w-20 [appearance:textfield] rounded-lg border border-gray-300 px-4 py-3 text-center text-lg font-semibold text-gray-900 transition-colors placeholder:text-gray-300 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-600 dark:focus:border-purple-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+										/>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
 			</div>
 
 			<!-- Help Text -->
 			<div
-				class="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-200"
+				class="rounded-lg bg-blue-50 p-3 text-xs text-blue-800 sm:text-sm dark:bg-blue-900/20 dark:text-blue-200"
 			>
 				<strong>Hinweis:</strong> Geben Sie Prioritäten von 1-5 ein (1 = höchste Priorität). Jede Priorität
 				darf nur einmal pro Woche vergeben werden. Leer lassen = keine Angabe.
 			</div>
-
-			<!-- Month input moved here for natural tab order -->
-			<div class="mt-4 flex flex-col gap-2">
-				<label for="month" class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-					Monat:
-				</label>
-				<input
-					id="month"
-					type="month"
-					bind:value={month}
-					class="rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400"
-				/>
-			</div>
 		</div>
 
-		<!-- Footer -->
-		<div class="flex justify-between gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
+		<!-- Footer - Sticky on mobile -->
+		<div
+			class="flex flex-col gap-2 border-t border-gray-200 p-4 sm:flex-row sm:justify-between sm:gap-3 sm:p-6 dark:border-gray-700"
+		>
 			<button
 				onclick={onClose}
-				class="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+				class="order-3 rounded-lg bg-gray-100 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:order-1 sm:py-2.5 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
 			>
 				Abbrechen
 			</button>
-			<div class="flex gap-3">
+			<div class="flex flex-col gap-2 sm:flex-row sm:gap-3">
 				<button
 					onclick={handleSubmitAndContinue}
-					class="rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+					class="order-1 rounded-lg bg-purple-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-purple-700 sm:order-2 sm:py-2.5 dark:bg-purple-500 dark:hover:bg-purple-600"
 				>
 					Speichern & Weiter
 				</button>
 				<button
 					onclick={handleSubmit}
-					class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+					class="order-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:order-3 sm:py-2.5 dark:bg-blue-500 dark:hover:bg-blue-600"
 				>
 					Speichern
 				</button>

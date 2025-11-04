@@ -503,20 +503,22 @@
 <div
 	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 >
-	<!-- Header -->
+	<!-- Header - Mobile Optimized -->
 	<div class="border-b bg-white shadow-md dark:bg-gray-800">
-		<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-			<div class="flex items-center justify-between">
+		<div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h1 class="text-3xl font-bold text-gray-800 dark:text-white">Admin Dashboard</h1>
-					<p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+					<h1 class="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
+						Admin Dashboard
+					</h1>
+					<p class="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-300">
 						Manage user submissions and export data
 					</p>
 				</div>
-				<div class="flex items-center gap-4">
+				<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
 					<select
 						bind:value={selectedMonth}
-						class="rounded-lg border border-gray-300 px-4 py-2 shadow-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+						class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500 sm:w-auto dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 					>
 						{#each monthOptions as month (month)}
 							<option value={month}>{month}</option>
@@ -527,11 +529,11 @@
 						type="button"
 						onclick={handleRefresh}
 						disabled={isRefreshing || isLoading}
-						class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+						class="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 						title="Refresh data"
 					>
 						<Refresh class="h-4 w-4 {isRefreshing ? 'animate-spin' : ''}" />
-						<span class="hidden sm:inline">
+						<span>
 							{isRefreshing ? 'Refreshing...' : 'Refresh'}
 						</span>
 					</button>
@@ -540,7 +542,7 @@
 		</div>
 	</div>
 
-	<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
 		<!-- Error Messages -->
 		{#if error}
 			<ErrorDisplay message={error} onClose={() => (error = '')} />
@@ -593,8 +595,9 @@
 				/>
 			{/if}
 
-			<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-				<!-- Main Content Area -->
+			<!-- Main Layout - Stack on Mobile, Side-by-side on Desktop -->
+			<div class="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:gap-8">
+				<!-- Main Content Area (Full width on mobile, 2/3 on desktop) -->
 				<div class="space-y-6 lg:col-span-2">
 					<!-- Private Key Upload -->
 					<AuthenticationPanel
@@ -627,14 +630,16 @@
 					/>
 				</div>
 
-				<!-- Sidebar Actions -->
-				<SidebarActions
-					{keyUploaded}
-					{stats}
-					decryptedUsersCount={decryptedUsers.size}
-					onManualEntry={openManualEntry}
-					onExportExcel={exportToExcel}
-				/>
+				<!-- Sidebar Actions (Full width on mobile, 1/3 on desktop) -->
+				<div class="lg:col-span-1">
+					<SidebarActions
+						{keyUploaded}
+						{stats}
+						decryptedUsersCount={decryptedUsers.size}
+						onManualEntry={openManualEntry}
+						onExportExcel={exportToExcel}
+					/>
+				</div>
 			</div>
 		{/if}
 	</div>
@@ -654,7 +659,6 @@
 	<ManualEntryModal
 		onClose={() => {
 			showManualEntry = false;
-			// manualEntryError = '';
 		}}
 		onSubmit={handleManualSubmit}
 		onSubmitAndContinue={handleManualSubmitAndContinue}
