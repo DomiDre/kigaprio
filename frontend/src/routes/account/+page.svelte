@@ -12,7 +12,7 @@
 	// User info
 	let username = $state('');
 	let accountCreated = $state('');
-	let lastLogin = $state('');
+	let lastSeen = $state('');
 
 	// Password change
 	let currentPassword = $state('');
@@ -37,26 +37,6 @@
 	let error = $state('');
 	let success = $state('');
 
-	// Password validation
-	function validatePassword(password: string): string | null {
-		if (password.length < 8) {
-			return 'Das Passwort muss mindestens 8 Zeichen lang sein';
-		}
-		if (!/[A-Z]/.test(password)) {
-			return 'Das Passwort muss mindestens einen Großbuchstaben enthalten';
-		}
-		if (!/[a-z]/.test(password)) {
-			return 'Das Passwort muss mindestens einen Kleinbuchstaben enthalten';
-		}
-		if (!/[0-9]/.test(password)) {
-			return 'Das Passwort muss mindestens eine Zahl enthalten';
-		}
-		if (!/[^A-Za-z0-9]/.test(password)) {
-			return 'Das Passwort muss mindestens ein Sonderzeichen enthalten';
-		}
-		return null;
-	}
-
 	// Load user account info
 	async function loadAccountInfo() {
 		if (!$isAuthenticated) {
@@ -72,11 +52,11 @@
 		try {
 			const accountInfo = await apiService.getAccountInfo();
 			username = accountInfo.username || '';
-			accountCreated = accountInfo.createdAt
-				? new Date(accountInfo.createdAt).toLocaleDateString('de-DE')
+			accountCreated = accountInfo.created
+				? new Date(accountInfo.created).toLocaleDateString('de-DE')
 				: '';
-			lastLogin = accountInfo.lastLogin
-				? new Date(accountInfo.lastLogin).toLocaleDateString('de-DE')
+			lastSeen = accountInfo.lastSeen
+				? new Date(accountInfo.lastSeen).toLocaleDateString('de-DE')
 				: '';
 		} catch (err: any) {
 			console.error('Error loading account info:', err);
@@ -107,12 +87,6 @@
 		}
 
 		// Validate password strength
-		const validationError = validatePassword(newPassword);
-		if (validationError) {
-			passwordError = validationError;
-			return;
-		}
-
 		try {
 			changingPassword = true;
 			await apiService.changePassword(currentPassword, newPassword);
@@ -351,7 +325,7 @@
 					</div>
 					<div>
 						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">Letzte Anmeldung</div>
-						<p class="mt-1 text-gray-800 dark:text-gray-200">{lastLogin || 'Nicht verfügbar'}</p>
+						<p class="mt-1 text-gray-800 dark:text-gray-200">{lastSeen || 'Nicht verfügbar'}</p>
 					</div>
 					<div>
 						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">Account-Status</div>
@@ -657,8 +631,6 @@
 						<ul class="list-disc pl-5 text-sm text-gray-600 dark:text-gray-400">
 							<li>Ihr Benutzerkonto und alle Anmeldedaten</li>
 							<li>Alle gespeicherten Prioritäten</li>
-							<li>Alle persönlichen Einstellungen</li>
-							<li>Sämtliche Aktivitätsprotokolle</li>
 						</ul>
 
 						<p class="text-sm text-gray-600 dark:text-gray-400">

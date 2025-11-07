@@ -219,3 +219,5 @@ redis_data/
 monitoring/alertmanager/data
 monitoring/grafana/data
 monitoring/prometheus/data
+
+.claude
