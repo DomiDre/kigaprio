@@ -37,51 +37,51 @@ services:
       - SETUID
       - SETGID
 
-  # Grafana - Visualization and dashboards
-  grafana:
-    image: grafana/grafana:12.2
-    restart: unless-stopped
-    user: "10003:10003"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
-      - GF_SERVER_ROOT_URL=https://grafana.kiga.dhjd.de
-      - GF_SMTP_ENABLED=true
-      - GF_SMTP_HOST__FILE=/run/secrets/smtp_host
-      - GF_SMTP_USER__FILE=/run/secrets/smtp_user
-      - GF_SMTP_PASSWORD__FILE=/run/secrets/smtp_password
-      - GF_SMTP_FROM_ADDRESS=alerts@dhjd.de
-    volumes:
-      - ./grafana/data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - kigaprio_monitoring
-      - proxy
-    expose:
-      - 3000
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.kiga.dhjd.de`)"
-      - "traefik.http.routers.grafana.entrypoints=websecure"
-      - "traefik.http.routers.grafana.tls=true"
-      - "traefik.http.routers.grafana.tls.certresolver=myresolver"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-    secrets:
-      - grafana_admin_password
-      - smtp_host
-      - smtp_user
-      - smtp_password
-    depends_on:
-      - prometheus
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
+  # # Grafana - Visualization and dashboards
+  # grafana:
+  #   image: grafana/grafana:12.2
+  #   restart: unless-stopped
+  #   user: "10003:10003"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_USER=admin
+  #     - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+  #     - GF_SERVER_ROOT_URL=https://grafana.kiga.dhjd.de
+  #     - GF_SMTP_ENABLED=true
+  #     - GF_SMTP_HOST__FILE=/run/secrets/smtp_host
+  #     - GF_SMTP_USER__FILE=/run/secrets/smtp_user
+  #     - GF_SMTP_PASSWORD__FILE=/run/secrets/smtp_password
+  #     - GF_SMTP_FROM_ADDRESS=alerts@dhjd.de
+  #   volumes:
+  #     - ./grafana/data:/var/lib/grafana
+  #     - ./grafana/provisioning:/etc/grafana/provisioning:ro
+  #     - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+  #   networks:
+  #     - kigaprio_monitoring
+  #     - proxy
+  #   expose:
+  #     - 3000
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.grafana.rule=Host(`grafana.kiga.dhjd.de`)"
+  #     - "traefik.http.routers.grafana.entrypoints=websecure"
+  #     - "traefik.http.routers.grafana.tls=true"
+  #     - "traefik.http.routers.grafana.tls.certresolver=myresolver"
+  #     - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+  #   secrets:
+  #     - grafana_admin_password
+  #     - smtp_host
+  #     - smtp_user
+  #     - smtp_password
+  #   depends_on:
+  #     - prometheus
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   cap_drop:
+  #     - ALL
+  #   cap_add:
+  #     - CHOWN
+  #     - SETUID
+  #     - SETGID
 
   # AlertManager - Alert routing and deduplication
   alertmanager:
