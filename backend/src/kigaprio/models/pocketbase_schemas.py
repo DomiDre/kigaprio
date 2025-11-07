@@ -22,6 +22,7 @@ class UsersResponse(BaseModel):
     collectionName: str
     created: str
     updated: str
+    lastSeen: str
 
 
 class PriorityRecord(BaseModel):
