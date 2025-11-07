@@ -21,6 +21,7 @@ services:
       - "traefik.http.routers.kigaprio-backend.entrypoints=websecure"
       - "traefik.http.routers.kigaprio-backend.tls=true"
       - "traefik.http.routers.kigaprio-backend.tls.certresolver=myresolver"
+      - "traefik.http.routers.kigaprio-backend.tls.options=modern-tls@file"
       - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
     depends_on:
       pocketbase:
@@ -151,6 +152,7 @@ services:
       - "traefik.http.routers.kigaprio-admin.entrypoints=websecure"
       - "traefik.http.routers.kigaprio-admin.tls=true"
       - "traefik.http.routers.kigaprio-admin.tls.certresolver=myresolver"
+      - "traefik.http.routers.kigaprio-admin.tls.options=modern-tls@file"
       - "traefik.http.services.kigaprio-admin.loadbalancer.server.port=3000"
 
 volumes:
