@@ -138,12 +138,8 @@ export class ApiService {
 			})
 		});
 
-		// Password change invalidates all sessions
-		authStore.clearAuth(false);
-		if (browser) {
-			goto('/login', { replaceState: true });
-		}
-
+		// Backend updates auth cookies with new token and DEK
+		// User stays logged in with new credentials
 		return response;
 	}
 

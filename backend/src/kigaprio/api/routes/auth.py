@@ -15,6 +15,7 @@ from kigaprio.middleware.metrics import (
     update_admin_sessions,
 )
 from kigaprio.models.auth import (
+    ChangePasswordRequest,
     DatabaseLoginResponse,
     LoginRequest,
     LoginResponse,
@@ -505,18 +506,162 @@ async def verify_session(
 
 @router.post("/change-password")
 async def change_password(
+    request: ChangePasswordRequest,
+    response: Response,
     current_session: SessionInfo = Depends(verify_token),
+    token: str = Depends(get_current_token),
+    redis_client: redis.Redis = Depends(get_redis),
 ):
     """
     Change user password.
 
-    TODO: Implement password change logic:
-    1. Verify current password
-    2. Unwrap DEK with old password
-    3. Rewrap DEK with new password
-    4. Update database
-    5. Invalidate all existing sessions
+    Process:
+    1. Verify current password by attempting to unwrap DEK
+    2. Validate new password matches confirmation
+    3. Re-wrap DEK with new password
+    4. Update PocketBase with new encryption data
+    5. Invalidate all existing sessions except current one
+    6. Set new auth cookies
     """
-    # TODO: Implement this
-    _ = current_session
-    return {"message": "Not implemented yet"}
+    try:
+        async with httpx.AsyncClient() as client:
+            # First, get user record to retrieve current encryption data
+            user_response = await client.get(
+                f"{POCKETBASE_URL}/api/collections/users/records/{current_session.id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            if user_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Benutzerdaten konnten nicht abgerufen werden",
+                )
+
+            user_data = user_response.json()
+
+            # Verify current password by attempting to unwrap DEK
+            try:
+                dek = EncryptionManager.get_user_dek(
+                    request.current_password,
+                    user_data["salt"],
+                    user_data["user_wrapped_dek"],
+                )
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Aktuelles Passwort ist falsch",
+                )
+
+            # Generate new encryption data with new password
+            updated_encryption = EncryptionManager.change_password(
+                request.current_password,
+                request.new_password,
+                user_data["salt"],
+                user_data["user_wrapped_dek"],
+            )
+
+            # Update user record in PocketBase with new password and encryption data
+            update_response = await client.patch(
+                f"{POCKETBASE_URL}/api/collections/users/records/{current_session.id}",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "password": request.new_password,
+                    "passwordConfirm": request.new_password,
+                    "oldPassword": request.current_password,
+                    "salt": updated_encryption["salt"],
+                    "user_wrapped_dek": updated_encryption["user_wrapped_dek"],
+                },
+            )
+
+            if update_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Passwort konnte nicht aktualisiert werden",
+                )
+
+            # Authenticate with new password to get fresh token
+            auth_response = await client.post(
+                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
+                json={
+                    "identity": current_session.username,
+                    "password": request.new_password,
+                },
+            )
+
+            if auth_response.status_code != 200:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Authentifizierung mit neuem Passwort fehlgeschlagen",
+                )
+
+            auth_data = auth_response.json()
+            new_token = auth_data["token"]
+
+            # Invalidate all existing sessions by pattern matching
+            session_pattern = f"session:*"
+            cursor = 0
+            invalidated_count = 0
+
+            while True:
+                cursor, keys = redis_client.scan(
+                    cursor, match=session_pattern, count=100
+                )
+                for key in keys:
+                    key_str = key.decode() if isinstance(key, bytes) else key
+                    # Don't delete the current session yet - we'll replace it
+                    if key_str != f"session:{token}":
+                        session_data = redis_client.get(key_str)
+                        if session_data:
+                            session_info = json.loads(session_data)
+                            # Only delete sessions for this user
+                            if session_info.get("user_id") == current_session.id:
+                                redis_client.delete(key_str)
+                                invalidated_count += 1
+
+                if cursor == 0:
+                    break
+
+            # Delete old session
+            redis_client.delete(f"session:{token}")
+
+            # Create new session with new token
+            session_key = f"session:{new_token}"
+            session_info = {
+                "user_id": current_session.id,
+                "username": current_session.username,
+                "role": "admin" if current_session.is_admin else "user",
+                "is_admin": current_session.is_admin,
+            }
+
+            # Set session duration (8 hours for regular users, 15 minutes for admins)
+            if current_session.is_admin:
+                session_ttl = 900  # 15 minutes
+                cookie_max_age = 900
+            else:
+                session_ttl = 8 * 3600  # 8 hours
+                cookie_max_age = 8 * 3600
+
+            redis_client.setex(session_key, session_ttl, json.dumps(session_info))
+
+            # Derive DEK with new password and updated encryption data
+            new_dek = EncryptionManager.get_user_dek(
+                request.new_password,
+                updated_encryption["salt"],
+                updated_encryption["user_wrapped_dek"],
+            )
+
+            # Set new auth cookies with new token and NEW DEK
+            set_auth_cookies(response, new_token, new_dek, cookie_max_age)
+
+            return {
+                "success": True,
+                "message": f"Passwort erfolgreich geändert. {invalidated_count} andere Sitzung(en) wurden abgemeldet.",
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Ein unerwarteter Fehler ist aufgetreten",
+        ) from e
