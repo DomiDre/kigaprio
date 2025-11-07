@@ -613,9 +613,7 @@ async def change_password(
                     key_str = key.decode() if isinstance(key, bytes) else key
                     # Don't delete the current session yet - we'll replace it
                     if key_str != f"session:{token}":
-                        session_data_raw = cast(
-                            bytes | None, redis_client.get(key_str)
-                        )
+                        session_data_raw = cast(bytes | None, redis_client.get(key_str))
                         if session_data_raw:
                             session_data = (
                                 session_data_raw.decode()
