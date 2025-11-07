@@ -17,7 +17,7 @@
 
 ## 📋 Overview
 
-KigaPrio is a secure web application designed for childcare facilities to manage daily priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
+KigaPrio is a secure web application designed for a single childcare facility to manage daily priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
 
 ### Key Capabilities
 - 🔐 **Server-side encryption** with user-controlled security levels
@@ -32,14 +32,15 @@ KigaPrio implements a privacy-first architecture with multiple layers of securit
 
 ### Technology Stack
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Backend** | FastAPI + Python 3.11 | Async API server for data validation & server-side encryption |
-| **Frontend** | SvelteKit | Modern reactive UI framework |
-| **Database** | PocketBase | SQLite-based with built-in auth |
-| **Cache** | Redis | Session management |
-| **Proxy** | Traefik | TLS termination and routing |
-| **Container** | Docker + Docker Compose | Consistent deployment environment |
+| Component      | Technology              | Purpose                                                           |
+| -------------- | ----------------------- | ----------------------------------------------------------------- |
+| **Backend**    | FastAPI + Python 3.11   | Async API server for data validation & server-side encryption     |
+| **Frontend**   | SvelteKit               | Modern reactive UI framework                                      |
+| **Database**   | PocketBase              | SQLite-based with built-in auth                                   |
+| **Cache**      | Redis                   | Session management                                                |
+| **Proxy**      | Traefik                 | TLS termination and routing                                       |
+| **Monitoring** | Prometheus              | Active monitoring for malicious access attempts with e-mail alert |
+| **Container**  | Docker + Docker Compose | Consistent deployment environment                                 |
 
 ### Security Model
 
@@ -56,8 +57,8 @@ Details in [ARCHITECTURE.md](ARCHITECTURE.md).
 - Docker Engine ≥ 24.0
 - Docker Compose ≥ 2.20
 - [just](https://github.com/casey/just) command runner
-- 2GB available RAM
-- 1GB available disk space
+- 2 GB available RAM (usage actually < 500 MB)
+- 3 GB available disk space
 
 ### Development Setup
 
@@ -92,6 +93,19 @@ just init-secrets
 just pocketbase-init
 ```
 
+On a local device perform
+```bash
+just init-admin-key
+```
+to generate public/private key pair. Move public key to server and keep private key safe.
+
+Run
+```bash
+just services-init
+```
+to generate folders with proper permissions and seperate user + groups for each service.
+
+
 2. **Deploy**
 ```bash
 # Build production images
@@ -118,6 +132,8 @@ kigaprio/
 │   │   ├── routes/       # Page routes
 │   │   ├── lib/          # Shared components
 │   └── static/           # Static assets
+├── admin_ui/             # SvelteKit application for admin access
+├── monitoring/           # Setup for prometheus monitoring service
 ├── justfile              # Command automation
 └── docker-compose.yml    # Service orchestration
 ```
