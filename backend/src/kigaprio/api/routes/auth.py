@@ -2,6 +2,7 @@ import base64
 import json
 import secrets
 from datetime import datetime
+from typing import cast
 
 import httpx
 import redis
@@ -541,16 +542,16 @@ async def change_password(
 
             # Verify current password by attempting to unwrap DEK
             try:
-                dek = EncryptionManager.get_user_dek(
+                EncryptionManager.get_user_dek(
                     request.current_password,
                     user_data["salt"],
                     user_data["user_wrapped_dek"],
                 )
-            except Exception:
+            except Exception as err:
                 raise HTTPException(
                     status_code=400,
                     detail="Aktuelles Passwort ist falsch",
-                )
+                ) from err
 
             # Generate new encryption data with new password
             updated_encryption = EncryptionManager.change_password(
@@ -598,20 +599,29 @@ async def change_password(
             new_token = auth_data["token"]
 
             # Invalidate all existing sessions by pattern matching
-            session_pattern = f"session:*"
-            cursor = 0
+            session_pattern = "session:*"
+            cursor: int = 0
             invalidated_count = 0
 
             while True:
-                cursor, keys = redis_client.scan(
-                    cursor, match=session_pattern, count=100
+                scan_result = cast(
+                    tuple[int, list[bytes]],
+                    redis_client.scan(cursor, match=session_pattern, count=100),
                 )
+                cursor, keys = scan_result
                 for key in keys:
                     key_str = key.decode() if isinstance(key, bytes) else key
                     # Don't delete the current session yet - we'll replace it
                     if key_str != f"session:{token}":
-                        session_data = redis_client.get(key_str)
-                        if session_data:
+                        session_data_raw = cast(
+                            bytes | None, redis_client.get(key_str)
+                        )
+                        if session_data_raw:
+                            session_data = (
+                                session_data_raw.decode()
+                                if isinstance(session_data_raw, bytes)
+                                else session_data_raw
+                            )
                             session_info = json.loads(session_data)
                             # Only delete sessions for this user
                             if session_info.get("user_id") == current_session.id:
