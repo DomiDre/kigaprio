@@ -487,7 +487,9 @@ def track_csp_violation(directive: str):
     csp_violation_total.labels(directive=directive).inc()
 
 
-def track_cleanup_run(success: bool, deleted_count: int, failed_count: int, duration: float):
+def track_cleanup_run(
+    success: bool, deleted_count: int, failed_count: int, duration: float
+):
     """Track cleanup task execution"""
     import time
 
@@ -499,7 +501,9 @@ def track_cleanup_run(success: bool, deleted_count: int, failed_count: int, dura
     cleanup_last_run_timestamp.set(time.time())
 
 
-def track_user_cleanup_run(success: bool, deleted_count: int, failed_count: int, duration: float):
+def track_user_cleanup_run(
+    success: bool, deleted_count: int, failed_count: int, duration: float
+):
     """Track user cleanup task execution"""
     import time
 

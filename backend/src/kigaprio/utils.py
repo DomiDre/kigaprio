@@ -2,7 +2,7 @@ import asyncio
 import base64
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import redis
@@ -93,9 +93,7 @@ async def verify_token(
             session_info = SessionInfo(**session_data)
 
             # Update lastSeen in background (non-blocking)
-            asyncio.create_task(
-                update_last_seen(session_info.id, token, redis_client)
-            )
+            asyncio.create_task(update_last_seen(session_info.id, token, redis_client))
 
             return session_info
         except Exception as e:
@@ -268,7 +266,7 @@ async def update_last_seen(
     # Update lastSeen in PocketBase
     try:
         async with httpx.AsyncClient() as client:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             response = await client.patch(
                 f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
                 headers={"Authorization": f"Bearer {token}"},

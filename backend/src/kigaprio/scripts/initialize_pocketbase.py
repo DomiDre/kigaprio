@@ -4,13 +4,13 @@ import sys
 
 import requests
 
-from kigaprio.services.magic_word import (
-    SERVICE_ACCOUNT_ID,
-    SERVICE_ACCOUNT_PASSWORD,
-    create_or_update_magic_word,
-)
+from kigaprio.services.magic_word import create_or_update_magic_word
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
+from kigaprio.services.service_account import (
+    SERVICE_ACCOUNT_ID,
+    SERVICE_ACCOUNT_PASSWORD,
+)
 
 superuser_login = input("Enter superuser login: ")
 superuser_password = getpass.getpass()

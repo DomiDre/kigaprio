@@ -5,11 +5,9 @@ import os
 import time
 from datetime import datetime
 
+import httpx
 from dateutil.relativedelta import relativedelta
 
-import httpx
-
-from kigaprio.config import settings
 from kigaprio.middleware.metrics import track_user_cleanup_run
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.service_account import authenticate_service_account

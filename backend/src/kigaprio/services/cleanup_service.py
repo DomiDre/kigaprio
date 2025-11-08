@@ -4,9 +4,8 @@ import logging
 import time
 from datetime import datetime
 
-from dateutil.relativedelta import relativedelta
-
 import httpx
+from dateutil.relativedelta import relativedelta
 
 from kigaprio.config import settings
 from kigaprio.middleware.metrics import track_cleanup_run
