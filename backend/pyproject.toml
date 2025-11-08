@@ -112,8 +112,7 @@ addopts = [
     "--cov=kigaprio",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-branch",
-    "-m", "not integration",  # By default, skip integration tests
+    "--cov-branch"
 ]
 filterwarnings = [
     "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning:testcontainers",
