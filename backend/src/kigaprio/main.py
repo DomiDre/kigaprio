@@ -4,7 +4,6 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -16,15 +15,14 @@ from kigaprio.middleware.metrics import (
     PrometheusMetricsMiddleware,
     metrics_endpoint,
     track_csp_violation,
-    update_health_status,
 )
 from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import (
-    close_redis,
-    redis_health_check,
-    update_redis_metrics,
+from kigaprio.services.background_tasks import (
+    cleanup_loop,
+    monitoring_loop,
+    user_cleanup_loop,
 )
+from kigaprio.services.redis_service import close_redis, redis_health_check
 from kigaprio.static_files_utils import setup_static_file_serving
 
 ENV = os.getenv("ENV", "production")
@@ -39,41 +37,11 @@ logger.info("Starting KigaPrio API")
 
 # Background task state
 _monitoring_task = None
+_cleanup_task = None
+_user_cleanup_task = None
 _ = _monitoring_task
-
-
-async def monitoring_loop():
-    """Background task to collect metrics from Redis and PocketBase"""
-    import asyncio
-
-    while True:
-        try:
-            # Update Redis metrics
-            update_redis_metrics()
-
-            # Check PocketBase health
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get(
-                        f"{POCKETBASE_URL}/api/health", timeout=5.0
-                    )
-                    pocketbase_healthy = response.status_code == 200
-            except Exception:
-                pocketbase_healthy = False
-            update_health_status("pocketbase", pocketbase_healthy)
-
-            # Check Redis health
-            redis_healthy = redis_health_check()
-            update_health_status("redis", redis_healthy)
-
-            # Backend is healthy if we're running this task
-            update_health_status("backend", True)
-
-        except Exception as e:
-            logger.error(f"Error in monitoring loop: {e}")
-
-        # Update every 15 seconds
-        await asyncio.sleep(15)
+_ = _cleanup_task
+_ = _user_cleanup_task
 
 
 @asynccontextmanager
@@ -85,14 +53,35 @@ async def lifespan(app: FastAPI):
     print("✓ Redis connected")
 
     _monitoring_task = asyncio.create_task(monitoring_loop())
-    print("Monitoring task started")
+    print("✓ Monitoring task started")
+
+    _cleanup_task = asyncio.create_task(cleanup_loop())
+    print("✓ Cleanup task started")
+
+    _user_cleanup_task = asyncio.create_task(user_cleanup_loop())
+    print("✓ User cleanup task started")
 
     yield
 
+    # Shutdown: cancel background tasks
     if _monitoring_task:
         _monitoring_task.cancel()
         try:
             await _monitoring_task
+        except asyncio.CancelledError:
+            pass
+
+    if _cleanup_task:
+        _cleanup_task.cancel()
+        try:
+            await _cleanup_task
+        except asyncio.CancelledError:
+            pass
+
+    if _user_cleanup_task:
+        _user_cleanup_task.cancel()
+        try:
+            await _user_cleanup_task
         except asyncio.CancelledError:
             pass
 

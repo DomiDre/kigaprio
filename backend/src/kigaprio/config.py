@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     )
     PROCESS_TIMEOUT: int = Field(default=300, description="Process timeout in seconds")
 
+    # Cleanup Settings
+    CLEANUP_INTERVAL_HOURS: int = Field(
+        default=24, description="Interval between cleanup runs in hours"
+    )
+    PRIORITY_RETENTION_MONTHS: int = Field(
+        default=2, description="Number of months to retain priority data"
+    )
+
 
 # Create global settings instance
 settings = Settings()

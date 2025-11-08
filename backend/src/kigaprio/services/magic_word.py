@@ -1,25 +1,9 @@
-from pathlib import Path
-
 import httpx
 import redis
 from fastapi import HTTPException
 
 from kigaprio.services.pocketbase_service import POCKETBASE_URL
-
-service_id_file = Path("/run/secrets/pb_service_id")
-service_password_file = Path("/run/secrets/pb_service_password")
-
-if not service_id_file.exists() or not service_password_file.exists():
-    print("Service ID/password are not set on backend as secret")
-
-SERVICE_ACCOUNT_ID = (
-    service_id_file.read_text().strip() if service_id_file.exists() else "pb_service"
-)
-SERVICE_ACCOUNT_PASSWORD = (
-    service_password_file.read_text().strip()
-    if service_password_file.exists()
-    else "password"
-)
+from kigaprio.services.service_account import authenticate_service_account
 
 
 async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | None:
@@ -36,22 +20,13 @@ async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | No
     # Fetch from database
     try:
         async with httpx.AsyncClient() as client:
-            # Use PocketBase's public API to get system settings
-            response = await client.post(
-                f"{POCKETBASE_URL}/api/collections/users/auth-with-password",
-                json={
-                    "identity": SERVICE_ACCOUNT_ID,
-                    "password": SERVICE_ACCOUNT_PASSWORD,
-                },
-            )
+            # Authenticate as service account
+            service_token = await authenticate_service_account(client)
 
-            if response.status_code != 200:
+            if not service_token:
                 raise HTTPException(
                     status_code=401, detail="Invalid service credentials"
                 )
-
-            data = response.json()
-            service_token = data.get("token")
             response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/system_settings/records",
                 params={"filter": 'key="registration_magic_word"'},
