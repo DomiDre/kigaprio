@@ -1,6 +1,8 @@
+import asyncio
 import base64
 import json
 import logging
+from datetime import UTC, datetime
 
 import httpx
 import redis
@@ -19,6 +21,8 @@ from kigaprio.services.pocketbase_service import POCKETBASE_URL
 from kigaprio.services.redis_service import get_redis
 
 # Cookie names
+# Update lastSeen at most once per hour to avoid excessive database writes
+LAST_SEEN_UPDATE_INTERVAL = 3600  # 1 hour in seconds
 
 
 async def get_current_token(
@@ -86,7 +90,12 @@ async def verify_token(
                 if isinstance(cached_session, str)
                 else json.loads(str(cached_session))
             )
-            return SessionInfo(**session_data)
+            session_info = SessionInfo(**session_data)
+
+            # Update lastSeen in background (non-blocking)
+            asyncio.create_task(update_last_seen(session_info.id, token, redis_client))
+
+            return session_info
         except Exception as e:
             track_session_lookup("invalid")
             logger.error(f"Failed to parse cached session: {e}")
@@ -176,6 +185,11 @@ async def verify_token(
                     logger.error(f"Failed to restore session to Redis: {e}")
                     # Continue anyway - PocketBase token is valid
 
+            # Update lastSeen in background (non-blocking)
+            asyncio.create_task(
+                update_last_seen(session_info.id, new_token, redis_client)
+            )
+
             return session_info
 
         except httpx.RequestError as e:
@@ -222,3 +236,58 @@ def get_client_ip(request: Request) -> str:
 
     # Fall back to direct connection
     return request.client.host if request.client else "127.0.0.1"
+
+
+async def update_last_seen(
+    user_id: str,
+    token: str,
+    redis_client: redis.Redis,
+) -> None:
+    """
+    Update the lastSeen timestamp for a user.
+
+    Uses Redis to throttle updates to at most once per hour to avoid
+    excessive database writes.
+    """
+    logger = logging.getLogger(__name__)
+
+    # Check if we've updated recently
+    throttle_key = f"lastseen:{user_id}"
+
+    try:
+        recently_updated = redis_client.get(throttle_key)
+        if recently_updated:
+            # Already updated recently, skip
+            return
+    except Exception as e:
+        logger.warning(f"Failed to check lastSeen throttle in Redis: {e}")
+        # Continue anyway to attempt update
+
+    # Update lastSeen in PocketBase
+    try:
+        async with httpx.AsyncClient() as client:
+            now = datetime.now(UTC).isoformat()
+            response = await client.patch(
+                f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"lastSeen": now},
+                timeout=5.0,
+            )
+
+            if response.status_code == 200:
+                # Set throttle for next hour
+                try:
+                    redis_client.setex(throttle_key, LAST_SEEN_UPDATE_INTERVAL, "1")
+                except Exception as e:
+                    logger.warning(f"Failed to set lastSeen throttle in Redis: {e}")
+
+                logger.debug(f"Updated lastSeen for user {user_id}")
+            else:
+                logger.warning(
+                    f"Failed to update lastSeen for user {user_id}: "
+                    f"{response.status_code} - {response.text}"
+                )
+    except httpx.RequestError as e:
+        logger.warning(f"Network error updating lastSeen for user {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error updating lastSeen for user {user_id}: {e}")

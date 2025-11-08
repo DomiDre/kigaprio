@@ -29,11 +29,24 @@ RUN mkdir -p src/kigaprio && touch src/kigaprio/__init__.py && touch README.md
 # --- Development stage ---
 FROM base AS development
 
+# Install supercronic for development scheduler
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && curl -fsSL https://github.com/aptible/supercronic/releases/download/v0.2.33/supercronic-linux-amd64 -o /usr/local/bin/supercronic \
+    && chmod +x /usr/local/bin/supercronic \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+USER ubuntu
+
 # Install dependencies
 RUN uv sync
 
 # Copy source code (this will overwrite the dummy __init__.py)
 COPY --chown=ubuntu:ubuntu src/ ./src/
+
+# Copy scheduler scripts
+COPY --chown=ubuntu:ubuntu scheduler.sh scheduler-dev.sh ./
 
 # Create directories
 RUN mkdir -p /app/static
@@ -48,12 +61,15 @@ CMD ["uv", "run", "python", "-m", "uvicorn", "kigaprio.main:app", "--host", "0.0
 # --- Production stage ---
 FROM ubuntu:24.04 AS production
 
-# Install only essential runtime dependencies
+# Install only essential runtime dependencies including supercronic
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
     curl \
+    ca-certificates \
+    && curl -fsSL https://github.com/aptible/supercronic/releases/download/v0.2.33/supercronic-linux-amd64 -o /usr/local/bin/supercronic \
+    && chmod +x /usr/local/bin/supercronic \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -104,7 +120,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 USER root
 COPY --chown=root:root ./load-secrets.sh /usr/local/bin/load-secrets.sh
-RUN chmod +x /usr/local/bin/load-secrets.sh
+COPY --chown=appuser:appuser ./scheduler.sh /app/scheduler.sh
+RUN chmod +x /usr/local/bin/load-secrets.sh && chmod +x /app/scheduler.sh
 USER appuser
 
 ENTRYPOINT ["/usr/local/bin/load-secrets.sh"]

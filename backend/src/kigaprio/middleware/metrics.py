@@ -205,6 +205,62 @@ user_registrations_total = Counter(
     ["result"],  # success, failed
 )
 
+# Cleanup task metrics
+cleanup_runs_total = Counter(
+    "kigaprio_cleanup_runs_total",
+    "Total cleanup task runs",
+    ["result"],  # success, failed
+)
+
+cleanup_records_deleted_total = Counter(
+    "kigaprio_cleanup_records_deleted_total",
+    "Total records deleted by cleanup task",
+)
+
+cleanup_records_failed_total = Counter(
+    "kigaprio_cleanup_records_failed_total",
+    "Total records that failed to delete during cleanup",
+)
+
+cleanup_duration_seconds = Histogram(
+    "kigaprio_cleanup_duration_seconds",
+    "Cleanup task duration in seconds",
+    buckets=(1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0),
+)
+
+cleanup_last_run_timestamp = Gauge(
+    "kigaprio_cleanup_last_run_timestamp",
+    "Timestamp of last cleanup run",
+)
+
+# User cleanup task metrics
+user_cleanup_runs_total = Counter(
+    "kigaprio_user_cleanup_runs_total",
+    "Total user cleanup task runs",
+    ["result"],  # success, failed
+)
+
+user_cleanup_users_deleted_total = Counter(
+    "kigaprio_user_cleanup_users_deleted_total",
+    "Total inactive users deleted by cleanup task",
+)
+
+user_cleanup_users_failed_total = Counter(
+    "kigaprio_user_cleanup_users_failed_total",
+    "Total users that failed to delete during cleanup",
+)
+
+user_cleanup_duration_seconds = Histogram(
+    "kigaprio_user_cleanup_duration_seconds",
+    "User cleanup task duration in seconds",
+    buckets=(1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0),
+)
+
+user_cleanup_last_run_timestamp = Gauge(
+    "kigaprio_user_cleanup_last_run_timestamp",
+    "Timestamp of last user cleanup run",
+)
+
 
 # ============================================================================
 # MIDDLEWARE
@@ -429,6 +485,34 @@ def update_health_status(component: str, is_healthy: bool):
 def track_csp_violation(directive: str):
     """Track CSP violation"""
     csp_violation_total.labels(directive=directive).inc()
+
+
+def track_cleanup_run(
+    success: bool, deleted_count: int, failed_count: int, duration: float
+):
+    """Track cleanup task execution"""
+    import time
+
+    result = "success" if success else "failed"
+    cleanup_runs_total.labels(result=result).inc()
+    cleanup_records_deleted_total.inc(deleted_count)
+    cleanup_records_failed_total.inc(failed_count)
+    cleanup_duration_seconds.observe(duration)
+    cleanup_last_run_timestamp.set(time.time())
+
+
+def track_user_cleanup_run(
+    success: bool, deleted_count: int, failed_count: int, duration: float
+):
+    """Track user cleanup task execution"""
+    import time
+
+    result = "success" if success else "failed"
+    user_cleanup_runs_total.labels(result=result).inc()
+    user_cleanup_users_deleted_total.inc(deleted_count)
+    user_cleanup_users_failed_total.inc(failed_count)
+    user_cleanup_duration_seconds.observe(duration)
+    user_cleanup_last_run_timestamp.set(time.time())
 
 
 # ============================================================================
