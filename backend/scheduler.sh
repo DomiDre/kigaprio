@@ -19,4 +19,4 @@ echo "Crontab configured:"
 cat /tmp/cleanup-crontab
 
 # Run supercronic with the crontab
-exec supercronic /tmp/cleanup-crontab
+exec /usr/local/bin/supercronic /tmp/cleanup-crontab

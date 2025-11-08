@@ -33,7 +33,7 @@ async def main():
         update_health_status("redis", redis_healthy)
 
         if redis_healthy:
-            await update_redis_metrics()
+            update_redis_metrics()
 
         # Check PocketBase health
         try:

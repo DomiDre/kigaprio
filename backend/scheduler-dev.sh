@@ -10,13 +10,10 @@ echo "⚠️  Running with shorter intervals for testing purposes"
 # Create a crontab for cleanup tasks (more frequent for dev)
 cat > /tmp/cleanup-crontab <<EOF
 # Run cleanup tasks every hour (instead of daily) for testing
-0 * * * * cd /app && uv run python -m kigaprio.scripts.run_cleanup_tasks
+*/1 * * * * cd /app && /home/ubuntu/.local/bin/uv run python -m kigaprio.scripts.run_cleanup_tasks
 
 # Run monitoring updates every 2 minutes (instead of 5) for testing
-*/2 * * * * cd /app && uv run python -m kigaprio.scripts.run_monitoring
-
-# Uncomment to run cleanup on startup (useful for testing)
-# @reboot sleep 10 && cd /app && uv run python -m kigaprio.scripts.run_cleanup_tasks
+*/1 * * * * cd /app && /home/ubuntu/.local/bin/uv run python -m kigaprio.scripts.run_monitoring
 EOF
 
 echo "Development crontab configured:"
@@ -31,4 +28,4 @@ echo "   docker compose exec scheduler uv run python -m kigaprio.scripts.run_cle
 echo ""
 
 # Run supercronic with the crontab
-exec supercronic /tmp/cleanup-crontab
+exec /usr/local/bin/supercronic -debug /tmp/cleanup-crontab

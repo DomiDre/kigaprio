@@ -27,9 +27,15 @@ build-no-cache:
     docker compose build --no-cache
 
 # Stop all containers
-down:
-    docker compose down
-    docker compose -f docker-compose.dev.yml down
+down service="": 
+    #!/usr/bin/env bash
+    if [ -z "{{service}}" ]; then
+        docker compose down
+        docker compose -f docker-compose.dev.yml down
+    else
+        docker compose down {{service}}
+        docker compose -f docker-compose.dev.yml down {{service}}
+    fi
 
 # Stop all containers and remove volumes
 down-volumes:
