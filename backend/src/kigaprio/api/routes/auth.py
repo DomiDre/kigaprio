@@ -470,6 +470,11 @@ async def logout_user(
     # Delete session from Redis
     redis_client.delete(session_key)
 
+    # Add token to blacklist to prevent reuse
+    # Set expiration to match PocketBase token expiration (30 days max)
+    blacklist_key = f"blacklist:{token}"
+    redis_client.setex(blacklist_key, 30 * 24 * 3600, "1")
+
     # Clear both httpOnly cookies
     clear_auth_cookies(response)
 

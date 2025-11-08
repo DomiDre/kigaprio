@@ -68,6 +68,22 @@ async def verify_token(
     """
     logger = logging.getLogger(__name__)
 
+    # Check if token is blacklisted (logged out)
+    blacklist_key = f"blacklist:{token}"
+    try:
+        is_blacklisted = redis_client.exists(blacklist_key)
+        if is_blacklisted:
+            logger.debug(f"Token is blacklisted: {token[:10]}...")
+            raise HTTPException(
+                status_code=401,
+                detail="Token wurde durch Logout ungültig gemacht",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Failed to check blacklist: {e}")
+        # Continue if blacklist check fails (don't block valid users)
+
     session_key = f"session:{token}"
 
     try:
