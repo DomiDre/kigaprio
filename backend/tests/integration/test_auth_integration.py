@@ -24,7 +24,7 @@ class TestAuthenticationIntegration:
         - Session creation in Redis
         - Cookie management
         """
-
+        print("!!!", pocketbase_url)
         # Register a new user
         registration_data = {
             "username": "testuser",
@@ -83,9 +83,9 @@ class TestAuthenticationIntegration:
         assert "dek" in cookies, "dek cookie not found"
 
         # Verify session endpoint - manually pass cookies
+        test_app.cookies = cookies
         verify_response = test_app.get(
             "/api/v1/auth/verify",
-            cookies=cookies
         )
         assert verify_response.status_code == 200, f"Verification failed: {verify_response.text}"
         data = verify_response.json()
@@ -168,11 +168,12 @@ class TestAuthenticationIntegration:
                 cookies[cookie_match.group(1)] = cookie_match.group(2)
 
         assert "auth_token" in cookies
+        test_app.cookies = cookies
 
         # Logout - pass the cookies
-        logout_response = test_app.post("/api/v1/auth/logout", cookies=cookies)
+        logout_response = test_app.post("/api/v1/auth/logout")
         assert logout_response.status_code == 200
 
         # Verify session is invalid - try to use the old cookies
-        verify_response = test_app.get("/api/v1/auth/verify", cookies=cookies)
+        verify_response = test_app.get("/api/v1/auth/verify")
         assert verify_response.status_code in [401, 403]

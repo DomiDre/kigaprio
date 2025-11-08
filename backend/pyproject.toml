@@ -115,3 +115,6 @@ addopts = [
     "--cov-branch",
     "-m", "not integration",  # By default, skip integration tests
 ]
+filterwarnings = [
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning:testcontainers",
+]

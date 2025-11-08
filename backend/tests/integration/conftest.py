@@ -10,19 +10,20 @@ from pathlib import Path
 from typing import Generator
 
 import httpx
-import requests
 import pytest
 import redis
-import asyncio
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
-from testcontainers.redis import RedisContainer
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
 
 @pytest.fixture(scope="session")
-def redis_container() -> Generator[RedisContainer, None, None]:
+def redis_container() -> Generator[DockerContainer, None, None]:
     """Start a Redis container for integration tests."""
-    container = RedisContainer("redis:8-alpine")
+    container = (
+        DockerContainer("redis:8-alpine")
+        .with_bind_ports("6379/tcp", 6379)
+        .waiting_for(LogMessageWaitStrategy('Ready to accept connections'))
+    )
     container.start()
 
     yield container
@@ -31,7 +32,7 @@ def redis_container() -> Generator[RedisContainer, None, None]:
 
 
 @pytest.fixture(scope="session")
-def redis_client(redis_container: RedisContainer) -> Generator[redis.Redis, None, None]:
+def redis_client(redis_container: DockerContainer) -> Generator[redis.Redis, None, None]:
     """Get a Redis client connected to the test container."""
     client = redis.Redis(
         host=redis_container.get_container_host_ip(),
@@ -80,10 +81,10 @@ def pocketbase_container(redis_client) -> Generator[DockerContainer, None, None]
         .with_bind_ports("8090/tcp", 8090)
         .with_env("PB_ADMIN_EMAIL", superuser_login)
         .with_env("PB_ADMIN_PASSWORD", superuser_password)
-        .with_volume_mapping(migrations_dir, "/pb_migrations", mode="ro")  # PocketBase expects migrations in /pb/pb_migrations
+        .with_volume_mapping(migrations_dir, "/pb_migrations", mode="ro")
+        .waiting_for(LogMessageWaitStrategy('Server started'))
     )
     container.start()
-    wait_for_logs(container, ".*Server started.*")
 
     # Wait for PocketBase to be ready
     host = container.get_container_host_ip()
