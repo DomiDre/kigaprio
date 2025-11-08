@@ -14,9 +14,7 @@ import base64
 import json
 
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.hashes import SHA256
 
 from kigaprio.services.encryption import EncryptionManager
@@ -102,7 +100,7 @@ class TestAESEncryption:
         encrypted = EncryptionManager.encrypt_data(original, test_dek)
         wrong_dek = EncryptionManager.generate_dek()
 
-        with pytest.raises(Exception):  # AES-GCM authentication failure
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure # AES-GCM authentication failure
             EncryptionManager.decrypt_data(encrypted, wrong_dek)
 
     def test_encrypt_empty_string(self, test_dek):
@@ -129,7 +127,7 @@ class TestAESEncryption:
 
     def test_decrypt_invalid_base64_fails(self, test_dek):
         """Invalid base64 should raise appropriate error."""
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
             EncryptionManager.decrypt_data("not_valid_base64!!!", test_dek)
 
     def test_decrypt_tampered_data_fails(self, test_dek):
@@ -142,7 +140,7 @@ class TestAESEncryption:
         tampered = encrypted_bytes[:-1] + b"X"  # Change last byte
         tampered_b64 = base64.b64encode(tampered).decode()
 
-        with pytest.raises(Exception):  # GCM authentication failure
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure # GCM authentication failure
             EncryptionManager.decrypt_data(tampered_b64, test_dek)
 
 
@@ -197,7 +195,7 @@ class TestFieldEncryption:
 class TestRSAKeyWrapping:
     """Test RSA key wrapping with admin public key."""
 
-    def test_wrap_dek_with_admin_key(self, test_dek, admin_rsa_keypair):
+    def test_wrap_dek_with_admin_key(self, test_dek):
         """DEK should be wrapped with admin RSA public key."""
         wrapped = EncryptionManager.wrap_dek_with_admin_key(test_dek)
         assert isinstance(wrapped, str)
@@ -222,7 +220,7 @@ class TestRSAKeyWrapping:
         )
         assert unwrapped == test_dek
 
-    def test_wrap_dek_unique_each_time(self, test_dek, admin_rsa_keypair):
+    def test_wrap_dek_unique_each_time(self, test_dek):
         """RSA-OAEP wrapping should produce different ciphertexts."""
         wrapped1 = EncryptionManager.wrap_dek_with_admin_key(test_dek)
         wrapped2 = EncryptionManager.wrap_dek_with_admin_key(test_dek)
@@ -234,7 +232,7 @@ class TestRSAKeyWrapping:
 class TestUserEncryptionDataCreation:
     """Test complete user encryption data creation."""
 
-    def test_create_user_encryption_data(self, test_password, admin_rsa_keypair):
+    def test_create_user_encryption_data(self, test_password):
         """Should create all required encryption data for new user."""
         result = EncryptionManager.create_user_encryption_data(test_password)
 
@@ -257,7 +255,7 @@ class TestUserEncryptionDataCreation:
         )
         assert len(dek) == 32
 
-    def test_created_dek_can_be_unwrapped(self, test_password, admin_rsa_keypair):
+    def test_created_dek_can_be_unwrapped(self, test_password):
         """User should be able to unwrap their DEK with password."""
         result = EncryptionManager.create_user_encryption_data(test_password)
 
@@ -301,7 +299,7 @@ class TestUserEncryptionDataCreation:
 class TestPasswordChange:
     """Test password change and DEK re-wrapping."""
 
-    def test_change_password_preserves_dek(self, test_password, admin_rsa_keypair):
+    def test_change_password_preserves_dek(self, test_password):
         """DEK should remain the same after password change."""
         # Create initial encryption data
         initial_data = EncryptionManager.create_user_encryption_data(test_password)
@@ -326,7 +324,10 @@ class TestPasswordChange:
         )
         assert unwrapped_dek == original_dek
 
-    def test_change_password_new_salt(self, test_password, admin_rsa_keypair):
+    def test_change_password_new_salt(
+        self,
+        test_password,
+    ):
         """Password change should generate new salt."""
         initial_data = EncryptionManager.create_user_encryption_data(test_password)
 
@@ -340,7 +341,10 @@ class TestPasswordChange:
 
         assert result["salt"] != initial_data["salt"]
 
-    def test_old_password_fails_after_change(self, test_password, admin_rsa_keypair):
+    def test_old_password_fails_after_change(
+        self,
+        test_password,
+    ):
         """Old password should not work after password change."""
         initial_data = EncryptionManager.create_user_encryption_data(test_password)
 
@@ -353,13 +357,14 @@ class TestPasswordChange:
         )
 
         # Try to unwrap with old password - should fail
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
             EncryptionManager.get_user_dek(
                 test_password, result["salt"], result["user_wrapped_dek"]
             )
 
     def test_encrypted_data_decryptable_after_password_change(
-        self, test_password, admin_rsa_keypair
+        self,
+        test_password,
     ):
         """Data encrypted before password change should still be decryptable."""
         # Create initial data and encrypt something
@@ -395,7 +400,10 @@ class TestPasswordChange:
 class TestGetUserDEK:
     """Test DEK unwrapping with password."""
 
-    def test_get_user_dek_success(self, test_password, admin_rsa_keypair):
+    def test_get_user_dek_success(
+        self,
+        test_password,
+    ):
         """Should successfully unwrap DEK with correct password."""
         data = EncryptionManager.create_user_encryption_data(test_password)
         dek = EncryptionManager.get_user_dek(
@@ -406,27 +414,40 @@ class TestGetUserDEK:
         assert len(dek) == 32
         assert isinstance(dek, bytes)
 
-    def test_get_user_dek_wrong_password_fails(self, test_password, admin_rsa_keypair):
+    def test_get_user_dek_wrong_password_fails(
+        self,
+        test_password,
+    ):
         """Wrong password should fail to unwrap DEK."""
         data = EncryptionManager.create_user_encryption_data(test_password)
 
-        with pytest.raises(Exception):
-            EncryptionManager.get_user_dek("WrongPassword", data["salt"], data["user_wrapped_dek"])
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
+            EncryptionManager.get_user_dek(
+                "WrongPassword", data["salt"], data["user_wrapped_dek"]
+            )
 
-    def test_get_user_dek_wrong_salt_fails(self, test_password, admin_rsa_keypair):
+    def test_get_user_dek_wrong_salt_fails(
+        self,
+        test_password,
+    ):
         """Wrong salt should fail to unwrap DEK."""
         data = EncryptionManager.create_user_encryption_data(test_password)
 
         wrong_salt = base64.b64encode(b"wrong_salt_16byt").decode()
-        with pytest.raises(Exception):
-            EncryptionManager.get_user_dek(test_password, wrong_salt, data["user_wrapped_dek"])
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
+            EncryptionManager.get_user_dek(
+                test_password, wrong_salt, data["user_wrapped_dek"]
+            )
 
 
 @pytest.mark.security
 class TestEncryptionSecurity:
     """Security-focused tests for encryption implementation."""
 
-    def test_dek_not_stored_in_plaintext(self, test_password, admin_rsa_keypair):
+    def test_dek_not_stored_in_plaintext(
+        self,
+        test_password,
+    ):
         """DEK should never be stored in plaintext."""
         result = EncryptionManager.create_user_encryption_data(test_password)
 
@@ -443,7 +464,10 @@ class TestEncryptionSecurity:
         # Also verify that 'dek' key is not in the result
         assert "dek" not in result
 
-    def test_password_not_stored(self, test_password, admin_rsa_keypair):
+    def test_password_not_stored(
+        self,
+        test_password,
+    ):
         """Password should never appear in encryption data."""
         result = EncryptionManager.create_user_encryption_data(test_password)
 
@@ -478,5 +502,5 @@ class TestEncryptionSecurity:
         tampered_b64 = base64.b64encode(bytes(tampered)).decode()
 
         # Decryption should fail due to authentication tag mismatch
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
             EncryptionManager.decrypt_data(tampered_b64, test_dek)
