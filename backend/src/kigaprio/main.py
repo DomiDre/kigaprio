@@ -17,11 +17,6 @@ from kigaprio.middleware.metrics import (
     track_csp_violation,
 )
 from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
-from kigaprio.services.background_tasks import (
-    cleanup_loop,
-    monitoring_loop,
-    user_cleanup_loop,
-)
 from kigaprio.services.redis_service import close_redis, redis_health_check
 from kigaprio.static_files_utils import setup_static_file_serving
 
@@ -35,55 +30,16 @@ logger = logging.getLogger(__name__)
 logger.info("Starting KigaPrio API")
 
 
-# Background task state
-_monitoring_task = None
-_cleanup_task = None
-_user_cleanup_task = None
-_ = _monitoring_task
-_ = _cleanup_task
-_ = _user_cleanup_task
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _ = app  # remove unused warning
+    _ = asyncio  # remove unused warning
     # Startup: test Redis connection
     if not redis_health_check():
         raise RuntimeError("Failed to connect to Redis")
     print("✓ Redis connected")
 
-    _monitoring_task = asyncio.create_task(monitoring_loop())
-    print("✓ Monitoring task started")
-
-    _cleanup_task = asyncio.create_task(cleanup_loop())
-    print("✓ Cleanup task started")
-
-    _user_cleanup_task = asyncio.create_task(user_cleanup_loop())
-    print("✓ User cleanup task started")
-
     yield
-
-    # Shutdown: cancel background tasks
-    if _monitoring_task:
-        _monitoring_task.cancel()
-        try:
-            await _monitoring_task
-        except asyncio.CancelledError:
-            pass
-
-    if _cleanup_task:
-        _cleanup_task.cancel()
-        try:
-            await _cleanup_task
-        except asyncio.CancelledError:
-            pass
-
-    if _user_cleanup_task:
-        _user_cleanup_task.cancel()
-        try:
-            await _user_cleanup_task
-        except asyncio.CancelledError:
-            pass
 
     # Shutdown: close connections
     close_redis()

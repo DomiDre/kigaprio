@@ -35,14 +35,20 @@ graph TB
         Traefik["Traefik<br/>Reverse Proxy"]
     end
 
-    subgraph Docker["Docker Networks"]
+    subgraph Docker["Backend Servers"]
         Backend["FastAPI (+Static SvelteKit)<br/>• Validation<br/>• Encryption<br/>• API Endpoints"]
-        Admin["Admin UI<br/>• Fetch User Data<br/>• Local Decryption<br/>• Generate Tables / Overviews"]
-        Prometheus["Monitoring<br/>• Observe access<br/>• Alert on unexpected usage spikes<br/>• Monitor server status"]
-        subgraph InternalNet["DB Network (Isolated)"]
-            Redis["Redis<br/>Memory Cache<br/>No Persistence"]
-            PocketBase["PocketBase<br/>Encrypted Storage<br/>Authentication"]
-        end
+        Admin["Admin UI<br/>SvelteKit Node Server<br/>• Fetch User Data<br/>• Local Decryption on Client<br/>• Generate Tables / Overviews"]
+        
+    end
+
+    subgraph Monitoring
+        Prometheus["Prometheus<br/>• Observe access<br/>• Alert on unexpected usage spikes<br/>• Monitor server status"]
+
+    end
+    subgraph InternalNet["Isolated Internal Network"]
+        Redis["Redis<br/>Memory Cache<br/>No Persistence"]
+        PocketBase["PocketBase<br/>Encrypted Storage<br/>Authentication"]
+        Cleanup["Scheduler<br/>Periodic Cleanup"]
     end
 
     Client -->|HTTPS| Traefik
@@ -55,6 +61,8 @@ graph TB
     Admin --> Redis
     Admin --> PocketBase
     Admin --> Prometheus
+    Cleanup --> PocketBase
+    Cleanup --> Prometheus
 ```
 
 ---

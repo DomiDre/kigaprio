@@ -126,6 +126,35 @@ services:
     secrets:
       - redis_pass
 
+  # Scheduler service for periodic cleanup tasks
+  scheduler:
+    image: kigaprio-backend
+    restart: unless-stopped
+    command: ["/app/scheduler.sh"]
+    environment:
+      - ENV=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379
+      - POCKETBASE_URL=http://pocketbase:8090
+      - CLEANUP_INTERVAL_HOURS=24
+      - PRIORITY_RETENTION_MONTHS=2
+      - USER_INACTIVITY_MONTHS=6
+    depends_on:
+      backend:
+        condition: service_healthy
+      pocketbase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - db-net
+      - monitoring
+    secrets:
+      - pb_service_id
+      - pb_service_password
+      - redis_pass
+      - metrics_token
+
   admin:
     build:
       context: ./admin_ui
