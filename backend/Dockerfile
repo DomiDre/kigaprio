@@ -29,11 +29,24 @@ RUN mkdir -p src/kigaprio && touch src/kigaprio/__init__.py && touch README.md
 # --- Development stage ---
 FROM base AS development
 
+# Install supercronic for development scheduler
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && curl -fsSL https://github.com/aptible/supercronic/releases/download/v0.2.33/supercronic-linux-amd64 -o /usr/local/bin/supercronic \
+    && chmod +x /usr/local/bin/supercronic \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+USER ubuntu
+
 # Install dependencies
 RUN uv sync
 
 # Copy source code (this will overwrite the dummy __init__.py)
 COPY --chown=ubuntu:ubuntu src/ ./src/
+
+# Copy scheduler scripts
+COPY --chown=ubuntu:ubuntu scheduler.sh scheduler-dev.sh ./
 
 # Create directories
 RUN mkdir -p /app/static

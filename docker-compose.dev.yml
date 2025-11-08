@@ -107,6 +107,38 @@ services:
     secrets:
       - redis_pass
 
+  # Scheduler service for periodic cleanup tasks (development)
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    image: kigaprio-backend:dev
+    restart: unless-stopped
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/scheduler-dev.sh:/app/scheduler-dev.sh:ro
+    command: ["/app/scheduler-dev.sh"]
+    environment:
+      - ENV=development
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - POCKETBASE_URL=http://pocketbase:8090
+      - CLEANUP_INTERVAL_HOURS=1
+      - PRIORITY_RETENTION_MONTHS=2
+      - USER_INACTIVITY_MONTHS=6
+    depends_on:
+      backend:
+        condition: service_healthy
+      pocketbase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - pb_service_id
+      - pb_service_password
+      - redis_pass
+
   admin:
     build:
       context: ./admin_ui
