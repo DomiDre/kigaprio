@@ -21,7 +21,9 @@ os.environ["LOG_LEVEL"] = "ERROR"
 @pytest.fixture
 def fake_redis():
     """Provide a fake Redis client for testing."""
-    return fakeredis.FakeRedis(decode_responses=False)
+    # Use decode_responses=True to match production Redis configuration
+    # Production code expects strings, not bytes
+    return fakeredis.FakeRedis(decode_responses=True)
 
 
 @pytest.fixture
@@ -101,6 +103,10 @@ def mock_admin_key(monkeypatch, admin_rsa_keypair, tmp_path):
     cache_key_file = secrets_dir / "server_cache_key"
     cache_key_file.write_bytes(b"test_cache_key_32_bytes_long_!!")
 
+    # Write redis password (needed for RedisService)
+    redis_pass_file = secrets_dir / "redis_pass"
+    redis_pass_file.write_text("test_redis_password")
+
     # Mock the Path objects in EncryptionManager
     from kigaprio.services.encryption import EncryptionManager
 
@@ -121,6 +127,7 @@ def sample_user_data():
         "id": "test_user_123",
         "username": "testuser",
         "email": "test@example.com",
+        "emailVisibility": False,
         "role": "user",
         "salt": base64.b64encode(b"test_salt_16bytes").decode(),
         "user_wrapped_dek": base64.b64encode(b"wrapped_dek_data").decode(),
@@ -128,6 +135,8 @@ def sample_user_data():
         "encrypted_fields": base64.b64encode(b'{"name":"encrypted_name"}').decode(),
         "lastSeen": "2025-01-08T10:00:00Z",
         "verified": True,
+        "collectionId": "users_collection_id",
+        "collectionName": "users",
         "created": "2025-01-01T00:00:00Z",
         "updated": "2025-01-08T00:00:00Z",
     }
@@ -140,6 +149,7 @@ def sample_admin_data():
         "id": "admin_user_456",
         "username": "admin",
         "email": "admin@example.com",
+        "emailVisibility": False,
         "role": "admin",
         "salt": base64.b64encode(b"admin_salt_16byt").decode(),
         "user_wrapped_dek": base64.b64encode(b"admin_wrapped_dek_data").decode(),
@@ -147,6 +157,8 @@ def sample_admin_data():
         "encrypted_fields": base64.b64encode(b'{"name":"Admin User"}').decode(),
         "lastSeen": "2025-01-08T12:00:00Z",
         "verified": True,
+        "collectionId": "users_collection_id",
+        "collectionName": "users",
         "created": "2025-01-01T00:00:00Z",
         "updated": "2025-01-08T12:00:00Z",
     }
@@ -177,9 +189,11 @@ def sample_priority_data():
                 "friday": 1,
             },
         ],
-        "encrypted_fields": None,
-        "identifier": None,
+        "encrypted_fields": "",
+        "identifier": "",
         "manual": False,
+        "collectionId": "priorities_collection_id",
+        "collectionName": "priorities",
         "created": "2025-01-01T00:00:00Z",
         "updated": "2025-01-01T00:00:00Z",
     }
