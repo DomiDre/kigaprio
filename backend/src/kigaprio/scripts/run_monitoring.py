@@ -29,7 +29,7 @@ async def main():
     """Update monitoring metrics."""
     try:
         # Update Redis metrics
-        redis_healthy = await redis_health_check()
+        redis_healthy = redis_health_check()
         update_health_status("redis", redis_healthy)
 
         if redis_healthy:
