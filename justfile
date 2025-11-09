@@ -60,6 +60,10 @@ logs-dev service="":
         docker compose -f docker-compose.dev.yml logs -f {{service}}
     fi
 
+# Use act to test github action locally
+github-action job:
+    act --rm -j {{job}} --secret-file "./.github/.secrets"
+
 # Open shell in backend container
 shell-backend:
     docker compose run --rm -it backend /bin/bash
@@ -86,6 +90,9 @@ test-frontend:
 
 # Run all tests
 test: test-backend test-frontend
+
+test-cli-locally:
+    ./scripts/test-ci-locally.sh
 
 # Format backend code
 format-backend:

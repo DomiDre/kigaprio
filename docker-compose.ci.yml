@@ -1,0 +1,71 @@
+# Docker Compose override for CI testing
+#
+# This file provides overrides for docker-compose.dev.yml to create an ephemeral,
+# production-like testing environment:
+#
+# - Removes volume mounts: Tests run against the built container, not local files
+# - Sets test environment variables
+# - Disables unnecessary services (frontend, admin, scheduler)
+# - No port exposure to host
+#
+# Usage: docker-compose -f docker-compose.dev.yml -f docker-compose.ci.yml ...
+
+services:
+  backend:
+    # Remove all volume mounts - test the built container image
+    volumes: []
+    # Override command to just run tests (not the dev server)
+    command: []
+    # Don't expose ports in CI
+    ports: []
+    # No hot reload needed
+    environment:
+      - ENV=test
+      - DEBUG=false
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:8000
+      - REDIS_URL=redis://redis:6379
+      - POCKETBASE_URL=http://pocketbase:8090
+      - USE_DOCKER_SERVICES=true
+
+  # PocketBase needs migrations for schema initialization
+  pocketbase:
+    ports: []  # Don't expose ports in CI
+    # Use ephemeral volumes for CI - don't mix with dev data
+    volumes:
+      - ./pocketbase/pb_migrations:/pb/pb_migrations:ro
+      # Override pb_data with anonymous volume (ephemeral, not shared with dev)
+      - /pb/pb_data
+      - /pb/pb_public
+
+  # Redis doesn't need changes, already ephemeral in dev
+
+  # Disable services not needed for backend testing
+  frontend:
+    profiles:
+      - disabled
+
+  admin:
+    profiles:
+      - disabled
+
+  scheduler:
+    profiles:
+      - disabled
+
+# Override secrets to use test secrets directory
+# The SECRETS_DIR environment variable should be set when running this compose file
+secrets:
+  admin_public_key:
+    file: ${SECRETS_DIR:-.secrets}/admin_public_key.pem
+  pb_admin_email:
+    file: ${SECRETS_DIR:-.secrets}/pb_admin_email
+  pb_admin_password:
+    file: ${SECRETS_DIR:-.secrets}/pb_admin_password
+  pb_service_id:
+    file: ${SECRETS_DIR:-.secrets}/pb_service_id
+  pb_service_password:
+    file: ${SECRETS_DIR:-.secrets}/pb_service_password
+  redis_pass:
+    file: ${SECRETS_DIR:-.secrets}/redis_pass
+  server_cache_key:
+    file: ${SECRETS_DIR:-.secrets}/server_cache_key

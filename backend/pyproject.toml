@@ -42,6 +42,8 @@ dev = [
     "types-python-dateutil>=2.9.0.20251108",
     "types-pyyaml>=6.0.12.20250915",
     "types-ujson>=5.10.0.20250822",
+    "testcontainers>=4.13.0",
+    "redis>=7.0.1",
 ]
 ocr = [
     "matplotlib>=3.9.4",
@@ -98,17 +100,20 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "unit: Unit tests that don't require external dependencies",
+    "integration: Integration tests that require Redis, PocketBase, etc.",
+    "security: Security-focused tests",
+    "slow: Tests that take a long time to run",
+]
 addopts = [
     "--strict-markers",
     "--tb=short",
     "--cov=kigaprio",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-branch",
+    "--cov-branch"
 ]
-markers = [
-    "unit: Unit tests that don't require external dependencies",
-    "integration: Integration tests that require Redis, PocketBase, etc.",
-    "security: Security-focused tests",
-    "slow: Tests that take a long time to run",
+filterwarnings = [
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning:testcontainers",
 ]
