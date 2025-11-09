@@ -1,42 +1,44 @@
-__pycache__/
+# Python
+__pycache__
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
+*.egg-info
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.git
-.gitignore
-Dockerfile*
-docker-compose*.yml
-.pytest_cache/
+build/
+
+# Testing
+.pytest_cache
 .coverage
 htmlcov/
+coverage.xml
 .tox/
-.mypy_cache/
-.DS_Store
-uploads/
-output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# CI/CD (don't need these in the container)
+.github/
 
 node_modules
+
+# CI/CD (don't need these in the container)
+.github/
+

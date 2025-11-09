@@ -5,8 +5,10 @@ Tests the full authentication flow with real Redis and PocketBase.
 """
 
 import re
+
 import pytest
 from fastapi.testclient import TestClient
+
 
 @pytest.mark.integration
 class TestAuthenticationIntegration:
@@ -30,21 +32,20 @@ class TestAuthenticationIntegration:
             "username": "testuser",
             "password": "SecurePassword123!",
             "name": "Test User",
-            "magic_word": "test"
+            "magic_word": "test",
         }
 
         # registration of user: magic word + register
         verify_magic_word_response = test_app.post(
             "/api/v1/auth/verify-magic-word",
-            json={
-                "magic_word": registration_data["magic_word"]
-            },
+            json={"magic_word": registration_data["magic_word"]},
         )
-        assert verify_magic_word_response.status_code == 200, "Failed to assert magic word"
+        assert verify_magic_word_response.status_code == 200, (
+            f"Failed to assert magic word: {verify_magic_word_response.status_code} - {verify_magic_word_response.text}"
+        )
         magic_word_body = verify_magic_word_response.json()
         assert "token" in magic_word_body
         registration_data["reg_token"] = magic_word_body["token"]
-
         register_response = test_app.post(
             "/api/v1/auth/register",
             json={
@@ -52,10 +53,12 @@ class TestAuthenticationIntegration:
                 "password": registration_data["password"],
                 "passwordConfirm": registration_data["password"],
                 "name": registration_data["name"],
-                "registration_token": registration_data["reg_token"]
+                "registration_token": registration_data["reg_token"],
             },
         )
-        assert register_response.status_code == 200, "Registrierung fehlgeschlagen"
+        assert register_response.status_code == 200, (
+            f"Registrierung fehlgeschlagen: {verify_magic_word_response.status_code} - {verify_magic_word_response.text}"
+        )
 
         # Login via API
         login_response = test_app.post(
@@ -75,7 +78,7 @@ class TestAuthenticationIntegration:
         cookies = {}
         for cookie_header in set_cookie_headers:
             # Parse cookie name and value from "name=value; attributes..."
-            cookie_match = re.match(r'([^=]+)=([^;]+)', cookie_header)
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
             if cookie_match:
                 cookies[cookie_match.group(1)] = cookie_match.group(2)
 
@@ -87,7 +90,9 @@ class TestAuthenticationIntegration:
         verify_response = test_app.get(
             "/api/v1/auth/verify",
         )
-        assert verify_response.status_code == 200, f"Verification failed: {verify_response.text}"
+        assert verify_response.status_code == 200, (
+            f"Verification failed: {verify_response.text}"
+        )
         data = verify_response.json()
         assert data["username"] == registration_data["username"]
         assert data["authenticated"] is True
@@ -108,7 +113,7 @@ class TestAuthenticationIntegration:
         set_cookie_headers = login_response.headers.get_list("set-cookie")
         cookies = {}
         for cookie_header in set_cookie_headers:
-            cookie_match = re.match(r'([^=]+)=([^;]+)', cookie_header)
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
             if cookie_match:
                 cookies[cookie_match.group(1)] = cookie_match.group(2)
 
@@ -121,15 +126,13 @@ class TestAuthenticationIntegration:
             "username": "logoutuser",
             "password": "Password123!",
             "name": "Logout User",
-            "magic_word": "test"
+            "magic_word": "test",
         }
 
         # Verify magic word and get registration token
         verify_magic_word_response = test_app.post(
             "/api/v1/auth/verify-magic-word",
-            json={
-                "magic_word": registration_data["magic_word"]
-            },
+            json={"magic_word": registration_data["magic_word"]},
         )
         assert verify_magic_word_response.status_code == 200
         magic_word_body = verify_magic_word_response.json()
@@ -143,7 +146,7 @@ class TestAuthenticationIntegration:
                 "password": registration_data["password"],
                 "passwordConfirm": registration_data["password"],
                 "name": registration_data["name"],
-                "registration_token": registration_data["reg_token"]
+                "registration_token": registration_data["reg_token"],
             },
         )
         assert register_response.status_code == 200
@@ -163,7 +166,7 @@ class TestAuthenticationIntegration:
         set_cookie_headers = login_response.headers.get_list("set-cookie")
         cookies = {}
         for cookie_header in set_cookie_headers:
-            cookie_match = re.match(r'([^=]+)=([^;]+)', cookie_header)
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
             if cookie_match:
                 cookies[cookie_match.group(1)] = cookie_match.group(2)
 

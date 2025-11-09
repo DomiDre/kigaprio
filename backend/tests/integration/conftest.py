@@ -1,13 +1,14 @@
 """
 Pytest fixtures for integration tests.
 
-Provides real Redis and PocketBase instances via testcontainers.
+Provides real Redis and PocketBase instances via testcontainers or docker-compose.
+Set USE_DOCKER_SERVICES=true to use docker-compose services instead of testcontainers.
 """
 
 import os
 import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import httpx
 import pytest
@@ -15,14 +16,22 @@ import redis
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
+# Check if we should use docker-compose services
+USE_DOCKER_SERVICES = os.getenv("USE_DOCKER_SERVICES", "").lower() == "true"
+
 
 @pytest.fixture(scope="session")
-def redis_container() -> Generator[DockerContainer, None, None]:
-    """Start a Redis container for integration tests."""
+def redis_container() -> Generator[DockerContainer | None, None, None]:
+    """Start a Redis container for integration tests (or skip if using docker-compose)."""
+    if USE_DOCKER_SERVICES:
+        # Skip testcontainers, we'll use docker-compose services
+        yield None
+        return
+
     container = (
         DockerContainer("redis:8-alpine")
         .with_bind_ports("6379/tcp", 6379)
-        .waiting_for(LogMessageWaitStrategy('Ready to accept connections'))
+        .waiting_for(LogMessageWaitStrategy("Ready to accept connections"))
     )
     container.start()
 
@@ -32,13 +41,23 @@ def redis_container() -> Generator[DockerContainer, None, None]:
 
 
 @pytest.fixture(scope="session")
-def redis_client(redis_container: DockerContainer) -> Generator[redis.Redis, None, None]:
-    """Get a Redis client connected to the test container."""
-    client = redis.Redis(
-        host=redis_container.get_container_host_ip(),
-        port=redis_container.get_exposed_port(6379),
-        decode_responses=True,
-    )
+def redis_client(
+    redis_container: DockerContainer | None,
+) -> Generator[redis.Redis, None, None]:
+    """Get a Redis client connected to the test container or docker-compose service."""
+    if USE_DOCKER_SERVICES:
+        from kigaprio.services import redis_service
+        # Reset the singleton state to avoid stale cached URLs
+        redis_service._redis_service._redis_url = None
+        redis_service._redis_service._pool = None
+        client = redis_service.get_redis()
+    else:
+        # Connect to testcontainer
+        client = redis.Redis(
+            host=redis_container.get_container_host_ip(),
+            port=redis_container.get_exposed_port(6379),
+            decode_responses=True,
+        )
 
     # Wait for Redis to be ready
     for _ in range(30):
@@ -50,7 +69,12 @@ def redis_client(redis_container: DockerContainer) -> Generator[redis.Redis, Non
 
     yield client
 
-    client.close()
+    if USE_DOCKER_SERVICES:
+        # Clean up the singleton
+        from kigaprio.services import redis_service
+        redis_service.close_redis()
+    else:
+        client.close()
 
 
 @pytest.fixture(scope="function")
@@ -61,15 +85,92 @@ def clean_redis(redis_client: redis.Redis) -> Generator[redis.Redis, None, None]
     redis_client.flushdb()
 
 
+def _setup_pocketbase(pocketbase_url: str) -> None:
+    """Set up PocketBase with required data (admin, settings, service account)."""
+    superuser_login = "admin@example.com"
+    superuser_password = "admintest"
+    magic_word = "test"
+
+    # Wait for PocketBase to be ready
+    for i in range(60):
+        try:
+            response = httpx.get(f"{pocketbase_url}/api/health", timeout=1.0)
+            if response.status_code == 200:
+                print("✓ PocketBase is ready")
+                break
+        except (httpx.RequestError, httpx.TimeoutException):
+            if i % 10 == 0:
+                print(f"  Still waiting... ({i}s)")
+            time.sleep(1)
+    else:
+        raise RuntimeError("PocketBase did not become ready in time")
+
+    client = httpx.Client(base_url=pocketbase_url, timeout=10.0)
+
+    # Authenticate as admin
+    print("Authenticating as admin...")
+    response = client.post(
+        "/api/collections/_superusers/auth-with-password",
+        json={
+            "identity": superuser_login,
+            "password": superuser_password,
+        },
+    )
+    assert response.status_code == 200, f"Failed to authenticate as admin: {response.status_code} - {response.text}"
+    token = response.json()["token"]
+    client.headers["Authorization"] = f"Bearer {token}"
+    print("✓ Authenticated as admin")
+
+    # Create magic word setting
+    print(f"Creating magic word setting (value='{magic_word}')...")
+    create_response = client.post(
+        "/api/collections/system_settings/records",
+        json={
+            "key": "registration_magic_word",
+            "value": magic_word,
+            "description": "Magic word required for user registration",
+            "last_updated_by": superuser_login,
+        },
+    )
+    assert create_response.status_code == 200, f"Failed to create magic word: {create_response.status_code} - {create_response.text}"
+    print("✓ Magic word created")
+
+    # Create service account
+    from kigaprio.services import service_account
+
+    print(f"Creating service account ({service_account.SERVICE_ACCOUNT_ID})...")
+    client.post(
+        "/api/collections/users/records",
+        json={
+            "username": service_account.SERVICE_ACCOUNT_ID,
+            "password": service_account.SERVICE_ACCOUNT_PASSWORD,
+            "passwordConfirm": service_account.SERVICE_ACCOUNT_PASSWORD,
+            "role": "service",
+        },
+    )
+    # Note: It's OK if this fails with 400 (duplicate) - the account may already exist
+    client.close()
+
+
 @pytest.fixture(scope="session")
-def pocketbase_container(redis_client) -> Generator[DockerContainer, None, None]:
-    """Start a PocketBase container for integration tests."""
+def pocketbase_container(redis_client) -> Generator[DockerContainer | None, None, None]:
+    """Start a PocketBase container for integration tests (or use docker-compose service)."""
+    if USE_DOCKER_SERVICES:
+        # Use docker-compose pocketbase service
+        # NOTE: In docker-compose mode, PocketBase setup is handled by the CI script
+        # (setup_pocketbase.py) before tests run, so we don't need to set it up here.
+        yield None
+        return
+
+    # Start testcontainer
     superuser_login = "admin@example.com"
     superuser_password = "admintest"
 
-    # Get the path to the migrations directory (relative to backend/tests/integration/)
-    # Go up to backend/ then to ../pocketbase/pb_migrations
-    migrations_dir = Path(__file__).resolve().parent.parent.parent.parent / "pocketbase" / "pb_migrations"
+    migrations_dir = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "pocketbase"
+        / "pb_migrations"
+    )
 
     print(f"Mounting migrations from: {migrations_dir}")
     print(f"Migrations exist: {migrations_dir.exists()}")
@@ -82,64 +183,15 @@ def pocketbase_container(redis_client) -> Generator[DockerContainer, None, None]
         .with_env("PB_ADMIN_EMAIL", superuser_login)
         .with_env("PB_ADMIN_PASSWORD", superuser_password)
         .with_volume_mapping(migrations_dir, "/pb_migrations", mode="ro")
-        .waiting_for(LogMessageWaitStrategy('Server started'))
+        .waiting_for(LogMessageWaitStrategy("Server started"))
     )
     container.start()
 
-    # Wait for PocketBase to be ready
     host = container.get_container_host_ip()
     port = container.get_exposed_port(8090)
     pocketbase_url = f"http://{host}:{port}"
 
-    client = httpx.Client(base_url=pocketbase_url, timeout=10.0)
-    superuser_login = "admin@example.com"
-    superuser_password = "admintest"
-    magic_word = "test"
-
-    response = client.post(
-        "/api/collections/_superusers/auth-with-password",
-        json={
-            "identity": superuser_login,
-            "password": superuser_password,
-        },
-    )
-    assert response.status_code == 200
-    response_body = response.json()
-    token = response_body["token"]
-
-    client.headers["Authorization"] = f"Bearer {token}"
-
-
-    create_response = client.post(
-        "/api/collections/system_settings/records",
-        json={
-            "key": "registration_magic_word",
-            "value": magic_word,
-            "description": "Magic word required for user registration",
-            "last_updated_by": superuser_login
-        },
-    )
-    assert create_response.status_code == 200
-
-    # Create service account
-    from kigaprio.services import service_account
-    response = client.post(
-        "/api/collections/users/records",
-        json={
-            "username": service_account.SERVICE_ACCOUNT_ID,
-            "password": service_account.SERVICE_ACCOUNT_PASSWORD,
-            "passwordConfirm": service_account.SERVICE_ACCOUNT_PASSWORD,
-            "role": "service",
-        }
-    )
-
-    for _ in range(60):  # Wait up to 60 seconds
-        try:
-            response = httpx.get(f"{pocketbase_url}/api/health", timeout=1.0)
-            if response.status_code == 200:
-                break
-        except (httpx.RequestError, httpx.TimeoutException):
-            time.sleep(1)
+    _setup_pocketbase(pocketbase_url)
 
     yield container
 
@@ -148,14 +200,17 @@ def pocketbase_container(redis_client) -> Generator[DockerContainer, None, None]
 
 @pytest.fixture(scope="function")
 def pocketbase_url(monkeypatch, pocketbase_container):
-    host = pocketbase_container.get_container_host_ip()
-    port = pocketbase_container.get_exposed_port(8090)
-    pocketbase_url = f"http://{host}:{port}"
-
-    from kigaprio.services import pocketbase_service
-    monkeypatch.setattr(pocketbase_service, "POCKETBASE_URL", pocketbase_url)
+    from kigaprio.services import pocketbase_service, service_account
+    if USE_DOCKER_SERVICES:
+        pocketbase_url = pocketbase_service.POCKETBASE_URL
+    else:
+        host = pocketbase_container.get_container_host_ip()
+        port = pocketbase_container.get_exposed_port(8090)
+        pocketbase_url = f"http://{host}:{port}"
+        monkeypatch.setattr(pocketbase_service, "POCKETBASE_URL", pocketbase_url)
+        # Also patch service_account module which imports POCKETBASE_URL directly
+        monkeypatch.setattr(service_account, "POCKETBASE_URL", pocketbase_url)
     return pocketbase_url
-
 
 
 @pytest.fixture(scope="function")
@@ -197,26 +252,20 @@ def test_app(pocketbase_url: str, clean_redis: redis.Redis):
     Uses the real PocketBase and Redis containers.
     """
     from fastapi.testclient import TestClient
-
-    # Set environment variables for the app
-    os.environ["POCKETBASE_URL"] = pocketbase_url
-    os.environ["REDIS_HOST"] = clean_redis.connection_pool.connection_kwargs["host"]
-    os.environ["REDIS_PORT"] = str(clean_redis.connection_pool.connection_kwargs["port"])
-
-    # Import main app after setting env vars
     from kigaprio.main import app
-
-    # Override get_redis to use our test Redis
     from kigaprio.services.redis_service import get_redis
 
-    def override_get_redis():
-        return clean_redis
+    # Override get_redis dependency when not using docker-compose
+    if not USE_DOCKER_SERVICES:
+        def get_test_redis():
+            return clean_redis
 
-    app.dependency_overrides[get_redis] = override_get_redis
+        app.dependency_overrides[get_redis] = get_test_redis
 
     client = TestClient(app)
 
     yield client
 
-    # Cleanup
-    app.dependency_overrides.clear()
+    # Clean up dependency overrides
+    if not USE_DOCKER_SERVICES:
+        app.dependency_overrides.clear()

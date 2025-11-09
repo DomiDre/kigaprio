@@ -43,36 +43,80 @@ jobs:
       continue-on-error: true  # Remove this if you want strict type checking
 
   backend-tests:
-    name: Backend Tests
+    name: Backend Tests (Unit & Integration)
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        version: "latest"
+    - name: Create required secrets directory
+      run: |
+        mkdir -p .secrets
+        # Create dummy secret files for testing
+        echo "dummy-key-for-testing-$(openssl rand -base64 32)" > .secrets/admin_public_key.pem
+        echo "test@example.com" > .secrets/pb_admin_email
+        echo "test-password-$(openssl rand -base64 16)" > .secrets/pb_admin_password
+        echo "service-id-$(openssl rand -hex 16)" > .secrets/pb_service_id
+        echo "service-password-$(openssl rand -base64 32)" > .secrets/pb_service_password
+        echo "redis-password-$(openssl rand -base64 32)" > .secrets/redis_pass
+        echo "cache-key-$(openssl rand -base64 32)" > .secrets/server_cache_key
+        echo "metrics-token-$(openssl rand -base64 32)" > .secrets/metrics_token
 
-    - name: Set up Python
-      run: uv python install
-      working-directory: ./backend
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-    - name: Install dependencies
-      run: uv sync
-      working-directory: ./backend
+    - name: Build Docker images
+      run: docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml build backend pocketbase
+
+    - name: Start dependencies (PocketBase & Redis)
+      run: |
+        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml up -d pocketbase redis
+        # Wait for services to be healthy
+        echo "Waiting for services to be ready..."
+        timeout 120 sh -c 'until docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml ps pocketbase | grep -q "healthy" && docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml ps redis | grep -q "healthy"; do sleep 2; done'
+        echo "Services are ready!"
+
+    - name: Initialize PocketBase admin user
+      run: |
+        echo "Creating PocketBase superuser..."
+        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --rm pocketbase \
+          ./pocketbase superuser upsert admin@example.com admintest
+
+    - name: Setup PocketBase test data
+      run: |
+        echo "Setting up PocketBase test data (magic word, service account)..."
+        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --rm backend \
+          uv run python tests/integration/setup_pocketbase.py
 
     - name: Run tests with coverage
-      run: uv run pytest --cov=src/kigaprio --cov-report=xml
-      working-directory: ./backend
-      env:
-        POCKETBASE_URL: http://pocketbase:8090
+      run: |
+        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --rm \
+          -e USE_DOCKER_SERVICES=true \
+          -e REDIS_PASSWORD=$(cat .secrets/redis_pass) \
+          backend \
+          uv run pytest --cov=kigaprio --cov-report=xml --cov-report=term-missing
+
+    - name: Copy coverage report from container
+      if: always()
+      run: |
+        # Create a temporary container to copy the coverage file
+        container_id=$(docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --rm -d backend sleep 1)
+        docker cp ${container_id}:/app/coverage.xml ./coverage.xml 2>/dev/null || \
+        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --rm backend cat coverage.xml > coverage.xml 2>/dev/null || \
+        echo "Warning: No coverage file found"
 
     - name: Upload coverage to Codecov
+      if: always()
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.xml
+        flags: backend
         fail_ci_if_error: false
+
+    - name: Cleanup
+      if: always()
+      run: docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml down -v
 
   frontend-security:
     name: Frontend Security Audit

@@ -12,21 +12,17 @@ Tests cover:
 """
 
 import base64
-import json
 
 import pytest
-from fastapi import HTTPException, Response
+from fastapi import HTTPException
 
 from kigaprio.models.auth import SessionInfo
 from kigaprio.models.pocketbase_schemas import UsersResponse
 from kigaprio.utils import (
     extract_session_info_from_record,
-    get_client_ip,
     get_current_dek,
     get_current_token,
     require_admin,
-    update_last_seen,
-    verify_token,
 )
 
 
@@ -127,5 +123,3 @@ class TestExtractSessionInfo:
         assert result.id == sample_admin_data["id"]
         assert result.username == sample_admin_data["username"]
         assert result.is_admin is True
-
-

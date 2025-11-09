@@ -11,13 +11,6 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-# Set test environment variables before importing app
-os.environ["ENV"] = "test"
-os.environ["REDIS_URL"] = "redis://localhost:6379"
-os.environ["POCKETBASE_URL"] = "http://localhost:8090"
-os.environ["LOG_LEVEL"] = "ERROR"
-
-
 @pytest.fixture
 def fake_redis():
     """Provide a fake Redis client for testing."""

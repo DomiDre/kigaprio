@@ -163,6 +163,16 @@ The project maintains code quality through:
 - **Formatting**: Ruff for Python, Prettier for JavaScript
 - **Type Checking**: mypy for Python, TypeScript for frontend
 - **Pre-commit Hooks**: Automated checks before commits
+- **Testing**: Unit and integration tests with pytest, coverage reports via [Codecov](https://codecov.io/gh/DomiDre/kigaprio)
+
+Tests run automatically in CI using docker-compose services for production-like testing. Run tests locally:
+```bash
+# Local development (uses testcontainers)
+cd backend && uv run pytest
+
+# CI mode (uses docker-compose, tests built container)
+./scripts/test-ci-locally.sh
+```
 
 ### API Documentation
 
