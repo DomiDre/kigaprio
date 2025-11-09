@@ -11,6 +11,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+
 @pytest.fixture
 def fake_redis():
     """Provide a fake Redis client for testing."""

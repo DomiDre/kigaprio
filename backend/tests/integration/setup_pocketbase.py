@@ -5,9 +5,10 @@ This script initializes PocketBase with the magic word and service account.
 It should be run from inside the backend container before tests.
 """
 
-import httpx
 import os
 import time
+
+import httpx
 
 
 def setup_pocketbase():

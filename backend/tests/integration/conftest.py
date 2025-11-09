@@ -47,12 +47,14 @@ def redis_client(
     """Get a Redis client connected to the test container or docker-compose service."""
     if USE_DOCKER_SERVICES:
         from kigaprio.services import redis_service
+
         # Reset the singleton state to avoid stale cached URLs
         redis_service._redis_service._redis_url = None
         redis_service._redis_service._pool = None
         client = redis_service.get_redis()
     else:
         # Connect to testcontainer
+        assert redis_container is not None, "redis container not loaded"
         client = redis.Redis(
             host=redis_container.get_container_host_ip(),
             port=redis_container.get_exposed_port(6379),
@@ -72,6 +74,7 @@ def redis_client(
     if USE_DOCKER_SERVICES:
         # Clean up the singleton
         from kigaprio.services import redis_service
+
         redis_service.close_redis()
     else:
         client.close()
@@ -116,7 +119,9 @@ def _setup_pocketbase(pocketbase_url: str) -> None:
             "password": superuser_password,
         },
     )
-    assert response.status_code == 200, f"Failed to authenticate as admin: {response.status_code} - {response.text}"
+    assert response.status_code == 200, (
+        f"Failed to authenticate as admin: {response.status_code} - {response.text}"
+    )
     token = response.json()["token"]
     client.headers["Authorization"] = f"Bearer {token}"
     print("✓ Authenticated as admin")
@@ -132,7 +137,9 @@ def _setup_pocketbase(pocketbase_url: str) -> None:
             "last_updated_by": superuser_login,
         },
     )
-    assert create_response.status_code == 200, f"Failed to create magic word: {create_response.status_code} - {create_response.text}"
+    assert create_response.status_code == 200, (
+        f"Failed to create magic word: {create_response.status_code} - {create_response.text}"
+    )
     print("✓ Magic word created")
 
     # Create service account
@@ -201,6 +208,7 @@ def pocketbase_container(redis_client) -> Generator[DockerContainer | None, None
 @pytest.fixture(scope="function")
 def pocketbase_url(monkeypatch, pocketbase_container):
     from kigaprio.services import pocketbase_service, service_account
+
     if USE_DOCKER_SERVICES:
         pocketbase_url = pocketbase_service.POCKETBASE_URL
     else:
@@ -252,11 +260,13 @@ def test_app(pocketbase_url: str, clean_redis: redis.Redis):
     Uses the real PocketBase and Redis containers.
     """
     from fastapi.testclient import TestClient
+
     from kigaprio.main import app
     from kigaprio.services.redis_service import get_redis
 
     # Override get_redis dependency when not using docker-compose
     if not USE_DOCKER_SERVICES:
+
         def get_test_redis():
             return clean_redis
 
