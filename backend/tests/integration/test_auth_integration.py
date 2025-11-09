@@ -5,6 +5,7 @@ Tests the full authentication flow with real Redis and PocketBase.
 """
 
 import re
+import secrets
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,9 +28,11 @@ class TestAuthenticationIntegration:
         - Cookie management
         """
         print("!!!", pocketbase_url)
-        # Register a new user
+        # Register a new user with unique username to avoid conflicts
+        # (needed when using docker-compose with persistent volumes between tests)
+        unique_suffix = secrets.token_hex(4)
         registration_data = {
-            "username": "testuser",
+            "username": f"testuser_{unique_suffix}",
             "password": "SecurePassword123!",
             "name": "Test User",
             "magic_word": "test",
@@ -57,7 +60,7 @@ class TestAuthenticationIntegration:
             },
         )
         assert register_response.status_code == 200, (
-            f"Registrierung fehlgeschlagen: {verify_magic_word_response.status_code} - {verify_magic_word_response.text}"
+            f"Registrierung fehlgeschlagen: {register_response.status_code} - {register_response.text}"
         )
 
         # Login via API
@@ -121,9 +124,10 @@ class TestAuthenticationIntegration:
 
     def test_logout_clears_session(self, test_app: TestClient):
         """Test that logout properly clears session and cookies."""
-        # Register a new user
+        # Register a new user with unique username
+        unique_suffix = secrets.token_hex(4)
         registration_data = {
-            "username": "logoutuser",
+            "username": f"logoutuser_{unique_suffix}",
             "password": "Password123!",
             "name": "Logout User",
             "magic_word": "test",

@@ -30,9 +30,12 @@ services:
   # PocketBase needs migrations for schema initialization
   pocketbase:
     ports: []  # Don't expose ports in CI
-    # Keep migrations volume - needed for database schema
+    # Use ephemeral volumes for CI - don't mix with dev data
     volumes:
       - ./pocketbase/pb_migrations:/pb/pb_migrations:ro
+      # Override pb_data with anonymous volume (ephemeral, not shared with dev)
+      - /pb/pb_data
+      - /pb/pb_public
 
   # Redis doesn't need changes, already ephemeral in dev
 
