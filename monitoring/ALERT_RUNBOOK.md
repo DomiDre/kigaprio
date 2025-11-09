@@ -1,4 +1,4 @@
-# KigaPrio Alerts
+# PrioTag Alerts
 
 ## Critical (Fix Immediately)
 - **App Down** → `docker compose restart backend`

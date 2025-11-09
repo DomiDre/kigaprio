@@ -3,23 +3,23 @@ import redis
 from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, HTTPException
 
-from kigaprio.middleware.metrics import (
+from priotag.middleware.metrics import (
     track_data_operation,
     track_encryption_error,
     track_priority_submission,
 )
-from kigaprio.models.auth import SessionInfo
-from kigaprio.models.pocketbase_schemas import PriorityRecord
-from kigaprio.models.priorities import (
+from priotag.models.auth import SessionInfo
+from priotag.models.pocketbase_schemas import PriorityRecord
+from priotag.models.priorities import (
     PriorityResponse,
     WeekPriority,
     validate_month_format_and_range,
 )
-from kigaprio.models.request import SuccessResponse
-from kigaprio.services.encryption import EncryptionManager
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import get_current_dek, get_current_token, verify_token
+from priotag.models.request import SuccessResponse
+from priotag.services.encryption import EncryptionManager
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import get_redis
+from priotag.utils import get_current_dek, get_current_token, verify_token
 
 router = APIRouter()
 

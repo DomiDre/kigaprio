@@ -8,14 +8,14 @@ import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from kigaprio.middleware.metrics import (
+from priotag.middleware.metrics import (
     track_login_attempt,
     track_magic_word_verification,
     track_user_registration,
     update_active_sessions,
     update_admin_sessions,
 )
-from kigaprio.models.auth import (
+from priotag.models.auth import (
     ChangePasswordRequest,
     DatabaseLoginResponse,
     LoginRequest,
@@ -26,19 +26,19 @@ from kigaprio.models.auth import (
     SecurityMode,
     SessionInfo,
 )
-from kigaprio.models.cookie import (
+from priotag.models.cookie import (
     COOKIE_AUTH_TOKEN,
     COOKIE_DEK,
     COOKIE_DOMAIN,
     COOKIE_PATH,
     COOKIE_SECURE,
 )
-from kigaprio.services.encryption import EncryptionManager
-from kigaprio.services.magic_word import get_magic_word_from_cache_or_db
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import get_redis
-from kigaprio.services.service_account import authenticate_service_account
-from kigaprio.utils import (
+from priotag.services.encryption import EncryptionManager
+from priotag.services.magic_word import get_magic_word_from_cache_or_db
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import get_redis
+from priotag.services.service_account import authenticate_service_account
+from priotag.utils import (
     extract_session_info_from_record,
     get_client_ip,
     get_current_token,

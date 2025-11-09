@@ -91,14 +91,14 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --name kigaprio-ci-test-runner --no-deps \
+        docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --name priotag-ci-test-runner --no-deps \
           backend \
-          uv run pytest --cov=kigaprio --cov-report=xml --cov-report=term-missing
+          uv run pytest --cov=priotag --cov-report=xml --cov-report=term-missing
 
     - name: Copy coverage report from container
       if: always()
       run: |
-        docker cp kigaprio-ci-test-runner:/app/coverage.xml ./coverage.xml 2>/dev/null || \
+        docker cp priotag-ci-test-runner:/app/coverage.xml ./coverage.xml 2>/dev/null || \
         echo "Warning: No coverage file found"
 
     - name: Upload coverage to Codecov
@@ -114,7 +114,7 @@ jobs:
       if: always()
       run: |
         # Remove test runner container if it exists
-        docker rm -f kigaprio-ci-test-runner 2>/dev/null || true
+        docker rm -f priotag-ci-test-runner 2>/dev/null || true
         # Shutdown services
         docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml down -v
 

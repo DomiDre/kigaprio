@@ -5,7 +5,7 @@ from urllib.parse import urlparse, urlunparse
 import redis
 from redis.exceptions import ConnectionError, TimeoutError
 
-from kigaprio.middleware.metrics import (
+from priotag.middleware.metrics import (
     update_redis_info_metrics,
     update_redis_pool_metrics,
 )

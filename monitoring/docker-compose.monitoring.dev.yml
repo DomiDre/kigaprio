@@ -14,7 +14,7 @@ services:
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - ./prometheus/data:/prometheus
     networks:
-      - kigaprio_default
+      - priotag_default
     #   - monitoring
       # - proxy
     ports:
@@ -57,7 +57,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
-      - kigaprio_default
+      - priotag_default
       # - monitoring
       # - proxy
     ports:
@@ -109,7 +109,7 @@ services:
       - ./alertmanager/data:/alertmanager
       - ./alertmanager/templates/:/etc/alertmanager/templates:ro
     networks:
-      - kigaprio_default
+      - priotag_default
       # - monitoring
     ports:
       - "9093:9093"
@@ -126,11 +126,11 @@ services:
       - ALL
 
 networks:
-  kigaprio_default:
+  priotag_default:
     external: true
 #   monitoring:
 #     driver: bridge
-  # kigaprio-prod:
+  # priotag-prod:
   #   external: true
   # proxy:
   #   external: true

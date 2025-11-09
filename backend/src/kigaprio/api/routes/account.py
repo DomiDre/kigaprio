@@ -2,11 +2,11 @@ import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from kigaprio.models.auth import SessionInfo
-from kigaprio.services.encryption import EncryptionManager
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import get_current_dek, get_current_token, verify_token
+from priotag.models.auth import SessionInfo
+from priotag.services.encryption import EncryptionManager
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import get_redis
+from priotag.utils import get_current_dek, get_current_token, verify_token
 
 router = APIRouter()
 
@@ -231,7 +231,7 @@ async def delete_account(
             redis_client.delete(session_key)
 
             # Clear authentication cookies
-            from kigaprio.api.routes.auth import clear_auth_cookies
+            from priotag.api.routes.auth import clear_auth_cookies
 
             clear_auth_cookies(response)
 

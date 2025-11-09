@@ -11,9 +11,9 @@ import sys
 
 import httpx
 
-from kigaprio.middleware.metrics import update_health_status
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import redis_health_check, update_redis_metrics
+from priotag.middleware.metrics import update_health_status
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import redis_health_check, update_redis_metrics
 
 # Configure logging
 logging.basicConfig(

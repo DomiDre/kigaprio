@@ -184,7 +184,7 @@
 			<div class="mt-8 text-center">
 				<div class="flex flex-wrap justify-center gap-4 text-sm text-gray-600 dark:text-gray-400">
 					<a
-						href="https://github.com/domidre/kigaprio"
+						href="https://github.com/domidre/priotag"
 						target="_blank"
 						rel="noopener noreferrer"
 						class="transition-colors hover:text-blue-600 dark:hover:text-blue-400"

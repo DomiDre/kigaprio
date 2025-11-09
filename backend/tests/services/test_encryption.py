@@ -17,7 +17,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.hashes import SHA256
 
-from kigaprio.services.encryption import EncryptionManager
+from priotag.services.encryption import EncryptionManager
 
 
 @pytest.mark.unit

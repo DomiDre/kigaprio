@@ -41,9 +41,9 @@ cleanup() {
     echo "🧹 Cleaning up..."
 
     # Remove test runner container if it exists
-    if docker ps -a --format '{{.Names}}' | grep -q '^kigaprio-test-runner$'; then
+    if docker ps -a --format '{{.Names}}' | grep -q '^priotag-test-runner$'; then
         echo "🗑️  Removing test runner container"
-        docker rm -f kigaprio-test-runner >/dev/null 2>&1 || true
+        docker rm -f priotag-test-runner >/dev/null 2>&1 || true
     fi
 
     # Shutdown docker services
@@ -97,14 +97,14 @@ echo ""
 # Run tests
 echo "🧪 Running tests with coverage..."
 # Note: Don't use --rm so we can copy the coverage file afterward
-docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --name kigaprio-test-runner --no-deps \
+docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml run --name priotag-test-runner --no-deps \
   backend \
-  uv run pytest --cov=kigaprio --cov-report=xml --cov-report=term-missing
+  uv run pytest --cov=priotag --cov-report=xml --cov-report=term-missing
 
 # Copy coverage report from the test container
 echo ""
 echo "📊 Copying coverage report..."
-docker cp kigaprio-test-runner:/app/coverage.xml ./coverage.xml 2>/dev/null || echo "⚠️  No coverage file found"
+docker cp priotag-test-runner:/app/coverage.xml ./coverage.xml 2>/dev/null || echo "⚠️  No coverage file found"
 
 echo ""
 echo "✅ CI test completed successfully!"

@@ -5,12 +5,12 @@ import logging
 
 import httpx
 
-from kigaprio.config import settings
-from kigaprio.middleware.metrics import update_health_status
-from kigaprio.services.cleanup_service import cleanup_old_priorities
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import redis_health_check, update_redis_metrics
-from kigaprio.services.user_cleanup_service import cleanup_inactive_users
+from priotag.config import settings
+from priotag.middleware.metrics import update_health_status
+from priotag.services.cleanup_service import cleanup_old_priorities
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import redis_health_check, update_redis_metrics
+from priotag.services.user_cleanup_service import cleanup_inactive_users
 
 logger = logging.getLogger(__name__)
 

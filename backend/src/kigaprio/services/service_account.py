@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.pocketbase_service import POCKETBASE_URL
 
 logger = logging.getLogger(__name__)
 

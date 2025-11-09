@@ -10,8 +10,8 @@ import asyncio
 import logging
 import sys
 
-from kigaprio.services.cleanup_service import cleanup_old_priorities
-from kigaprio.services.user_cleanup_service import cleanup_inactive_users
+from priotag.services.cleanup_service import cleanup_old_priorities
+from priotag.services.user_cleanup_service import cleanup_inactive_users
 
 # Configure logging
 logging.basicConfig(

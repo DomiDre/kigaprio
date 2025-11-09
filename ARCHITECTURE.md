@@ -1,4 +1,4 @@
-# KigaPrio System Architecture
+# PrioTag System Architecture
 
 ## Table of Contents
 1. [System Overview](#system-overview)
@@ -13,7 +13,7 @@
 
 ## System Overview
 
-KigaPrio implements a privacy-first architecture for managing sensitive data with server-side encryption. 
+PrioTag implements a privacy-first architecture for managing sensitive data with server-side encryption. 
 Goal of the architecture is to keep collected data at a pure minimum, avoid any data collection, and to minimize data losses in worst case scenarios.
 
 ### Technology Stack
