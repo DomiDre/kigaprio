@@ -12,7 +12,7 @@
 ## How to Check If Things Work
 ```bash
 # Is it up?
-curl https://kiga.dhjd.de/api/v1/health
+curl https://priotag.de/api/v1/health
 
 # Any errors?
 docker compose logs backend --tail=50
