@@ -15,15 +15,14 @@
 	let selectedMonth = monthOptions[0];
 	let completedWeeks = 0;
 	let totalWeeks = 0;
-	let progressPercentage = 0;
 	let allWeeksCompleted = false;
 	let error: string | null = null;
 
 	// Statistics
 	let totalPrioritiesSet = 0;
-	let currentStreak = 0;
-	let longestStreak = 0;
 	let completionRate = 0;
+	let mostCommonHighPriorityDay = '';
+	let mostCommonLowPriorityDay = '';
 
 	// Helper function to check if a week is complete
 	function isWeekComplete(week: WeekData): boolean {
@@ -109,54 +108,77 @@
 
 		// Count completed weeks
 		completedWeeks = priorities.filter(isWeekComplete).length;
-		progressPercentage = totalWeeks > 0 ? Math.round((completedWeeks / totalWeeks) * 100) : 0;
 		allWeeksCompleted = completedWeeks === totalWeeks && totalWeeks > 0;
 	}
 
 	function calculateStatistics() {
-		// Calculate total priorities set
-		totalPrioritiesSet = priorities.reduce((total, week) => {
-			const weekPriorities = [
-				week.monday,
-				week.tuesday,
-				week.wednesday,
-				week.thursday,
-				week.friday
-			];
-			return total + weekPriorities.filter((p) => p !== null && p !== undefined).length;
-		}, 0);
+		totalPrioritiesSet = 0;
 
-		// Calculate streaks
-		let tempCurrentStreak = 0;
-		let tempLongestStreak = 0;
-		let streakActive = true;
+		// Track which days get which priority levels
+		const dayPriorityCount = {
+			monday: { high: 0, low: 0 },
+			tuesday: { high: 0, low: 0 },
+			wednesday: { high: 0, low: 0 },
+			thursday: { high: 0, low: 0 },
+			friday: { high: 0, low: 0 }
+		};
 
 		priorities.forEach((week) => {
-			if (isWeekComplete(week)) {
-				if (streakActive) {
-					tempCurrentStreak++;
+			const weekPriorities = [
+				{ day: 'monday' as const, priority: week.monday },
+				{ day: 'tuesday' as const, priority: week.tuesday },
+				{ day: 'wednesday' as const, priority: week.wednesday },
+				{ day: 'thursday' as const, priority: week.thursday },
+				{ day: 'friday' as const, priority: week.friday }
+			];
+
+			weekPriorities.forEach(({ day, priority }) => {
+				if (priority !== null && priority !== undefined) {
+					totalPrioritiesSet++;
+					if (priority >= 4) {
+						dayPriorityCount[day].high++;
+					}
+					if (priority <= 2) {
+						dayPriorityCount[day].low++;
+					}
 				}
-				tempLongestStreak++;
-			} else {
-				streakActive = false;
-				if (tempLongestStreak > longestStreak) {
-					longestStreak = tempLongestStreak;
-				}
-				tempLongestStreak = 0;
-			}
+			});
 		});
 
-		currentStreak = tempCurrentStreak;
-		if (tempLongestStreak > longestStreak) {
-			longestStreak = tempLongestStreak;
-		}
-
-		// Calculate completion rate
+		// Calculate completion rate (how many days are filled)
 		const totalPossiblePriorities = totalWeeks * 5;
 		completionRate =
 			totalPossiblePriorities > 0
 				? Math.round((totalPrioritiesSet / totalPossiblePriorities) * 100)
 				: 0;
+
+		// Find which day most often gets high priority (4-5)
+		const dayNames = {
+			monday: 'Montag',
+			tuesday: 'Dienstag',
+			wednesday: 'Mittwoch',
+			thursday: 'Donnerstag',
+			friday: 'Freitag'
+		};
+
+		let maxHighDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' = 'monday' as const;
+		let maxHighCount = dayPriorityCount.monday.high;
+		let maxLowDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' = 'monday' as const;
+		let maxLowCount = dayPriorityCount.monday.low;
+
+		(Object.keys(dayPriorityCount) as Array<keyof typeof dayPriorityCount>).forEach((day) => {
+			if (dayPriorityCount[day].high > maxHighCount) {
+				maxHighCount = dayPriorityCount[day].high;
+				maxHighDay = day;
+			}
+			if (dayPriorityCount[day].low > maxLowCount) {
+				maxLowCount = dayPriorityCount[day].low;
+				maxLowDay = day;
+			}
+		});
+
+		mostCommonHighPriorityDay = maxHighCount > 0 ? dayNames[maxHighDay] : '';
+		mostCommonLowPriorityDay = maxLowCount > 0 ? dayNames[maxLowDay] : '';
 	}
 
 	async function handleLogout() {
@@ -262,68 +284,55 @@
 				</div>
 			{:else}
 				<!-- Main Statistics Grid -->
-				<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-					<!-- Progress Card -->
+				<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+					<!-- Completion Rate (Days Filled) -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
 							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Fortschritt</span>
 							<span class="text-2xl">📊</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
-							{progressPercentage}%
+							{completionRate}%
 						</div>
 						<div class="mb-2 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 							<div
 								class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-500"
-								style="width:{progressPercentage}%"
+								style="width:{completionRate}%"
 							></div>
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{completedWeeks}/{totalWeeks} Wochen
+							{totalPrioritiesSet} von {totalWeeks * 5} Tagen priorisiert
 						</div>
 					</div>
 
-					<!-- Current Streak -->
+					<!-- Most Important Day -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
-							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
-								>Aktuelle Serie</span
-							>
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Fokus-Tag</span>
 							<span class="text-2xl">🔥</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
-							{currentStreak}
+							{mostCommonHighPriorityDay || '-'}
 						</div>
-						<div class="text-xs text-gray-600 dark:text-gray-400">aufeinanderfolgende Wochen</div>
+						<div class="text-xs text-gray-600 dark:text-gray-400">
+							{mostCommonHighPriorityDay ? 'Oft mit hoher Priorität (4-5)' : 'Keine Daten'}
+						</div>
 					</div>
 
-					<!-- Completion Rate -->
+					<!-- Most Relaxed Day -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
 							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
-								>Abschlussquote</span
+								>Entspannter Tag</span
 							>
-							<span class="text-2xl">✅</span>
+							<span class="text-2xl">☕</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
-							{completionRate}%
+							{mostCommonLowPriorityDay || '-'}
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{totalPrioritiesSet}/{totalWeeks * 5} Prioritäten
+							{mostCommonLowPriorityDay ? 'Oft mit niedriger Priorität (1-2)' : 'Keine Daten'}
 						</div>
-					</div>
-
-					<!-- Longest Streak -->
-					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
-						<div class="mb-2 flex items-center justify-between">
-							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Längste Serie</span
-							>
-							<span class="text-2xl">🏆</span>
-						</div>
-						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
-							{longestStreak}
-						</div>
-						<div class="text-xs text-gray-600 dark:text-gray-400">Wochen in Folge</div>
 					</div>
 				</div>
 
