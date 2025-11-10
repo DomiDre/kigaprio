@@ -45,8 +45,8 @@
 		<div class="container mx-auto max-w-5xl px-4 py-8">
 			<!-- Header -->
 			<div class="mb-8 text-center">
-				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Login Prioliste</h1>
-				<p class="text-gray-600 dark:text-gray-300">Kindergarten Prioliste eingeben</p>
+				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Prio Tag</h1>
+				<p class="text-gray-600 dark:text-gray-300">Prio Tage für den Monat festlegen</p>
 			</div>
 
 			<!-- Main Card -->
