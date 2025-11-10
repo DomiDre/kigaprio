@@ -14,10 +14,10 @@ services:
       - DEBUG=false
       - REDIS_URL=redis://redis:6379
       - POCKETBASE_URL=http://pocketbase:8090
-      - CORS_ORIGINS=https://admin.kiga.dhjd.de,https://kiga.dhjd.de
+      - CORS_ORIGINS=https://admin.priotag.de,https://priotag.de
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.priotag-backend.rule=Host(`kiga.dhjd.de`)"
+      - "traefik.http.routers.priotag-backend.rule=Host(`priotag.de`)"
       - "traefik.http.routers.priotag-backend.entrypoints=websecure"
       - "traefik.http.routers.priotag-backend.tls=true"
       - "traefik.http.routers.priotag-backend.tls.certresolver=myresolver"
@@ -169,7 +169,7 @@ services:
     image: priotag-admin
     environment:
       - NODE_ENV=production
-      - PUBLIC_BACKEND_URL=https://kiga.dhjd.de
+      - PUBLIC_BACKEND_URL=https://priotag.de
     expose:
       - 3000
     depends_on:
@@ -183,7 +183,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.priotag-admin.rule=Host(`admin.kiga.dhjd.de`)"
+      - "traefik.http.routers.priotag-admin.rule=Host(`admin.priotag.de`)"
       - "traefik.http.routers.priotag-admin.entrypoints=websecure"
       - "traefik.http.routers.priotag-admin.tls=true"
       - "traefik.http.routers.priotag-admin.tls.certresolver=myresolver"

@@ -295,5 +295,4 @@ monitoring-status:
     @docker compose -f ./monitoring/docker-compose.monitoring.yml ps
     @echo ""
     @echo "=== Service URLs ==="
-    @echo "Grafana: https://grafana.kiga.dhjd.de"
-    @echo "Prometheus: https://prometheus.kiga.dhjd.de"
+    @echo "Prometheus: https://prometheus.priotag.de"

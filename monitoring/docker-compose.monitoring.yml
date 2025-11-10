@@ -22,7 +22,7 @@ services:
       - metrics_token
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.kiga.dhjd.de`)"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.priotag.de`)"
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.routers.prometheus.tls=true"
       - "traefik.http.routers.prometheus.tls.certresolver=myresolver"
@@ -46,12 +46,12 @@ services:
   #   environment:
   #     - GF_SECURITY_ADMIN_USER=admin
   #     - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
-  #     - GF_SERVER_ROOT_URL=https://grafana.kiga.dhjd.de
+  #     - GF_SERVER_ROOT_URL=https://grafana.priotag.de
   #     - GF_SMTP_ENABLED=true
   #     - GF_SMTP_HOST__FILE=/run/secrets/smtp_host
   #     - GF_SMTP_USER__FILE=/run/secrets/smtp_user
   #     - GF_SMTP_PASSWORD__FILE=/run/secrets/smtp_password
-  #     - GF_SMTP_FROM_ADDRESS=alerts@dhjd.de
+  #     - GF_SMTP_FROM_ADDRESS=alerts@priotag.de
   #   volumes:
   #     - ./grafana/data:/var/lib/grafana
   #     - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -63,7 +63,7 @@ services:
   #     - 3000
   #   labels:
   #     - "traefik.enable=true"
-  #     - "traefik.http.routers.grafana.rule=Host(`grafana.kiga.dhjd.de`)"
+  #     - "traefik.http.routers.grafana.rule=Host(`grafana.priotag.de`)"
   #     - "traefik.http.routers.grafana.entrypoints=websecure"
   #     - "traefik.http.routers.grafana.tls=true"
   #     - "traefik.http.routers.grafana.tls.certresolver=myresolver"
