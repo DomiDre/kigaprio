@@ -203,45 +203,105 @@
 						</p>
 					</div>
 
+					<!-- Privacy Info Banner -->
+					<div
+						class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
+					>
+						<div class="flex items-start">
+							<svg
+								class="mr-2 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400"
+								fill="currentColor"
+								viewBox="0 0 20 20"
+							>
+								<path
+									fill-rule="evenodd"
+									d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+									clip-rule="evenodd"
+								/>
+							</svg>
+							<div class="text-sm text-blue-800 dark:text-blue-300">
+								<p class="mb-1 font-semibold">Datenschutzhinweis:</p>
+								<ul class="space-y-1 text-xs">
+									<li>🔓 Ihr Pseudonym (Loginname) wird im Klartext gespeichert</li>
+									<li>🔒 Der Name Ihres Kindes wird verschlüsselt in der Datenbank gespeichert</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+
 					<div>
-						<label
-							for="fullName"
-							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-						>
-							Name
-						</label>
+						<div class="mb-1 flex items-center justify-between">
+							<label
+								for="fullName"
+								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+							>
+								Name Ihres Kindes
+							</label>
+							<span
+								class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
+							>
+								<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+									<path
+										fill-rule="evenodd"
+										d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+								Verschlüsselt
+							</span>
+						</div>
 						<input
 							id="fullName"
 							type="text"
 							bind:value={fullName}
 							disabled={loading}
-							placeholder="Namen des Kindes eingeben"
+							placeholder="z.B. Max Mustermann"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
 								   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 						/>
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Wird verschlüsselt in der Datenbank gespeichert
+						</p>
 					</div>
 
 					<div>
-						<label
-							for="username"
-							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-						>
-							Loginname
-						</label>
+						<div class="mb-1 flex items-center justify-between">
+							<label
+								for="username"
+								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+							>
+								Pseudonym (Loginname)
+							</label>
+							<span
+								class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+							>
+								<svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+									<path
+										fill-rule="evenodd"
+										d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+								Klartext
+							</span>
+						</div>
 						<input
 							id="username"
 							type="text"
 							bind:value={username}
 							required
 							disabled={loading}
-							placeholder="Username eingeben"
+							placeholder="z.B. elternteil123"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
 								   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 						/>
+						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Wird im Klartext gespeichert. Verwenden Sie keine echten Namen.
+						</p>
 					</div>
 
 					<div>
@@ -373,29 +433,6 @@
 					Hier klicken zum einloggen.
 				</button>
 			</p>
-		</div>
-
-		<!-- Security Note -->
-		<div class="mx-auto mt-6 max-w-md">
-			<div
-				class="flex items-start rounded-lg bg-white p-4 text-xs text-gray-500 shadow dark:bg-gray-800 dark:text-gray-400"
-			>
-				<svg
-					class="mr-2 h-4 w-4 flex-shrink-0 text-green-600"
-					fill="currentColor"
-					viewBox="0 0 20 20"
-				>
-					<path
-						fill-rule="evenodd"
-						d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-						clip-rule="evenodd"
-					/>
-				</svg>
-				<p class="leading-relaxed">
-					Gespeicherte Daten werden Serverseitig verschlüsselt. Wir können Ihre persönlichen
-					Informationen nicht lesen.
-				</p>
-			</div>
 		</div>
 	</div>
 </div>
