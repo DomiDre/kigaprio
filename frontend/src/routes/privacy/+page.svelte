@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 
-	const lastUpdate = '05.10.2025';
+	const lastUpdate = '10.11.2025';
 </script>
 
 <div
@@ -28,9 +28,8 @@
 				<h2 class="mb-3 text-2xl font-semibold text-gray-800 dark:text-white">1. Überblick</h2>
 				<p class="text-gray-700 dark:text-gray-300">
 					Diese Datenschutzerklärung informiert Sie über die Verarbeitung personenbezogener Daten
-					bei der Nutzung der Kindergarten Prioliste. Wir nehmen den Schutz Ihrer persönlichen Daten
-					sehr ernst und behandeln diese vertraulich sowie entsprechend der gesetzlichen
-					Datenschutzvorschriften.
+					bei der Nutzung von PrioTag. Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst und
+					behandeln diese vertraulich sowie entsprechend der gesetzlichen Datenschutzvorschriften.
 				</p>
 			</section>
 
@@ -52,11 +51,8 @@
 				<div class="ml-4 space-y-2 text-gray-700 dark:text-gray-300">
 					<p><strong>Registrierungsdaten:</strong></p>
 					<ul class="list-disc space-y-1" style="padding-left: 2rem;">
-						<li>E-Mail-Adresse (kann auch eine Pseudonym-Adresse sein)</li>
-						<li>
-							Name Ihres Kindes (bei Pseudoynimisierung sollte dies der Administration vor Ort
-							bekannt gegeben werden zur Zurteilung)
-						</li>
+						<li>Loginname (kann ein beliebiges Pseudonym sein)</li>
+						<li>Name Ihres Kindes</li>
 					</ul>
 					<p class="mt-3"><strong>Nutzungsdaten:</strong></p>
 					<ul class="ml-6 list-disc space-y-1" style="padding-left: 2rem;">
@@ -81,10 +77,6 @@
 						<strong>Bedarfsplanung:</strong> Ermittlung der täglichen Prioritäten für die Kindergartenplatzvergabe
 					</li>
 					<li>
-						<strong>Benachrichtigungen:</strong> Optionale Erinnerungen bei fehlenden Prioritätsangaben
-						(nur wenn eine gültige E-Mail-Adresse angegeben wurde)
-					</li>
-					<li>
 						<strong>Verwaltung:</strong> Kontoverwaltung und Zuordnung der Prioritäten zu Ihrem Kind
 					</li>
 				</ul>
@@ -95,17 +87,30 @@
 					5. Datenspeicherung und -sicherheit
 				</h2>
 				<p class="mb-3 text-gray-700 dark:text-gray-300">
-					<strong>Speicherort:</strong> Ihre Daten werden in einer PocketBase-Datenbank auf einem VPS-Server
+					<strong>Speicherort:</strong> Ihre Daten werden in einer PocketBase-Datenbank auf einem Server
 					bei Netcup (Deutschland) gespeichert.
 				</p>
 				<p class="mb-3 text-gray-700 dark:text-gray-300">
 					<strong>Zugriffsschutz:</strong> Der Zugriff auf die Datenbank ist durch ein Administrator-Passwort
 					geschützt und ausschließlich der Kindergartenverwaltung zugänglich.
 				</p>
+				<p class="mb-3 text-gray-700 dark:text-gray-300">
+					<strong>Verschlüsselung:</strong> Name des Kinds und Prioritätsdaten werden verschlüsselt in
+					der Datenbank gespeichert, eine Entschlüsselung Ihrer eigenen Daten ist nur Ihnen mit Ihrem
+					Passwort möglich oder der Administration mit einem generellen Schlüssel, der gesondert gesichert
+					wird.
+				</p>
 				<p class="text-gray-700 dark:text-gray-300">
-					<strong>Sicherheitsmaßnahmen:</strong> Wir setzen technische und organisatorische Sicherheitsmaßnahmen
-					ein, um Ihre Daten gegen zufällige oder vorsätzliche Manipulationen, Verlust, Zerstörung oder
-					den Zugriff unberechtigter Personen zu schützen.
+					<strong>Sicherheitsmaßnahmen:</strong> Wir setzen technische und organisatorische
+					Sicherheitsmaßnahmen ein, um Ihre Daten gegen zufällige oder vorsätzliche Manipulationen,
+					Verlust, Zerstörung oder den Zugriff unberechtigter Personen zu schützen. Eine Umfassende
+					Beschreibung findet sich
+					<a
+						href="https://github.com/DomiDre/priotag/blob/main/ARCHITECTURE.md"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="transition-colors hover:text-blue-600 dark:hover:text-blue-400">hier</a
+					>.
 				</p>
 			</section>
 
@@ -115,17 +120,18 @@
 				</h2>
 				<div class="space-y-3 text-gray-700 dark:text-gray-300">
 					<p>
-						<strong>Accountdaten:</strong> Ihr Account und die zugehörigen Stammdaten (E-Mail, Kindername)
-						werden nach 6 Monaten Inaktivität automatisch gelöscht.
+						<strong>Accountdaten:</strong> Ihr Account und die zugehörigen Stammdaten (Kindername) werden
+						nach 6 Monaten Inaktivität automatisch gelöscht.
 					</p>
 					<p>
-						<strong>Prioritätsdaten:</strong> Die eingegebenen Wochentags-Prioritäten werden monatlich
-						gelöscht, sobald der jeweilige Monat abgelaufen ist und die Daten nicht mehr für die Planung
-						benötigt werden.
+						<strong>Prioritätsdaten:</strong> Die eingegebenen Wochentags-Prioritäten werden automatisch
+						2 Monate nach Ablauf des jeweiligen Monats gelöscht, sobald sie nicht mehr für die aktuelle
+						Planung benötigt werden. Der aktuelle und der vergangene Monat bleiben dabei verfügbar.
 					</p>
 					<p>
 						<strong>Löschung auf Anfrage:</strong> Sie können jederzeit die sofortige Löschung Ihres
-						Accounts und aller zugehörigen Daten beantragen.
+						Accounts und aller zugehörigen Daten beantragen. Die Daten werden unverzüglich gelöscht und
+						ein Löschprotokoll entsprechend erstellt.
 					</p>
 				</div>
 			</section>
@@ -135,10 +141,8 @@
 					7. Pseudonyme Nutzung
 				</h2>
 				<p class="text-gray-700 dark:text-gray-300">
-					Sie können den Dienst mit einer Pseudonym-E-Mail-Adresse nutzen. Eine echte E-Mail-Adresse
-					ist nur erforderlich, wenn Sie Erinnerungen bei fehlenden Prioritätsangaben erhalten
-					möchten. Die Nutzung mit Pseudonym-Adresse schränkt lediglich die
-					Benachrichtigungsfunktion ein.
+					Sie können den Dienst mit einem Pseudonym nutzen. Sollte für den Kindesnamen ebenfalls ein
+					Pseudonym verwendet werden, sprechen Sie dies einfach mit der Kindergarten Leitung ab.
 				</p>
 			</section>
 
