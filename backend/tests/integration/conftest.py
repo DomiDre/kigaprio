@@ -46,7 +46,7 @@ def redis_client(
 ) -> Generator[redis.Redis, None, None]:
     """Get a Redis client connected to the test container or docker-compose service."""
     if USE_DOCKER_SERVICES:
-        from kigaprio.services import redis_service
+        from priotag.services import redis_service
 
         # Reset the singleton state to avoid stale cached URLs
         redis_service._redis_service._redis_url = None
@@ -73,7 +73,7 @@ def redis_client(
 
     if USE_DOCKER_SERVICES:
         # Clean up the singleton
-        from kigaprio.services import redis_service
+        from priotag.services import redis_service
 
         redis_service.close_redis()
     else:
@@ -143,7 +143,7 @@ def _setup_pocketbase(pocketbase_url: str) -> None:
     print("✓ Magic word created")
 
     # Create service account
-    from kigaprio.services import service_account
+    from priotag.services import service_account
 
     print(f"Creating service account ({service_account.SERVICE_ACCOUNT_ID})...")
     client.post(
@@ -207,7 +207,7 @@ def pocketbase_container(redis_client) -> Generator[DockerContainer | None, None
 
 @pytest.fixture(scope="function")
 def pocketbase_url(monkeypatch, pocketbase_container):
-    from kigaprio.services import pocketbase_service, service_account
+    from priotag.services import pocketbase_service, service_account
 
     if USE_DOCKER_SERVICES:
         pocketbase_url = pocketbase_service.POCKETBASE_URL
@@ -261,8 +261,8 @@ def test_app(pocketbase_url: str, clean_redis: redis.Redis):
     """
     from fastapi.testclient import TestClient
 
-    from kigaprio.main import app
-    from kigaprio.services.redis_service import get_redis
+    from priotag.main import app
+    from priotag.services.redis_service import get_redis
 
     # Override get_redis dependency when not using docker-compose
     if not USE_DOCKER_SERVICES:

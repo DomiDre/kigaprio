@@ -16,9 +16,9 @@ import base64
 import pytest
 from fastapi import HTTPException
 
-from kigaprio.models.auth import SessionInfo
-from kigaprio.models.pocketbase_schemas import UsersResponse
-from kigaprio.utils import (
+from priotag.models.auth import SessionInfo
+from priotag.models.pocketbase_schemas import UsersResponse
+from priotag.utils import (
     extract_session_info_from_record,
     get_current_dek,
     get_current_token,

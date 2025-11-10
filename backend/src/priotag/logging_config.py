@@ -21,7 +21,7 @@ def setup_logging(log_level: str = "INFO") -> None:
     root_logger.addHandler(console_handler)
 
     # Configure specific loggers
-    logging.getLogger("kigaprio").setLevel(
+    logging.getLogger("priotag").setLevel(
         logging.DEBUG if log_level == "DEBUG" else logging.INFO
     )
     logging.getLogger("uvicorn.error").setLevel(logging.INFO)

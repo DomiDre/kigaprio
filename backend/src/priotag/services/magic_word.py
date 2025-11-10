@@ -2,8 +2,8 @@ import httpx
 import redis
 from fastapi import HTTPException
 
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.service_account import authenticate_service_account
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.service_account import authenticate_service_account
 
 
 async def get_magic_word_from_cache_or_db(redis_client: redis.Redis) -> str | None:

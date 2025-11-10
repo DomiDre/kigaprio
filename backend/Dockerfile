@@ -23,7 +23,7 @@ WORKDIR /app
 COPY --chown=ubuntu:ubuntu pyproject.toml uv.lock .python-version ./
 
 # Create a minimal __init__.py to avoid sync issues
-RUN mkdir -p src/kigaprio && touch src/kigaprio/__init__.py && touch README.md
+RUN mkdir -p src/priotag && touch src/priotag/__init__.py && touch README.md
 
 
 # --- Development stage ---
@@ -55,7 +55,7 @@ RUN mkdir -p /app/static
 EXPOSE 8000
 
 # Run with uv
-CMD ["uv", "run", "python", "-m", "uvicorn", "kigaprio.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uv", "run", "python", "-m", "uvicorn", "priotag.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 
 # --- Production stage ---
@@ -91,7 +91,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/appuser/.local/bin:$PATH"
 
 # Create dummy files for uv
-RUN mkdir -p src/kigaprio && touch src/kigaprio/__init__.py && touch README.md
+RUN mkdir -p src/priotag && touch src/priotag/__init__.py && touch README.md
 
 # Install production dependencies only
 RUN uv sync --frozen --no-dev
@@ -127,6 +127,6 @@ USER appuser
 ENTRYPOINT ["/usr/local/bin/load-secrets.sh"]
 # Run with gunicorn for production
 CMD ["gunicorn", \
-     "kigaprio.main:app", \
+     "priotag.main:app", \
      "--config", \
-     "/app/src/kigaprio/gunicorn_config.py"]
+     "/app/src/priotag/gunicorn_config.py"]

@@ -3,9 +3,9 @@
 Manual cleanup script for testing.
 
 Usage:
-  python -m kigaprio.scripts.manual_cleanup --priorities  # Clean old priorities
-  python -m kigaprio.scripts.manual_cleanup --users       # Clean inactive users
-  python -m kigaprio.scripts.manual_cleanup --all         # Run both cleanups
+  python -m priotag.scripts.manual_cleanup --priorities  # Clean old priorities
+  python -m priotag.scripts.manual_cleanup --users       # Clean inactive users
+  python -m priotag.scripts.manual_cleanup --all         # Run both cleanups
 """
 
 import argparse
@@ -13,8 +13,8 @@ import asyncio
 import logging
 import sys
 
-from kigaprio.services.cleanup_service import cleanup_old_priorities
-from kigaprio.services.user_cleanup_service import cleanup_inactive_users
+from priotag.services.cleanup_service import cleanup_old_priorities
+from priotag.services.user_cleanup_service import cleanup_inactive_users
 
 # Configure logging
 logging.basicConfig(

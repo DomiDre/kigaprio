@@ -4,23 +4,23 @@ import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException
 
-from kigaprio.models.admin import (
+from priotag.models.admin import (
     ManualPriorityRecordForAdmin,
     ManualPriorityRequest,
     UpdateMagicWordRequest,
     UserPriorityRecordForAdmin,
 )
-from kigaprio.models.auth import SessionInfo
-from kigaprio.models.pocketbase_schemas import PriorityRecord, UsersResponse
-from kigaprio.models.priorities import validate_month_format_and_range
-from kigaprio.services.encryption import EncryptionManager
-from kigaprio.services.magic_word import (
+from priotag.models.auth import SessionInfo
+from priotag.models.pocketbase_schemas import PriorityRecord, UsersResponse
+from priotag.models.priorities import validate_month_format_and_range
+from priotag.services.encryption import EncryptionManager
+from priotag.services.magic_word import (
     create_or_update_magic_word,
     get_magic_word_from_cache_or_db,
 )
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import get_redis
-from kigaprio.utils import get_current_dek, get_current_token, require_admin
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import get_redis
+from priotag.utils import get_current_dek, get_current_token, require_admin
 
 router = APIRouter()
 

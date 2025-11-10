@@ -8,17 +8,17 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from kigaprio.api.routes import account, admin, auth, health, priorities
-from kigaprio.config import settings
-from kigaprio.logging_config import setup_logging
-from kigaprio.middleware.metrics import (
+from priotag.api.routes import account, admin, auth, health, priorities
+from priotag.config import settings
+from priotag.logging_config import setup_logging
+from priotag.middleware.metrics import (
     PrometheusMetricsMiddleware,
     metrics_endpoint,
     track_csp_violation,
 )
-from kigaprio.middleware.security_headers import SecurityHeadersMiddleware
-from kigaprio.services.redis_service import close_redis, redis_health_check
-from kigaprio.static_files_utils import setup_static_file_serving
+from priotag.middleware.security_headers import SecurityHeadersMiddleware
+from priotag.services.redis_service import close_redis, redis_health_check
+from priotag.static_files_utils import setup_static_file_serving
 
 ENV = os.getenv("ENV", "production")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG" if ENV == "development" else "INFO")
@@ -27,7 +27,7 @@ setup_logging(LOG_LEVEL)
 
 
 logger = logging.getLogger(__name__)
-logger.info("Starting KigaPrio API")
+logger.info("Starting PrioTag API")
 
 
 @asynccontextmanager
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="KigaPrio API",
+    title="PrioTag API",
     description="API for analyzing images and PDFs with Excel output generation",
     version="0.1.0",
     docs_url=None if ENV == "production" else "/api/docs",
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "kigaprio.main:app",
+        "priotag.main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.ENV == "development",

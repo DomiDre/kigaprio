@@ -1,8 +1,8 @@
-# KigaPrio
+# PrioTag
 
 <div align="center">
 
-[![CI Status](https://github.com/DomiDre/kigaprio/actions/workflows/ci.yml/badge.svg)](https://github.com/DomiDre/kigaprio/actions/workflows/ci.yml)
+[![CI Status](https://github.com/DomiDre/priotag/actions/workflows/ci.yml/badge.svg)](https://github.com/DomiDre/priotag/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen.svg)](https://www.docker.com/)
 [![GDPR Compliant](https://img.shields.io/badge/GDPR-Compliant-green.svg)](ARCHITECTURE.md#gdpr-compliance)
@@ -17,7 +17,7 @@
 
 ## 📋 Overview
 
-KigaPrio is a secure web application designed for a single childcare facility to manage daily priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
+PrioTag is a secure web application designed for a single childcare facility to manage daily priorities with server-side encryption. It enables parents to submit childcare preferences while ensuring complete data privacy through user-controlled encryption and GDPR-compliant architecture.
 
 ### Key Capabilities
 - 🔐 **Server-side encryption** with user-controlled security levels
@@ -28,7 +28,7 @@ KigaPrio is a secure web application designed for a single childcare facility to
 
 ## 🏗️ Architecture
 
-KigaPrio implements a privacy-first architecture with multiple layers of security. For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+PrioTag implements a privacy-first architecture with multiple layers of security. For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Technology Stack
 
@@ -64,8 +64,8 @@ Details in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/DomiDre/kigaprio.git
-cd kigaprio
+git clone https://github.com/DomiDre/priotag.git
+cd priotag
 ```
 
 2. **Start development environment**
@@ -118,9 +118,9 @@ just prod
 ## 📁 Project Structure
 
 ```
-kigaprio/
+priotag/
 ├── backend/              # FastAPI application
-│   ├── src/kigaprio/     # Application code
+│   ├── src/priotag/     # Application code
 │   │   ├── api/          # API endpoints
 │   │   ├── middleware/   # Middleware in requests, e.g. token refresh
 │   │   ├── models/       # Data models
@@ -163,7 +163,7 @@ The project maintains code quality through:
 - **Formatting**: Ruff for Python, Prettier for JavaScript
 - **Type Checking**: mypy for Python, TypeScript for frontend
 - **Pre-commit Hooks**: Automated checks before commits
-- **Testing**: Unit and integration tests with pytest, coverage reports via [Codecov](https://codecov.io/gh/DomiDre/kigaprio)
+- **Testing**: Unit and integration tests with pytest, coverage reports via [Codecov](https://codecov.io/gh/DomiDre/priotag)
 
 Tests run automatically in CI using docker-compose services for production-like testing. Run tests locally:
 ```bash
@@ -248,5 +248,5 @@ Built with:
 ## 📞 Support
 
 For issues and questions:
-- **Bug Reports**: [GitHub Issues](https://github.com/DomiDre/kigaprio/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/DomiDre/kigaprio/discussions)
+- **Bug Reports**: [GitHub Issues](https://github.com/DomiDre/priotag/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/DomiDre/priotag/discussions)

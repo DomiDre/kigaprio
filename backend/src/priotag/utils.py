@@ -8,17 +8,17 @@ import httpx
 import redis
 from fastapi import Cookie, Depends, HTTPException, Request, Response
 
-from kigaprio.middleware.metrics import track_session_lookup
-from kigaprio.models.auth import SessionInfo
-from kigaprio.models.cookie import (
+from priotag.middleware.metrics import track_session_lookup
+from priotag.models.auth import SessionInfo
+from priotag.models.cookie import (
     COOKIE_AUTH_TOKEN,
     COOKIE_DEK,
     COOKIE_PATH,
     COOKIE_SECURE,
 )
-from kigaprio.models.pocketbase_schemas import UsersResponse
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import get_redis
+from priotag.models.pocketbase_schemas import UsersResponse
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import get_redis
 
 # Cookie names
 # Update lastSeen at most once per hour to avoid excessive database writes

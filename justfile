@@ -176,7 +176,7 @@ copy-static-to-backend:
     echo "Building frontend..."
     docker compose -f docker-compose.dev.yml exec frontend npm run build
     echo "Copying static files to backend..."
-    docker cp kigaprio-frontend-dev:/app/build/. kigaprio-backend-dev:/app/static/
+    docker cp priotag-frontend-dev:/app/build/. priotag-backend-dev:/app/static/
     echo "Static files copied! Access at http://localhost:8000"
 
 # Run development with static file building
@@ -190,14 +190,14 @@ init-secrets:
 # Initialize the admin public / private key, where public key is needed for the server to run
 init-admin-key:
     #!/usr/bin/env bash
-    docker run --rm -it -v ./backend:/app kigaprio-backend:dev uv run src/kigaprio/scripts/initialize_admin_keypair.py
+    docker run --rm -it -v ./backend:/app priotag-backend:dev uv run src/priotag/scripts/initialize_admin_keypair.py
     mv ./backend/admin_public_key.pem ./.secrets/
     mv ./backend/admin_private_key.pem ./
 
 # Initialize pocketbase directories for storage
 pocketbase-init: init-secrets
     ./pocketbase/init.sh
-    docker compose -f docker-compose.dev.yml run --rm backend uv run src/kigaprio/scripts/initialize_pocketbase.py
+    docker compose -f docker-compose.dev.yml run --rm backend uv run src/priotag/scripts/initialize_pocketbase.py
 
 services-init:
     #!/usr/bin/env bash
@@ -205,48 +205,48 @@ services-init:
     mkdir -p redis_data
     sudo chmod 700 redis_data
     echo "Creating user for redis"
-    sudo groupadd --gid 10001 redis-kigaprio
+    sudo groupadd --gid 10001 redis-priotag
     sudo useradd --system \
       --uid 10001 --gid 10001 \
       --no-create-home \
       --shell /usr/sbin/nologin \
-      redis-kigaprio
+      redis-priotag
     echo "Setting ownership (requires sudo)..."
     sudo chown -R 10001:10001 redis_data || echo "⚠️  Could not set ownership for redis"
     echo "Redis persistence initialized"
 
     mkdir -p monitoring/prometheus/data
     sudo chmod 700 monitoring/prometheus/data
-    sudo groupadd --gid 10002 prometheus-kigaprio
+    sudo groupadd --gid 10002 prometheus-priotag
     sudo useradd --system \
       --uid 10002 --gid 10002 \
       --no-create-home \
       --shell /usr/sbin/nologin \
-      prometheus-kigaprio
+      prometheus-priotag
     echo "Setting ownership (requires sudo)..."
     sudo chown -R 10002:10002 monitoring/prometheus || echo "⚠️  Could not set ownership for prometheus"
     echo "Prometheus initialized"
 
     mkdir -p monitoring/grafana/data
     sudo chmod 700 monitoring/grafana/data
-    sudo groupadd --gid 10003 grafana-kigaprio
+    sudo groupadd --gid 10003 grafana-priotag
     sudo useradd --system \
       --uid 10003 --gid 10003 \
       --no-create-home \
       --shell /usr/sbin/nologin \
-      grafana-kigaprio
+      grafana-priotag
     echo "Setting ownership (requires sudo)..."
     sudo chown -R 10003:10003 monitoring/grafana || echo "⚠️  Could not set ownership for prometheus"
     echo "grafana initialized"
 
     mkdir -p monitoring/alertmanager/data
     sudo chmod 700 monitoring/alertmanager/data
-    sudo groupadd --gid 10004 alertmanager-kigaprio
+    sudo groupadd --gid 10004 alertmanager-priotag
     sudo useradd --system \
       --uid 10004 --gid 10004 \
       --no-create-home \
       --shell /usr/sbin/nologin \
-      alertmanager-kigaprio
+      alertmanager-priotag
     echo "Setting ownership (requires sudo)..."
     sudo chown -R 10004:10004 monitoring/alertmanager || echo "⚠️  Could not set ownership for prometheus"
     echo "alertmanager initialized"

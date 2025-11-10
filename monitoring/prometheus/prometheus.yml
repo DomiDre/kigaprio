@@ -2,7 +2,7 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    cluster: 'kigaprio-production'
+    cluster: 'priotag-production'
     environment: 'production'
 
 # Alert rules
@@ -28,14 +28,14 @@ scrape_configs:
         replacement: 'prometheus'
 
   # FastAPI Backend metrics
-  - job_name: 'kigaprio-backend'
+  - job_name: 'priotag-backend'
     metrics_path: '/api/v1/metrics'
     static_configs:
       - targets: ['backend:8000']
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
-        replacement: 'kigaprio-backend'
+        replacement: 'priotag-backend'
     authorization:
       type: Bearer
       credentials_file: /run/secrets/metrics_token

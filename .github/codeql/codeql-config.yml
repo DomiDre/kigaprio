@@ -2,4 +2,4 @@ name: "CodeQL config"
 queries:
   - uses: security-and-quality
 paths-ignore:
-  - backend/src/kigaprio/static_files_utils.py
+  - backend/src/priotag/static_files_utils.py

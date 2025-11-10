@@ -2072,7 +2072,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kigaprio"
+name = "priotag"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

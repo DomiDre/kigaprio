@@ -80,7 +80,7 @@ receivers:
     email_configs:
       - to: '$ALERTMANAGER_EMAIL_TO'
         headers:
-          Subject: '[KigaPrio] {{ .GroupLabels.severity | toUpper }}: {{ .GroupLabels.alertname }}'
+          Subject: '[PrioTag] {{ .GroupLabels.severity | toUpper }}: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.html" . }}'
         send_resolved: true
 
@@ -89,7 +89,7 @@ receivers:
     email_configs:
       - to: '$ALERTMANAGER_EMAIL_TO'
         headers:
-          Subject: '🚨 [CRITICAL SECURITY] KigaPrio: {{ .GroupLabels.alertname }}'
+          Subject: '🚨 [CRITICAL SECURITY] PrioTag: {{ .GroupLabels.alertname }}'
           Priority: 'urgent'
         html: '{{ template "email.html" . }}'
         send_resolved: true
@@ -99,7 +99,7 @@ receivers:
     email_configs:
       - to: '$ALERTMANAGER_EMAIL_TO'
         headers:
-          Subject: '[SECURITY] KigaPrio: {{ .GroupLabels.alertname }}'
+          Subject: '[SECURITY] PrioTag: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.html" . }}'
         send_resolved: true
 
@@ -108,7 +108,7 @@ receivers:
     email_configs:
       - to: '$ALERTMANAGER_EMAIL_TO'
         headers:
-          Subject: '🔥 [CRITICAL] KigaPrio: {{ .GroupLabels.alertname }}'
+          Subject: '🔥 [CRITICAL] PrioTag: {{ .GroupLabels.alertname }}'
           Priority: 'urgent'
         html: '{{ template "email.html" . }}'
         send_resolved: true
@@ -118,7 +118,7 @@ receivers:
     email_configs:
       - to: '$ALERTMANAGER_EMAIL_TO'
         headers:
-          Subject: '[OPS] KigaPrio: {{ .GroupLabels.alertname }}'
+          Subject: '[OPS] PrioTag: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.html" . }}'
         send_resolved: true
 
@@ -127,6 +127,6 @@ receivers:
     email_configs:
       - to: '$ALERTMANAGER_EMAIL_TO'
         headers:
-          Subject: '[INFO] KigaPrio: {{ .GroupLabels.alertname }}'
+          Subject: '[INFO] PrioTag: {{ .GroupLabels.alertname }}'
         html: '{{ template "email.html" . }}'
         send_resolved: true

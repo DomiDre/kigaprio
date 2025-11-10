@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from kigaprio.models.priorities import WeekPriority
+from priotag.models.priorities import WeekPriority
 
 
 class UpdateMagicWordRequest(BaseModel):

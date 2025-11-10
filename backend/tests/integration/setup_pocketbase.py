@@ -72,7 +72,7 @@ def setup_pocketbase():
     print("✓ Magic word created")
 
     # Create service account
-    from kigaprio.services import service_account
+    from priotag.services import service_account
 
     print(f"Creating service account ({service_account.SERVICE_ACCOUNT_ID})...")
     service_response = client.post(

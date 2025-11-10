@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from kigaprio.models.pocketbase_schemas import UsersResponse
+from priotag.models.pocketbase_schemas import UsersResponse
 
 SecurityMode = Literal["session", "persistent"]
 

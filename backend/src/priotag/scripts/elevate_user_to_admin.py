@@ -3,7 +3,7 @@ import sys
 
 import requests
 
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.pocketbase_service import POCKETBASE_URL
 
 superuser_login = input("Enter superuser login: ")
 superuser_password = getpass.getpass()

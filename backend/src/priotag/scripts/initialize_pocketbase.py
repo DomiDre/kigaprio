@@ -4,10 +4,10 @@ import sys
 
 import requests
 
-from kigaprio.services.magic_word import create_or_update_magic_word
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.redis_service import get_redis
-from kigaprio.services.service_account import (
+from priotag.services.magic_word import create_or_update_magic_word
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.redis_service import get_redis
+from priotag.services.service_account import (
     SERVICE_ACCOUNT_ID,
     SERVICE_ACCOUNT_PASSWORD,
 )

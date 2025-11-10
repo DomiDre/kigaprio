@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: 'KigaPrio Dashboards'
+  - name: 'PrioTag Dashboards'
     orgId: 1
-    folder: 'KigaPrio'
+    folder: 'PrioTag'
     type: file
     disableDeletion: false
     editable: true

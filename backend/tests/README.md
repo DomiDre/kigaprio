@@ -1,8 +1,8 @@
 # Backend Tests
 
-[![codecov](https://codecov.io/gh/DomiDre/kigaprio/graph/badge.svg?token=1XUOS5Y6GF)](https://codecov.io/gh/DomiDre/kigaprio)
+[![codecov](https://codecov.io/gh/DomiDre/priotag/graph/badge.svg?token=1XUOS5Y6GF)](https://codecov.io/gh/DomiDre/priotag)
 
-This directory contains comprehensive tests for the KigaPrio backend application, including both unit tests and integration tests.
+This directory contains comprehensive tests for the PrioTag backend application, including both unit tests and integration tests.
 
 ## Test Structure
 
@@ -96,7 +96,7 @@ uv run pytest tests/test_utils.py
 uv run pytest tests/test_utils.py::TestVerifyToken
 
 # Run with coverage report
-uv run pytest --cov=src/kigaprio --cov-report=html
+uv run pytest --cov=src/priotag --cov-report=html
 ```
 
 ## Test Fixtures

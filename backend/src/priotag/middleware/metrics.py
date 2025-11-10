@@ -1,4 +1,4 @@
-"""Prometheus metrics middleware for KigaPrio backend"""
+"""Prometheus metrics middleware for PrioTag backend"""
 
 import time
 from collections.abc import Callable
@@ -19,13 +19,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # HTTP Request metrics
 http_requests_total = Counter(
-    "kigaprio_http_requests_total",
+    "priotag_http_requests_total",
     "Total HTTP requests",
     ["method", "endpoint", "status"],
 )
 
 http_request_duration_seconds = Histogram(
-    "kigaprio_http_request_duration_seconds",
+    "priotag_http_request_duration_seconds",
     "HTTP request latency in seconds",
     ["method", "endpoint"],
     buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0),
@@ -33,231 +33,231 @@ http_request_duration_seconds = Histogram(
 
 # Authentication metrics
 login_attempts_total = Counter(
-    "kigaprio_login_attempts_total",
+    "priotag_login_attempts_total",
     "Total login attempts",
     ["result", "client_ip"],  # result: success, failed_credentials, rate_limited
 )
 
 failed_login_total = Counter(
-    "kigaprio_failed_login_total",
+    "priotag_failed_login_total",
     "Total failed login attempts",
     ["reason"],  # reason: invalid_credentials, rate_limited, account_locked
 )
 
 admin_failed_auth_total = Counter(
-    "kigaprio_admin_failed_auth_total",
+    "priotag_admin_failed_auth_total",
     "Failed admin authentication attempts",
     ["reason"],
 )
 
 active_sessions = Gauge(
-    "kigaprio_active_sessions",
+    "priotag_active_sessions",
     "Number of active sessions",
     ["security_mode"],  # session, persistent
 )
 
 admin_sessions_active = Gauge(
-    "kigaprio_admin_sessions_active",
+    "priotag_admin_sessions_active",
     "Number of active admin sessions",
 )
 
 # Rate limiting metrics
 rate_limit_exceeded_total = Counter(
-    "kigaprio_rate_limit_exceeded_total",
+    "priotag_rate_limit_exceeded_total",
     "Rate limit violations",
     ["endpoint", "limit_type"],  # limit_type: login, api, magic_word
 )
 
 # Security metrics
 unauthorized_access_total = Counter(
-    "kigaprio_unauthorized_access_total",
+    "priotag_unauthorized_access_total",
     "Unauthorized access attempts (403)",
     ["endpoint"],
 )
 
 encryption_error_total = Counter(
-    "kigaprio_encryption_error_total",
+    "priotag_encryption_error_total",
     "Encryption/decryption errors",
     ["operation"],  # operation: encrypt, decrypt, key_derivation
 )
 
 csp_violation_total = Counter(
-    "kigaprio_csp_violation_total",
+    "priotag_csp_violation_total",
     "Content Security Policy violations",
     ["directive"],
 )
 
 # Session metrics
 session_lookups_total = Counter(
-    "kigaprio_session_lookups_total",
+    "priotag_session_lookups_total",
     "Total session lookups",
     ["result"],  # result: cache_hit, cache_miss, invalid
 )
 
 session_cache_miss_total = Counter(
-    "kigaprio_session_cache_miss_total",
+    "priotag_session_cache_miss_total",
     "Session cache misses requiring PocketBase refresh",
 )
 
 # Data access metrics
 priority_submissions_total = Counter(
-    "kigaprio_priority_submissions_total",
+    "priotag_priority_submissions_total",
     "Total priority submissions",
     ["month"],
 )
 
 data_operations_total = Counter(
-    "kigaprio_data_operations_total",
+    "priotag_data_operations_total",
     "Total data operations",
     ["operation", "collection"],  # operation: create, read, update, delete
 )
 
 # PocketBase HTTP API metrics
 pocketbase_request_duration_seconds = Histogram(
-    "kigaprio_pocketbase_request_duration_seconds",
+    "priotag_pocketbase_request_duration_seconds",
     "PocketBase API request duration",
     ["operation", "collection", "status"],
     buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0),
 )
 
 pocketbase_request_total = Counter(
-    "kigaprio_pocketbase_request_total",
+    "priotag_pocketbase_request_total",
     "Total PocketBase API requests",
     ["operation", "collection", "status"],
 )
 
 pocketbase_error_total = Counter(
-    "kigaprio_pocketbase_error_total",
+    "priotag_pocketbase_error_total",
     "PocketBase API errors",
     ["operation", "collection", "error_type"],
 )
 
 # Redis metrics
 redis_connection_error_total = Counter(
-    "kigaprio_redis_connection_error_total",
+    "priotag_redis_connection_error_total",
     "Redis connection errors",
 )
 
 redis_operation_duration_seconds = Histogram(
-    "kigaprio_redis_operation_duration_seconds",
+    "priotag_redis_operation_duration_seconds",
     "Redis operation duration",
     ["operation"],
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5),
 )
 
 redis_pool_connections_active = Gauge(
-    "kigaprio_redis_pool_connections_active",
+    "priotag_redis_pool_connections_active",
     "Active Redis pool connections",
 )
 
 redis_pool_connections_available = Gauge(
-    "kigaprio_redis_pool_connections_available",
+    "priotag_redis_pool_connections_available",
     "Available Redis pool connections",
 )
 
 redis_pool_connections_max = Gauge(
-    "kigaprio_redis_pool_connections_max",
+    "priotag_redis_pool_connections_max",
     "Maximum Redis pool connections",
 )
 
 redis_info_memory_used_bytes = Gauge(
-    "kigaprio_redis_info_memory_used_bytes",
+    "priotag_redis_info_memory_used_bytes",
     "Redis memory used in bytes",
 )
 
 redis_info_memory_max_bytes = Gauge(
-    "kigaprio_redis_info_memory_max_bytes",
+    "priotag_redis_info_memory_max_bytes",
     "Redis max memory in bytes",
 )
 
 redis_info_connected_clients = Gauge(
-    "kigaprio_redis_info_connected_clients",
+    "priotag_redis_info_connected_clients",
     "Number of connected Redis clients",
 )
 
 # System metrics
 active_connections = Gauge(
-    "kigaprio_active_connections",
+    "priotag_active_connections",
     "Number of active HTTP connections",
 )
 
 health_check_status = Gauge(
-    "kigaprio_health_check_status",
+    "priotag_health_check_status",
     "Health check status (1=healthy, 0=unhealthy)",
     ["component"],  # backend, redis, pocketbase
 )
 
 # Business metrics
 magic_word_verification_total = Counter(
-    "kigaprio_magic_word_verification_total",
+    "priotag_magic_word_verification_total",
     "Magic word verifications",
     ["result"],  # success, failed
 )
 
 magic_word_verification_failed_total = Counter(
-    "kigaprio_magic_word_verification_failed_total",
+    "priotag_magic_word_verification_failed_total",
     "Failed magic word verifications",
 )
 
 user_registrations_total = Counter(
-    "kigaprio_user_registrations_total",
+    "priotag_user_registrations_total",
     "Total user registrations",
     ["result"],  # success, failed
 )
 
 # Cleanup task metrics
 cleanup_runs_total = Counter(
-    "kigaprio_cleanup_runs_total",
+    "priotag_cleanup_runs_total",
     "Total cleanup task runs",
     ["result"],  # success, failed
 )
 
 cleanup_records_deleted_total = Counter(
-    "kigaprio_cleanup_records_deleted_total",
+    "priotag_cleanup_records_deleted_total",
     "Total records deleted by cleanup task",
 )
 
 cleanup_records_failed_total = Counter(
-    "kigaprio_cleanup_records_failed_total",
+    "priotag_cleanup_records_failed_total",
     "Total records that failed to delete during cleanup",
 )
 
 cleanup_duration_seconds = Histogram(
-    "kigaprio_cleanup_duration_seconds",
+    "priotag_cleanup_duration_seconds",
     "Cleanup task duration in seconds",
     buckets=(1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0),
 )
 
 cleanup_last_run_timestamp = Gauge(
-    "kigaprio_cleanup_last_run_timestamp",
+    "priotag_cleanup_last_run_timestamp",
     "Timestamp of last cleanup run",
 )
 
 # User cleanup task metrics
 user_cleanup_runs_total = Counter(
-    "kigaprio_user_cleanup_runs_total",
+    "priotag_user_cleanup_runs_total",
     "Total user cleanup task runs",
     ["result"],  # success, failed
 )
 
 user_cleanup_users_deleted_total = Counter(
-    "kigaprio_user_cleanup_users_deleted_total",
+    "priotag_user_cleanup_users_deleted_total",
     "Total inactive users deleted by cleanup task",
 )
 
 user_cleanup_users_failed_total = Counter(
-    "kigaprio_user_cleanup_users_failed_total",
+    "priotag_user_cleanup_users_failed_total",
     "Total users that failed to delete during cleanup",
 )
 
 user_cleanup_duration_seconds = Histogram(
-    "kigaprio_user_cleanup_duration_seconds",
+    "priotag_user_cleanup_duration_seconds",
     "User cleanup task duration in seconds",
     buckets=(1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0),
 )
 
 user_cleanup_last_run_timestamp = Gauge(
-    "kigaprio_user_cleanup_last_run_timestamp",
+    "priotag_user_cleanup_last_run_timestamp",
     "Timestamp of last user cleanup run",
 )
 

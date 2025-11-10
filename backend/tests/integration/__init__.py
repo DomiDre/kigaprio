@@ -1,1 +1,1 @@
-"""Integration tests for KigaPrio backend."""
+"""Integration tests for PrioTag backend."""

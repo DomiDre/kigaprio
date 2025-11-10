@@ -4,7 +4,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    image: kigaprio-backend
+    image: priotag-backend
     restart: unless-stopped
     volumes:
       - frontend-static:/app/static:ro
@@ -17,12 +17,12 @@ services:
       - CORS_ORIGINS=https://admin.kiga.dhjd.de,https://kiga.dhjd.de
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.kigaprio-backend.rule=Host(`kiga.dhjd.de`)"
-      - "traefik.http.routers.kigaprio-backend.entrypoints=websecure"
-      - "traefik.http.routers.kigaprio-backend.tls=true"
-      - "traefik.http.routers.kigaprio-backend.tls.certresolver=myresolver"
-      - "traefik.http.routers.kigaprio-backend.tls.options=modern-tls@file"
-      - "traefik.http.services.kigaprio-backend.loadbalancer.server.port=8000"
+      - "traefik.http.routers.priotag-backend.rule=Host(`kiga.dhjd.de`)"
+      - "traefik.http.routers.priotag-backend.entrypoints=websecure"
+      - "traefik.http.routers.priotag-backend.tls=true"
+      - "traefik.http.routers.priotag-backend.tls.certresolver=myresolver"
+      - "traefik.http.routers.priotag-backend.tls.options=modern-tls@file"
+      - "traefik.http.services.priotag-backend.loadbalancer.server.port=8000"
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -56,7 +56,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: builder
-    image: kigaprio-frontend-builder
+    image: priotag-frontend-builder
     restart: "no"
     user: "0:0"
     volumes:
@@ -75,7 +75,7 @@ services:
         - USER_UID=1000
         - USER_GID=1000
         - PB_VERSION=0.30.2
-    image: kigaprio-pocketbase
+    image: priotag-pocketbase
     restart: unless-stopped
     expose:
       - 8090
@@ -128,7 +128,7 @@ services:
 
   # Scheduler service for periodic cleanup tasks
   scheduler:
-    image: kigaprio-backend
+    image: priotag-backend
     restart: unless-stopped
     command: ["/app/scheduler.sh"]
     environment:
@@ -166,7 +166,7 @@ services:
       context: ./admin_ui
       dockerfile: Dockerfile
       target: production
-    image: kigaprio-admin
+    image: priotag-admin
     environment:
       - NODE_ENV=production
       - PUBLIC_BACKEND_URL=https://kiga.dhjd.de
@@ -183,12 +183,12 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.kigaprio-admin.rule=Host(`admin.kiga.dhjd.de`)"
-      - "traefik.http.routers.kigaprio-admin.entrypoints=websecure"
-      - "traefik.http.routers.kigaprio-admin.tls=true"
-      - "traefik.http.routers.kigaprio-admin.tls.certresolver=myresolver"
-      - "traefik.http.routers.kigaprio-admin.tls.options=modern-tls@file"
-      - "traefik.http.services.kigaprio-admin.loadbalancer.server.port=3000"
+      - "traefik.http.routers.priotag-admin.rule=Host(`admin.kiga.dhjd.de`)"
+      - "traefik.http.routers.priotag-admin.entrypoints=websecure"
+      - "traefik.http.routers.priotag-admin.tls=true"
+      - "traefik.http.routers.priotag-admin.tls.certresolver=myresolver"
+      - "traefik.http.routers.priotag-admin.tls.options=modern-tls@file"
+      - "traefik.http.services.priotag-admin.loadbalancer.server.port=3000"
 
 volumes:
   frontend-static:

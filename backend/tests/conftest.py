@@ -1,5 +1,5 @@
 """
-Pytest configuration and shared fixtures for KigaPrio backend tests.
+Pytest configuration and shared fixtures for PrioTag backend tests.
 """
 
 import base64
@@ -102,7 +102,7 @@ def mock_admin_key(monkeypatch, admin_rsa_keypair, tmp_path):
     redis_pass_file.write_text("test_redis_password")
 
     # Mock the Path objects in EncryptionManager
-    from kigaprio.services.encryption import EncryptionManager
+    from priotag.services.encryption import EncryptionManager
 
     # Reset class variables to force re-reading
     EncryptionManager.ADMIN_PUBLIC_KEY_PEM = admin_rsa_keypair["public_pem"]
@@ -196,7 +196,7 @@ def sample_priority_data():
 @pytest.fixture
 def sample_session_info():
     """Sample session info for testing."""
-    from kigaprio.models.auth import SessionInfo
+    from priotag.models.auth import SessionInfo
 
     return SessionInfo(
         id="test_user_123",
@@ -208,7 +208,7 @@ def sample_session_info():
 @pytest.fixture
 def sample_admin_session_info():
     """Sample admin session info for testing."""
-    from kigaprio.models.auth import SessionInfo
+    from priotag.models.auth import SessionInfo
 
     return SessionInfo(
         id="admin_user_456",
@@ -220,7 +220,7 @@ def sample_admin_session_info():
 @pytest.fixture
 def test_dek():
     """Generate a test Data Encryption Key."""
-    from kigaprio.services.encryption import EncryptionManager
+    from priotag.services.encryption import EncryptionManager
 
     return EncryptionManager.generate_dek()
 

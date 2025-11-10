@@ -8,9 +8,9 @@ from datetime import datetime
 import httpx
 from dateutil.relativedelta import relativedelta
 
-from kigaprio.middleware.metrics import track_user_cleanup_run
-from kigaprio.services.pocketbase_service import POCKETBASE_URL
-from kigaprio.services.service_account import authenticate_service_account
+from priotag.middleware.metrics import track_user_cleanup_run
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.services.service_account import authenticate_service_account
 
 logger = logging.getLogger(__name__)
 

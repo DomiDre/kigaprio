@@ -4,15 +4,15 @@
 
 set -e
 
-echo "Starting KigaPrio cleanup scheduler..."
+echo "Starting PrioTag cleanup scheduler..."
 
 # Create a crontab for cleanup tasks
 cat > /tmp/cleanup-crontab <<EOF
 # Run cleanup tasks daily at 2 AM
-0 2 * * * python -m kigaprio.scripts.run_cleanup_tasks
+0 2 * * * python -m priotag.scripts.run_cleanup_tasks
 
 # Run monitoring updates every 5 minutes (for health checks and metrics)
-*/5 * * * * python -m kigaprio.scripts.run_monitoring
+*/5 * * * * python -m priotag.scripts.run_monitoring
 EOF
 
 echo "Crontab configured:"

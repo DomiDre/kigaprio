@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
       target: development
     user: "1000:1000"
-    image: kigaprio-backend:dev
+    image: priotag-backend:dev
     volumes:
       - ./backend/src:/app/src
       - ./backend/pyproject.toml:/app/pyproject.toml
@@ -20,7 +20,7 @@ services:
       - POCKETBASE_URL=http://pocketbase:8090
     ports:
       - "8000:8000"
-    command: uv run uvicorn kigaprio.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uv run uvicorn priotag.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 10s
@@ -42,7 +42,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: builder
-    image: kigaprio-frontend:builder
+    image: priotag-frontend:builder
     user: "0:0"
     volumes:
       - ./frontend/src:/app/src
@@ -78,7 +78,7 @@ services:
         - USER_UID=1000
         - USER_GID=1000
         - PB_VERSION=0.30.2
-    image: kigaprio-pocketbase
+    image: priotag-pocketbase
     restart: unless-stopped
     expose:
       - 8090

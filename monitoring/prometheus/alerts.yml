@@ -7,7 +7,7 @@ groups:
     rules:
       # High rate of failed login attempts (potential brute force)
       - alert: HighFailedLoginRate
-        expr: rate(kigaprio_failed_login_total[5m]) > 5
+        expr: rate(priotag_failed_login_total[5m]) > 5
         for: 2m
         labels:
           severity: critical
@@ -18,7 +18,7 @@ groups:
 
       # Rate limiting triggered frequently
       - alert: FrequentRateLimiting
-        expr: rate(kigaprio_rate_limit_exceeded_total[5m]) > 10
+        expr: rate(priotag_rate_limit_exceeded_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -31,7 +31,7 @@ groups:
       - alert: MultipleUserLoginFromSameIP
         expr: |
           sum by (client_ip) (
-            rate(kigaprio_login_attempts_total[10m])
+            rate(priotag_login_attempts_total[10m])
           ) > 10
         for: 5m
         labels:
@@ -43,7 +43,7 @@ groups:
 
       # Encryption/decryption failures
       - alert: EncryptionFailures
-        expr: rate(kigaprio_encryption_error_total[5m]) > 0.1
+        expr: rate(priotag_encryption_error_total[5m]) > 0.1
         for: 2m
         labels:
           severity: critical
@@ -54,7 +54,7 @@ groups:
 
       # Unauthorized access attempts
       - alert: UnauthorizedAccessAttempts
-        expr: rate(kigaprio_unauthorized_access_total[5m]) > 5
+        expr: rate(priotag_unauthorized_access_total[5m]) > 5
         for: 5m
         labels:
           severity: warning
@@ -65,7 +65,7 @@ groups:
 
       # CSP violations
       - alert: CSPViolations
-        expr: rate(kigaprio_csp_violation_total[5m]) > 1
+        expr: rate(priotag_csp_violation_total[5m]) > 1
         for: 10m
         labels:
           severity: warning
@@ -77,9 +77,9 @@ groups:
       # Admin session hijacking attempt
       - alert: AdminSessionAnomalies
         expr: |
-          (kigaprio_admin_sessions_active > 3)
+          (priotag_admin_sessions_active > 3)
           or
-          (rate(kigaprio_admin_failed_auth_total[5m]) > 0.5)
+          (rate(priotag_admin_failed_auth_total[5m]) > 0.5)
         for: 1m
         labels:
           severity: critical
@@ -96,13 +96,13 @@ groups:
     rules:
       # Service is down
       - alert: ServiceDown
-        expr: up{job="kigaprio-backend"} == 0
+        expr: up{job="priotag-backend"} == 0
         for: 1m
         labels:
           severity: critical
           category: availability
         annotations:
-          summary: "KigaPrio backend is down"
+          summary: "PrioTag backend is down"
           description: "Backend service has been down for more than 1 minute."
 
       # Redis is down
@@ -130,9 +130,9 @@ groups:
       # High error rate
       - alert: HighErrorRate
         expr: |
-          sum(rate(kigaprio_http_requests_total{status=~"5.."}[5m])) 
+          sum(rate(priotag_http_requests_total{status=~"5.."}[5m])) 
           / 
-          sum(rate(kigaprio_http_requests_total[5m])) > 0.05
+          sum(rate(priotag_http_requests_total[5m])) > 0.05
         for: 5m
         labels:
           severity: critical
@@ -143,7 +143,7 @@ groups:
 
       # Health check failures
       - alert: HealthCheckFailing
-        expr: kigaprio_health_check_status == 0
+        expr: priotag_health_check_status == 0
         for: 2m
         labels:
           severity: critical
@@ -162,7 +162,7 @@ groups:
       - alert: HighAPILatency
         expr: |
           histogram_quantile(0.95, 
-            rate(kigaprio_http_request_duration_seconds_bucket[5m])
+            rate(priotag_http_request_duration_seconds_bucket[5m])
           ) > 2
         for: 5m
         labels:
@@ -176,7 +176,7 @@ groups:
       - alert: SlowDatabaseQueries
         expr: |
           histogram_quantile(0.95,
-            rate(kigaprio_db_query_duration_seconds_bucket[5m])
+            rate(priotag_db_query_duration_seconds_bucket[5m])
           ) > 1
         for: 5m
         labels:
@@ -226,7 +226,7 @@ groups:
 
       # High connection count
       - alert: HighConnectionCount
-        expr: kigaprio_active_connections > 100
+        expr: priotag_active_connections > 100
         for: 5m
         labels:
           severity: warning
@@ -239,7 +239,7 @@ groups:
       - alert: HighPocketBaseLatency
         expr: |
           histogram_quantile(0.95,
-            rate(kigaprio_pocketbase_request_duration_seconds_bucket[5m])
+            rate(priotag_pocketbase_request_duration_seconds_bucket[5m])
           ) > 2
         for: 5m
         labels:
@@ -252,9 +252,9 @@ groups:
       # PocketBase error rate
       - alert: HighPocketBaseErrorRate
         expr: |
-          sum(rate(kigaprio_pocketbase_request_total{status=~"5.."}[5m]))
+          sum(rate(priotag_pocketbase_request_total{status=~"5.."}[5m]))
           /
-          sum(rate(kigaprio_pocketbase_request_total[5m])) > 0.05
+          sum(rate(priotag_pocketbase_request_total[5m])) > 0.05
         for: 5m
         labels:
           severity: critical
@@ -272,9 +272,9 @@ groups:
       # Session cache misses too high
       - alert: HighSessionCacheMissRate
         expr: |
-          rate(kigaprio_session_cache_miss_total[10m]) 
+          rate(priotag_session_cache_miss_total[10m]) 
           / 
-          rate(kigaprio_session_lookups_total[10m]) > 0.3
+          rate(priotag_session_lookups_total[10m]) > 0.3
         for: 10m
         labels:
           severity: warning
@@ -285,7 +285,7 @@ groups:
 
       # Redis connection errors
       - alert: RedisConnectionErrors
-        expr: rate(kigaprio_redis_connection_error_total[5m]) > 0
+        expr: rate(priotag_redis_connection_error_total[5m]) > 0
         for: 2m
         labels:
           severity: critical
@@ -296,7 +296,7 @@ groups:
 
       # Redis pool exhaustion
       - alert: RedisPoolExhausted
-        expr: kigaprio_redis_pool_connections_available <= 0
+        expr: priotag_redis_pool_connections_available <= 0
         for: 2m
         labels:
           severity: critical
@@ -308,9 +308,9 @@ groups:
       # Redis memory usage high
       - alert: RedisMemoryHigh
         expr: |
-          kigaprio_redis_info_memory_used_bytes 
+          priotag_redis_info_memory_used_bytes 
           / 
-          kigaprio_redis_info_memory_max_bytes > 0.9
+          priotag_redis_info_memory_max_bytes > 0.9
         for: 5m
         labels:
           severity: warning
@@ -329,9 +329,9 @@ groups:
       - alert: UnusualSubmissionRate
         expr: |
           abs(
-            rate(kigaprio_priority_submissions_total[1h])
-            - rate(kigaprio_priority_submissions_total[1h] offset 24h)
-          ) / rate(kigaprio_priority_submissions_total[1h] offset 24h) > 2
+            rate(priotag_priority_submissions_total[1h])
+            - rate(priotag_priority_submissions_total[1h] offset 24h)
+          ) / rate(priotag_priority_submissions_total[1h] offset 24h) > 2
         for: 15m
         labels:
           severity: info
@@ -345,7 +345,7 @@ groups:
         expr: |
           (hour() >= 6 and hour() <= 22)
           and
-          rate(kigaprio_priority_submissions_total[2h]) == 0
+          rate(priotag_priority_submissions_total[2h]) == 0
         for: 2h
         labels:
           severity: warning
@@ -357,9 +357,9 @@ groups:
       # High magic word verification failure rate
       - alert: HighMagicWordFailureRate
         expr: |
-          rate(kigaprio_magic_word_verification_failed_total[10m])
+          rate(priotag_magic_word_verification_failed_total[10m])
           / 
-          rate(kigaprio_magic_word_verification_total[10m]) > 0.5
+          rate(priotag_magic_word_verification_total[10m]) > 0.5
         for: 10m
         labels:
           severity: info
