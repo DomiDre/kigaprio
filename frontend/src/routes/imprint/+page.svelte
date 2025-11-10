@@ -145,7 +145,7 @@
 					Technische Umsetzung
 				</h2>
 				<div class="space-y-1 text-gray-700 dark:text-gray-300">
-					<p><strong>Entwicklung:</strong>Dominique Dresen</p>
+					<p><strong>Entwicklung:</strong> Dominique Dresen</p>
 					<p>
 						<strong>GitHub:</strong>
 						<a
