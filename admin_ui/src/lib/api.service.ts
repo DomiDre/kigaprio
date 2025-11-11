@@ -3,6 +3,13 @@ import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
 import type { WeekPriority } from '$lib/priorities.types';
 import { env } from '$env/dynamic/public';
+import type {
+	VacationDayAdmin,
+	VacationDayCreate,
+	VacationDayUpdate,
+	BulkVacationDayCreate,
+	BulkVacationDayResponse
+} from '$lib/vacation-days.types';
 
 export class ApiService {
 	public baseUrl: string;
@@ -172,6 +179,57 @@ export class ApiService {
 				month,
 				weeks
 			})
+		});
+	}
+
+	// ==================== Vacation Days ====================
+
+	async createVacationDay(data: VacationDayCreate): Promise<VacationDayAdmin> {
+		return this.requestJson('/admin/vacation-days', {
+			method: 'POST',
+			body: JSON.stringify(data)
+		});
+	}
+
+	async bulkCreateVacationDays(data: BulkVacationDayCreate): Promise<BulkVacationDayResponse> {
+		return this.requestJson('/admin/vacation-days/bulk', {
+			method: 'POST',
+			body: JSON.stringify(data)
+		});
+	}
+
+	async getVacationDays(params?: {
+		year?: number;
+		type?: string;
+	}): Promise<VacationDayAdmin[]> {
+		const queryParams = new URLSearchParams();
+		if (params?.year) queryParams.append('year', params.year.toString());
+		if (params?.type) queryParams.append('type', params.type);
+
+		const query = queryParams.toString();
+		const endpoint = `/admin/vacation-days${query ? `?${query}` : ''}`;
+
+		return this.requestJson(endpoint, {
+			method: 'GET'
+		});
+	}
+
+	async getVacationDay(date: string): Promise<VacationDayAdmin> {
+		return this.requestJson(`/admin/vacation-days/${date}`, {
+			method: 'GET'
+		});
+	}
+
+	async updateVacationDay(date: string, data: VacationDayUpdate): Promise<VacationDayAdmin> {
+		return this.requestJson(`/admin/vacation-days/${date}`, {
+			method: 'PUT',
+			body: JSON.stringify(data)
+		});
+	}
+
+	async deleteVacationDay(date: string): Promise<{ success: boolean; message: string }> {
+		return this.requestJson(`/admin/vacation-days/${date}`, {
+			method: 'DELETE'
 		});
 	}
 }

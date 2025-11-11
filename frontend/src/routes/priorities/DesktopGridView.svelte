@@ -1,9 +1,36 @@
 <script lang="ts">
 	import type { WeekData, WeekPriority } from '$lib/priorities.types';
+	import type { VacationDay } from '$lib/vacation-days.types';
 	import { dayNames, priorityColors } from '$lib/priorities.config';
+	import { getVacationDayForDate } from '$lib/dateHelpers.utils';
 
-	export let weeks: WeekData[];
-	export let openEditModal: (week: WeekData, index: number) => void;
+	type Props = {
+		weeks: WeekData[];
+		openEditModal: (week: WeekData, index: number) => void;
+		vacationDaysMap: Map<string, VacationDay>;
+	};
+
+	let { weeks, openEditModal, vacationDaysMap }: Props = $props();
+
+	// Make vacation day lookups reactive by creating a derived helper
+	let getVacation = $derived.by(() => {
+		return (dateStr: string) => getVacationDayForDate(dateStr, vacationDaysMap);
+	});
+
+	// Helper to get the full date for a day in a week
+	function getFullDateForDay(week: WeekData, dayIndex: number): string {
+		if (!week.startDate) return '';
+
+		const [day, month, year] = week.startDate.split('.');
+		const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+		const currentDate = new Date(startDate);
+		currentDate.setDate(currentDate.getDate() + dayIndex);
+
+		const dayStr = currentDate.getDate().toString().padStart(2, '0');
+		const monthStr = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+		const yearStr = currentDate.getFullYear();
+		return `${dayStr}.${monthStr}.${yearStr}`;
+	}
 </script>
 
 <div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-{weeks.length}">
@@ -37,17 +64,33 @@
 			</div>
 
 			<div class="space-y-2">
-				{#each Object.entries(dayNames) as [dayKey, dayName] (dayKey)}
+				{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex (dayKey)}
 					{@const priority = week[dayKey as keyof WeekPriority]}
+					{@const fullDate = getFullDateForDay(week, dayIndex)}
+					{@const vacationDay = getVacation(fullDate)}
 					<div
-						class="flex items-center justify-between rounded p-2
+						class="flex items-center justify-between gap-1 rounded p-2
 						{week.status === 'pending'
 							? 'border border-purple-200 bg-purple-50 dark:border-purple-700 dark:bg-purple-900/20'
 							: 'bg-gray-50 dark:bg-gray-700'}"
 					>
-						<span class="text-sm font-medium dark:text-gray-300">
-							{dayName.substring(0, 2)}
-						</span>
+						<div class="flex items-center gap-1">
+							<span class="text-sm font-medium dark:text-gray-300">
+								{dayName.substring(0, 2)}
+							</span>
+							{#if vacationDay}
+								<span
+									class="text-xs"
+									title={`${vacationDay.type === 'vacation' ? 'Urlaub' : vacationDay.type === 'public_holiday' ? 'Feiertag' : 'Abwesend'}: ${vacationDay.description}`}
+								>
+									{vacationDay.type === 'vacation'
+										? '🏖️'
+										: vacationDay.type === 'public_holiday'
+											? '🎉'
+											: '📋'}
+								</span>
+							{/if}
+						</div>
 						<span
 							class="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white
 							{priority

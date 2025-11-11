@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
+	import type { VacationDay } from '$lib/vacation-days.types';
 	import { dayNames, dayKeys } from '$lib/priorities.config';
 	import { scale } from 'svelte/transition';
-	import { isWeekComplete } from '$lib/dateHelpers.utils';
+	import { isWeekComplete, getVacationDayForDate } from '$lib/dateHelpers.utils';
 
 	type Props = {
 		week: WeekData;
@@ -10,15 +11,21 @@
 		selectPriority: (weekIndex: number, day: DayName, priority: Priority) => void;
 		saveWeek: (weekIndex: number) => Promise<void>;
 		getDayDates: (weekData: WeekData) => string[];
+		vacationDaysMap: Map<string, VacationDay>;
 	};
 
-	let { week, weekIndex, selectPriority, saveWeek, getDayDates }: Props = $props();
+	let { week, weekIndex, selectPriority, saveWeek, getDayDates, vacationDaysMap }: Props = $props();
 
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
 	let isSaveInFlight = false;
 
 	let weekCompleted = $derived(isWeekComplete(week));
+
+	// Make vacation day lookups reactive by creating a derived helper
+	let getVacation = $derived.by(() => {
+		return (dateStr: string) => getVacationDayForDate(dateStr, vacationDaysMap);
+	});
 
 	async function handlePrioritySelect(dayKey: DayName, priority: Priority) {
 		const oldPriority = week[dayKey];
@@ -189,6 +196,11 @@
 				: ''}
 			{@const currentPriority = week[dayKey]}
 			{@const dayName = dayNames[dayKey]}
+			{@const startDateParts = week.startDate?.split('.')}
+			{@const fullDate = startDateParts && dayDates[dayIndex]
+				? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+				: ''}
+			{@const vacationDay = fullDate ? getVacation(fullDate) : undefined}
 
 			<div
 				class="rounded-lg p-3 transition-all
@@ -200,8 +212,25 @@
 					<div class="flex items-center gap-2">
 						<span class="font-semibold text-gray-700 dark:text-gray-200">{dayName}</span>
 						<span class="text-xs text-gray-500 dark:text-gray-400">
-							{dayDates[dayIndex]}. {monthName}
+							{dayDates[dayIndex]} {monthName}
 						</span>
+						{#if vacationDay}
+							<span
+								class="rounded px-1.5 py-0.5 text-xs font-medium
+								{vacationDay.type === 'vacation'
+									? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+									: vacationDay.type === 'public_holiday'
+										? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+										: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'}"
+								title={vacationDay.description}
+							>
+								{vacationDay.type === 'vacation'
+									? '🏖️ Urlaub'
+									: vacationDay.type === 'public_holiday'
+										? '🎉 Feiertag'
+										: '📋 Abwesend'}
+							</span>
+						{/if}
 					</div>
 					{#if currentPriority}
 						<span

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, authStore } from '$lib/auth.store';
 	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/priorities.types';
+	import type { VacationDay } from '$lib/vacation-days.types';
 
 	// Import components
 	import Legend from '$lib/components/Legend.svelte';
@@ -40,6 +41,7 @@
 	let weeks = $state<WeekData[]>([]);
 	let isLoading = $state(true);
 	let dekMissing = $state(false);
+	let vacationDays = $state<VacationDay[]>([]);
 
 	// Helper function to check if a week is complete
 	function isWeekComplete(week: WeekData): boolean {
@@ -67,6 +69,28 @@
 	let completedWeeks = $derived(weeks.filter((w) => calculateWeekStatus(w) === 'completed').length);
 	let progressPercentage = $derived(weeks.length > 0 ? (completedWeeks / weeks.length) * 100 : 0);
 
+	// Create a map of vacation days by date (YYYY-MM-DD format)
+	let vacationDaysMap = $derived.by(() => {
+		const map = new Map<string, VacationDay>();
+		vacationDays.forEach((vd) => {
+			// Extract YYYY-MM-DD from the timestamp format (YYYY-MM-DD HH:mm:ss.SSSZ)
+			const dateMatch = vd.date.match(/^(\d{4}-\d{2}-\d{2})/);
+			if (dateMatch) {
+				map.set(dateMatch[1], vd);
+			}
+		});
+		return map;
+	});
+
+	// Helper function to get vacation day for a specific date string (DD.MM.YYYY format)
+	function getVacationDayForDate(dateStr: string): VacationDay | undefined {
+		// Convert DD.MM.YYYY to YYYY-MM-DD
+		const parts = dateStr.split('.');
+		if (parts.length !== 3) return undefined;
+		const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+		return vacationDaysMap.get(isoDate);
+	}
+
 	// Check authentication and DEK availability on mount
 	onMount(() => {
 		if (!$isAuthenticated) {
@@ -79,6 +103,9 @@
 
 		isLoading = false;
 
+		// Load initial data
+		loadVacationDays();
+
 		return () => window.removeEventListener('resize', checkMobile);
 	});
 
@@ -90,6 +117,7 @@
 		if (!dekMissing && $isAuthenticated) {
 			console.log('Getting that week data');
 			loadUserData();
+			loadVacationDays();
 		}
 	});
 
@@ -132,6 +160,21 @@
 				saveError = 'Fehler beim Laden der Prioritäten';
 				setTimeout(() => (saveError = ''), 3000);
 			}
+		}
+	}
+
+	async function loadVacationDays() {
+		if (!$isAuthenticated) return;
+
+		try {
+			const { year, month } = parseMonthString(selectedMonth);
+			vacationDays = await apiService.getVacationDays({
+				year,
+				month: month + 1 // month is 0-indexed
+			});
+		} catch (error: any) {
+			console.error('Error loading vacation days:', error);
+			// Don't show error to user, vacation days are optional information
 		}
 	}
 
@@ -304,9 +347,10 @@
 							{selectPriority}
 							{saveWeek}
 							{getDayDates}
+							{vacationDaysMap}
 						/>
 					{:else}
-						<DesktopGridView {weeks} {openEditModal} />
+						<DesktopGridView {weeks} {openEditModal} {vacationDaysMap} />
 					{/if}
 				{/if}
 				<Notifications {saveError} {saveSuccess} />
@@ -320,6 +364,7 @@
 					saveWeek={saveEditingWeek}
 					{getDayDates}
 					onWeekChange={handleWeekChange}
+					{vacationDaysMap}
 				/>
 			{/if}
 		</div>

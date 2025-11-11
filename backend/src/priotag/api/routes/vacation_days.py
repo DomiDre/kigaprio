@@ -1,0 +1,546 @@
+"""Vacation days admin endpoints"""
+
+from typing import Any
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
+
+from priotag.models.auth import SessionInfo
+from priotag.models.vacation_days import (
+    BulkVacationDayCreate,
+    BulkVacationDayResponse,
+    VacationDayCreate,
+    VacationDayResponse,
+    VacationDayUpdate,
+    VacationDayUserResponse,
+)
+from priotag.services.pocketbase_service import POCKETBASE_URL
+from priotag.utils import get_current_token, require_admin, verify_token
+
+router = APIRouter()
+user_router = APIRouter()  # Router for user-facing endpoints
+
+
+@router.post("/vacation-days", response_model=VacationDayResponse)
+async def create_vacation_day(
+    request: VacationDayCreate,
+    token: str = Depends(get_current_token),
+    session_info: SessionInfo = Depends(require_admin),
+):
+    """
+    Admin endpoint to create a single vacation day.
+
+    Args:
+        request: Vacation day data (date, type, description)
+        token: Admin auth token
+        session_info: Admin session information
+
+    Returns:
+        Created vacation day record
+    """
+    async with httpx.AsyncClient() as client:
+        # Check if vacation day already exists for this date
+        # Use date substring comparison for YYYY-MM-DD format
+        check_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params={"filter": f'date ~ "{request.date}"'},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if check_response.status_code == 200:
+            items = check_response.json().get("items", [])
+            if len(items) > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Urlaubstag für {request.date} existiert bereits",
+                )
+
+        # Create vacation day record
+        vacation_data = {
+            "date": request.date,
+            "type": request.type,
+            "description": request.description,
+            "created_by": session_info.username,
+        }
+
+        response = await client.post(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            json=vacation_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code not in [200, 201]:
+            error_data = response.json()
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=error_data.get(
+                    "message", "Fehler beim Erstellen des Urlaubstags"
+                ),
+            )
+
+        record_data = response.json()
+        return VacationDayResponse(**record_data)
+
+
+@router.post("/vacation-days/bulk", response_model=BulkVacationDayResponse)
+async def create_vacation_days_bulk(
+    request: BulkVacationDayCreate,
+    token: str = Depends(get_current_token),
+    session_info: SessionInfo = Depends(require_admin),
+):
+    """
+    Admin endpoint to create multiple vacation days at once.
+
+    Args:
+        request: List of vacation days to create
+        token: Admin auth token
+        session_info: Admin session information
+
+    Returns:
+        Summary of created, skipped, and failed vacation days
+    """
+    created = 0
+    skipped = 0
+    errors = []
+
+    async with httpx.AsyncClient() as client:
+        for day in request.days:
+            try:
+                # Check if vacation day already exists using substring match
+                check_response = await client.get(
+                    f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+                    params={"filter": f'date ~ "{day.date}"'},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+                if check_response.status_code == 200:
+                    items = check_response.json().get("items", [])
+                    if len(items) > 0:
+                        skipped += 1
+                        continue
+
+                # Create vacation day
+                vacation_data = {
+                    "date": day.date,
+                    "type": day.type,
+                    "description": day.description,
+                    "created_by": session_info.username,
+                }
+
+                response = await client.post(
+                    f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+                    json=vacation_data,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+                if response.status_code in [200, 201]:
+                    created += 1
+                else:
+                    error_data = response.json()
+                    errors.append(
+                        {
+                            "date": day.date,
+                            "error": error_data.get("message", "Unbekannter Fehler"),
+                        }
+                    )
+
+            except Exception as e:
+                errors.append({"date": day.date, "error": str(e)})
+
+    return BulkVacationDayResponse(created=created, skipped=skipped, errors=errors)
+
+
+@router.get("/vacation-days", response_model=list[VacationDayResponse])
+async def get_all_vacation_days(
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+    year: int | None = None,
+    type: str | None = None,
+):
+    """
+    Admin endpoint to get all vacation days with optional filtering.
+
+    Args:
+        token: Admin auth token
+        year: Optional year filter (e.g., 2024)
+        type: Optional type filter (vacation, admin_leave, public_holiday)
+
+    Returns:
+        List of vacation day records
+    """
+    async with httpx.AsyncClient() as client:
+        # Build filter
+        filters = []
+        if year:
+            filters.append(f'date >= "{year}-01-01" && date <= "{year}-12-31"')
+        if type:
+            filters.append(f'type="{type}"')
+
+        filter_str = " && ".join(filters) if filters else ""
+
+        params: dict[str, Any] = {"perPage": 500, "sort": "date"}
+        if filter_str:
+            params["filter"] = filter_str
+
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen der Urlaubstage",
+            )
+
+        vacation_days_data = response.json().get("items", [])
+        return [VacationDayResponse(**day) for day in vacation_days_data]
+
+
+@router.get("/vacation-days/{date}", response_model=VacationDayResponse)
+async def get_vacation_day(
+    date: str,
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+):
+    """
+    Admin endpoint to get a specific vacation day by date.
+
+    Args:
+        date: Date in YYYY-MM-DD format
+        token: Admin auth token
+
+    Returns:
+        Vacation day record
+    """
+    async with httpx.AsyncClient() as client:
+        # Use substring match for date comparison
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params={"filter": f'date ~ "{date}"'},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen des Urlaubstags",
+            )
+
+        items = response.json().get("items", [])
+        if len(items) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Urlaubstag nicht gefunden: {date}",
+            )
+
+        return VacationDayResponse(**items[0])
+
+
+@router.put("/vacation-days/{date}", response_model=VacationDayResponse)
+async def update_vacation_day(
+    date: str,
+    request: VacationDayUpdate,
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+):
+    """
+    Admin endpoint to update a vacation day.
+
+    Args:
+        date: Date in YYYY-MM-DD format
+        request: Updated vacation day data
+        token: Admin auth token
+
+    Returns:
+        Updated vacation day record
+    """
+    async with httpx.AsyncClient() as client:
+        # Find the vacation day using substring match
+        check_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params={"filter": f'date ~ "{date}"'},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if check_response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Suchen des Urlaubstags",
+            )
+
+        items = check_response.json().get("items", [])
+        if len(items) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Urlaubstag nicht gefunden: {date}",
+            )
+
+        record_id = items[0]["id"]
+
+        # Build update data (only include non-None fields)
+        update_data: dict[str, Any] = {}
+        if request.type is not None:
+            update_data["type"] = request.type
+        if request.description is not None:
+            update_data["description"] = request.description
+
+        if not update_data:
+            # No fields to update, return existing record
+            return VacationDayResponse(**items[0])
+
+        # Update the vacation day
+        response = await client.patch(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records/{record_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code not in [200, 201]:
+            error_data = response.json()
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=error_data.get(
+                    "message", "Fehler beim Aktualisieren des Urlaubstags"
+                ),
+            )
+
+        record_data = response.json()
+        return VacationDayResponse(**record_data)
+
+
+@router.delete("/vacation-days/{date}")
+async def delete_vacation_day(
+    date: str,
+    token: str = Depends(get_current_token),
+    _=Depends(require_admin),
+):
+    """
+    Admin endpoint to delete a vacation day.
+
+    Args:
+        date: Date in YYYY-MM-DD format
+        token: Admin auth token
+
+    Returns:
+        Success message
+    """
+    async with httpx.AsyncClient() as client:
+        # Find the vacation day using substring match
+        check_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params={"filter": f'date ~ "{date}"'},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if check_response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Suchen des Urlaubstags",
+            )
+
+        items = check_response.json().get("items", [])
+        if len(items) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Urlaubstag nicht gefunden: {date}",
+            )
+
+        record_id = items[0]["id"]
+
+        # Delete the vacation day
+        delete_response = await client.delete(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records/{record_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if delete_response.status_code not in [200, 204]:
+            raise HTTPException(
+                status_code=delete_response.status_code,
+                detail="Fehler beim Löschen des Urlaubstags",
+            )
+
+        return {
+            "success": True,
+            "message": f"Urlaubstag gelöscht: {date}",
+        }
+
+
+# ============================================================================
+# User-Facing Endpoints (Read-Only)
+# ============================================================================
+
+
+@user_router.get("/vacation-days", response_model=list[VacationDayUserResponse])
+async def get_vacation_days_for_users(
+    token: str = Depends(get_current_token),
+    _=Depends(verify_token),
+    year: int | None = None,
+    month: int | None = None,
+    type: str | None = None,
+):
+    """
+    User endpoint to get vacation days with optional filtering.
+    Users can see all vacation days to know when the office is closed.
+
+    Args:
+        token: User auth token
+        year: Optional year filter (e.g., 2025)
+        month: Optional month filter (1-12)
+        type: Optional type filter (vacation, admin_leave, public_holiday)
+
+    Returns:
+        List of vacation day records (simplified for users)
+    """
+    async with httpx.AsyncClient() as client:
+        # Build filter
+        filters = []
+        if year and month:
+            # Filter by specific year and month
+            filters.append(
+                f'date >= "{year}-{month:02d}-01" && date < "{year}-{month:02d}-32"'
+            )
+        elif year:
+            # Filter by year only
+            filters.append(f'date >= "{year}-01-01" && date <= "{year}-12-31"')
+        elif month:
+            # If only month is provided, ignore it (needs year for context)
+            pass
+
+        if type:
+            filters.append(f'type="{type}"')
+
+        filter_str = " && ".join(filters) if filters else ""
+
+        params: dict[str, Any] = {"perPage": 500, "sort": "date"}
+        if filter_str:
+            params["filter"] = filter_str
+
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen der Urlaubstage",
+            )
+
+        vacation_days_data = response.json().get("items", [])
+        # Return simplified response with only date, type, and description
+        return [
+            VacationDayUserResponse(
+                date=day["date"], type=day["type"], description=day["description"]
+            )
+            for day in vacation_days_data
+        ]
+
+
+@user_router.get("/vacation-days/range", response_model=list[VacationDayUserResponse])
+async def get_vacation_days_in_range(
+    start_date: str,
+    end_date: str,
+    token: str = Depends(get_current_token),
+    _=Depends(verify_token),
+    type: str | None = None,
+):
+    """
+    User endpoint to get vacation days within a date range.
+    Useful for displaying vacation days in a calendar view.
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        token: User auth token
+        type: Optional type filter (vacation, admin_leave, public_holiday)
+
+    Returns:
+        List of vacation day records within the date range (simplified for users)
+    """
+    # Validate date format
+    from priotag.models.vacation_days import validate_date_format
+
+    try:
+        validate_date_format(start_date)
+        validate_date_format(end_date)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    async with httpx.AsyncClient() as client:
+        # Build filter for date range
+        filters = [f'date >= "{start_date}" && date <= "{end_date}"']
+
+        if type:
+            filters.append(f'type="{type}"')
+
+        filter_str = " && ".join(filters)
+
+        params: dict[str, Any] = {"perPage": 500, "sort": "date", "filter": filter_str}
+
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen der Urlaubstage",
+            )
+
+        vacation_days_data = response.json().get("items", [])
+        # Return simplified response with only date, type, and description
+        return [
+            VacationDayUserResponse(
+                date=day["date"], type=day["type"], description=day["description"]
+            )
+            for day in vacation_days_data
+        ]
+
+
+@user_router.get("/vacation-days/{date}", response_model=VacationDayUserResponse)
+async def get_vacation_day_for_users(
+    date: str,
+    token: str = Depends(get_current_token),
+    _=Depends(verify_token),
+):
+    """
+    User endpoint to check if a specific date is a vacation day.
+
+    Args:
+        date: Date in YYYY-MM-DD format
+        token: User auth token
+
+    Returns:
+        Vacation day record if exists (simplified for users)
+    """
+    async with httpx.AsyncClient() as client:
+        # Use substring match for date comparison
+        response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/vacation_days/records",
+            params={"filter": f'date ~ "{date}"'},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen des Urlaubstags",
+            )
+
+        items = response.json().get("items", [])
+        if len(items) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Urlaubstag nicht gefunden: {date}",
+            )
+
+        day = items[0]
+        # Return simplified response with only date, type, and description
+        return VacationDayUserResponse(
+            date=day["date"], type=day["type"], description=day["description"]
+        )

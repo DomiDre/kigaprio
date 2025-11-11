@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
+	import type { VacationDay } from '$lib/vacation-days.types';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { dayKeys, dayNames } from '$lib/priorities.config';
+	import { getVacationDayForDate } from '$lib/dateHelpers.utils';
 
 	type Props = {
 		editingWeek: WeekData;
@@ -11,13 +13,19 @@
 		saveWeek: (weekIndex: number) => Promise<void>;
 		getDayDates: (weekData: WeekData) => string[];
 		onWeekChange: (dayKey: DayName, priority: Priority) => void;
+		vacationDaysMap: Map<string, VacationDay>;
 	};
-	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, getDayDates, onWeekChange }: Props =
+	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, getDayDates, onWeekChange, vacationDaysMap }: Props =
 		$props();
 
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
 	let pendingSavePromise: Promise<void> | null = null;
+
+	// Make vacation day lookups reactive by creating a derived helper
+	let getVacation = $derived.by(() => {
+		return (dateStr: string) => getVacationDayForDate(dateStr, vacationDaysMap);
+	});
 
 	// Helper function to check if week is complete
 	function isWeekComplete(week: WeekData): boolean {
@@ -260,6 +268,11 @@
 					: ''}
 				{@const currentPriority = editingWeek[dayKey]}
 				{@const dayName = dayNames[dayKey]}
+				{@const startDateParts = editingWeek.startDate?.split('.')}
+				{@const fullDate = startDateParts && dayDates && dayDates[dayIndex]
+					? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: ''}
+				{@const vacationDay = fullDate ? getVacation(fullDate) : undefined}
 
 				<div
 					class="group rounded-lg border-2 p-4 transition-all
@@ -275,6 +288,23 @@
 							{#if dayDates && dayDates[dayIndex]}
 								<span class="text-sm text-gray-500 dark:text-gray-400">
 									{dayDates[dayIndex]}. {monthName}
+								</span>
+							{/if}
+							{#if vacationDay}
+								<span
+									class="rounded px-2 py-1 text-xs font-medium
+									{vacationDay.type === 'vacation'
+										? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+										: vacationDay.type === 'public_holiday'
+											? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+											: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'}"
+									title={vacationDay.description}
+								>
+									{vacationDay.type === 'vacation'
+										? '🏖️ Urlaub'
+										: vacationDay.type === 'public_holiday'
+											? '🎉 Feiertag'
+											: '📋 Abwesend'}
 								</span>
 							{/if}
 						</div>

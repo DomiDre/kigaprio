@@ -1,5 +1,6 @@
 import { SvelteDate } from 'svelte/reactivity';
 import type { WeekData } from '$lib/priorities.types';
+import type { VacationDay } from '$lib/vacation-days.types';
 import { monthNames } from '$lib/priorities.config';
 
 export function getWeeksForMonth(year: number, month: number): WeekData[] {
@@ -155,4 +156,25 @@ export function getWeekStatus(week: WeekData): 'completed' | 'pending' | 'empty'
 	} else {
 		return 'empty';
 	}
+}
+
+/**
+ * Gets vacation day for a date string from the vacation days map
+ * @param dateStr Date in DD.MM.YYYY format
+ * @param vacationDaysMap Map of vacation days with YYYY-MM-DD keys
+ * @returns VacationDay object if found, undefined otherwise
+ */
+export function getVacationDayForDate(
+	dateStr: string,
+	vacationDaysMap: Map<string, VacationDay>
+): VacationDay | undefined {
+	if (!dateStr) return undefined;
+	// Convert DD.MM.YYYY to YYYY-MM-DD with zero-padding
+	const parts = dateStr.split('.');
+	if (parts.length !== 3) return undefined;
+	const day = parts[0].padStart(2, '0');
+	const month = parts[1].padStart(2, '0');
+	const year = parts[2];
+	const isoDate = `${year}-${month}-${day}`;
+	return vacationDaysMap.get(isoDate);
 }

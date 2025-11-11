@@ -38,3 +38,17 @@ class PriorityRecord(BaseModel):
     collectionName: str
     created: str
     updated: str
+
+
+class VacationDayRecord(BaseModel):
+    """Vacation day record (stored in database)."""
+
+    id: str
+    date: str
+    type: Literal["vacation", "admin_leave", "public_holiday"]
+    description: str
+    created_by: str
+    collectionId: str
+    collectionName: str
+    created: str
+    updated: str
