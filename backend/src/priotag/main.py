@@ -102,9 +102,7 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(
     vacation_days.router, prefix="/api/v1/admin", tags=["Vacation Days Admin"]
 )
-app.include_router(
-    vacation_days.user_router, prefix="/api/v1", tags=["Vacation Days"]
-)
+app.include_router(vacation_days.user_router, prefix="/api/v1", tags=["Vacation Days"])
 app.include_router(account.router, prefix="/api/v1/account", tags=["Account"])
 
 

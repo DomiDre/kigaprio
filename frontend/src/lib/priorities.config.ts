@@ -2,19 +2,19 @@ import type { DayName } from '$lib/priorities.types';
 
 // Priority configuration with proper typing
 export const priorityColors: Record<1 | 2 | 3 | 4 | 5, string> = {
-	5: 'bg-red-500',
-	4: 'bg-orange-500',
+	1: 'bg-red-500',
+	2: 'bg-orange-500',
 	3: 'bg-yellow-500',
-	2: 'bg-blue-500',
-	1: 'bg-gray-400'
+	4: 'bg-blue-500',
+	5: 'bg-gray-400'
 } as const;
 
 export const priorityLabels: Record<1 | 2 | 3 | 4 | 5, string> = {
-	5: 'Sehr wichtig',
-	4: 'Wichtig',
+	1: 'Sehr wichtig',
+	2: 'Wichtig',
 	3: 'Normal',
-	2: 'Weniger wichtig',
-	1: 'Unwichtig'
+	4: 'Weniger wichtig',
+	5: 'Unwichtig'
 } as const;
 
 export const dayKeys: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];

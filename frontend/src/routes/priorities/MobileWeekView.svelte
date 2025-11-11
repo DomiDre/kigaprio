@@ -3,7 +3,11 @@
 	import type { VacationDay } from '$lib/vacation-days.types';
 	import { dayNames, dayKeys } from '$lib/priorities.config';
 	import { scale } from 'svelte/transition';
-	import { isWeekComplete, getVacationDayForDate } from '$lib/dateHelpers.utils';
+	import {
+		isWeekComplete,
+		getVacationDayForDate,
+		getValidPriorities
+	} from '$lib/dateHelpers.utils';
 
 	type Props = {
 		week: WeekData;
@@ -21,6 +25,7 @@
 	let isSaveInFlight = false;
 
 	let weekCompleted = $derived(isWeekComplete(week, vacationDaysMap));
+	let validPriorities = $derived(getValidPriorities(week, vacationDaysMap));
 
 	// Make vacation day lookups reactive by creating a derived helper
 	let getVacation = $derived.by(() => {
@@ -207,7 +212,9 @@
 			<div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 				<div
 					class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-300"
-					style="width: {getTotalNonVacationDays() > 0 ? (getCompletedDaysCount() / getTotalNonVacationDays()) * 100 : 0}%"
+					style="width: {getTotalNonVacationDays() > 0
+						? (getCompletedDaysCount() / getTotalNonVacationDays()) * 100
+						: 0}%"
 				></div>
 			</div>
 		</div>
@@ -231,9 +238,10 @@
 			{@const currentPriority = week[dayKey]}
 			{@const dayName = dayNames[dayKey]}
 			{@const startDateParts = week.startDate?.split('.')}
-			{@const fullDate = startDateParts && dayDates[dayIndex]
-				? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
-				: ''}
+			{@const fullDate =
+				startDateParts && dayDates[dayIndex]
+					? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: ''}
 			{@const vacationDay = fullDate ? getVacation(fullDate) : undefined}
 
 			<div
@@ -246,7 +254,8 @@
 					<div class="flex items-center gap-2">
 						<span class="font-semibold text-gray-700 dark:text-gray-200">{dayName}</span>
 						<span class="text-xs text-gray-500 dark:text-gray-400">
-							{dayDates[dayIndex]} {monthName}
+							{dayDates[dayIndex]}
+							{monthName}
 						</span>
 						{#if vacationDay}
 							<span
@@ -276,7 +285,7 @@
 				</div>
 
 				<div class="flex justify-center gap-1.5">
-					{#each [1, 2, 3, 4, 5] as priority (priority)}
+					{#each validPriorities as priority (priority)}
 						{@const typedPriority = priority as Priority}
 						{@const isSelected = currentPriority === priority}
 						{@const isUsedElsewhere =

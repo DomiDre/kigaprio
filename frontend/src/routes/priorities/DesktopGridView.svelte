@@ -3,6 +3,7 @@
 	import type { VacationDay } from '$lib/vacation-days.types';
 	import { dayNames, priorityColors } from '$lib/priorities.config';
 	import { getVacationDayForDate } from '$lib/dateHelpers.utils';
+	import { SvelteDate } from 'svelte/reactivity';
 
 	type Props = {
 		weeks: WeekData[];
@@ -23,7 +24,7 @@
 
 		const [day, month, year] = week.startDate.split('.');
 		const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-		const currentDate = new Date(startDate);
+		const currentDate = new SvelteDate(startDate);
 		currentDate.setDate(currentDate.getDate() + dayIndex);
 
 		const dayStr = currentDate.getDate().toString().padStart(2, '0');

@@ -4,7 +4,7 @@
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { dayKeys, dayNames } from '$lib/priorities.config';
-	import { getVacationDayForDate } from '$lib/dateHelpers.utils';
+	import { getVacationDayForDate, getValidPriorities } from '$lib/dateHelpers.utils';
 
 	type Props = {
 		editingWeek: WeekData;
@@ -15,8 +15,15 @@
 		onWeekChange: (dayKey: DayName, priority: Priority) => void;
 		vacationDaysMap: Map<string, VacationDay>;
 	};
-	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, getDayDates, onWeekChange, vacationDaysMap }: Props =
-		$props();
+	let {
+		editingWeek,
+		activeWeekIndex,
+		closeEditModal,
+		saveWeek,
+		getDayDates,
+		onWeekChange,
+		vacationDaysMap
+	}: Props = $props();
 
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
@@ -26,6 +33,8 @@
 	let getVacation = $derived.by(() => {
 		return (dateStr: string) => getVacationDayForDate(dateStr, vacationDaysMap);
 	});
+
+	let validPriorities = $derived(getValidPriorities(editingWeek, vacationDaysMap));
 
 	// Helper function to check if week is complete (accounting for vacation days)
 	function isWeekCompleteLocal(week: WeekData): boolean {
@@ -311,12 +320,16 @@
 			<div class="mb-4">
 				<div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
 					<span>Fortschritt</span>
-					<span>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)} Tage</span>
+					<span
+						>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)} Tage</span
+					>
 				</div>
 				<div class="mt-1 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 					<div
 						class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-300"
-						style="width: {getTotalNonVacationDays(editingWeek) > 0 ? (getAssignedDaysCount(editingWeek) / getTotalNonVacationDays(editingWeek)) * 100 : 0}%"
+						style="width: {getTotalNonVacationDays(editingWeek) > 0
+							? (getAssignedDaysCount(editingWeek) / getTotalNonVacationDays(editingWeek)) * 100
+							: 0}%"
 					></div>
 				</div>
 			</div>
@@ -335,9 +348,10 @@
 				{@const currentPriority = editingWeek[dayKey]}
 				{@const dayName = dayNames[dayKey]}
 				{@const startDateParts = editingWeek.startDate?.split('.')}
-				{@const fullDate = startDateParts && dayDates && dayDates[dayIndex]
-					? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
-					: ''}
+				{@const fullDate =
+					startDateParts && dayDates && dayDates[dayIndex]
+						? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+						: ''}
 				{@const vacationDay = fullDate ? getVacation(fullDate) : undefined}
 
 				<div
@@ -384,7 +398,7 @@
 					</div>
 
 					<div class="flex justify-center gap-2 sm:gap-3">
-						{#each [1, 2, 3, 4, 5] as priority (priority)}
+						{#each validPriorities as priority (priority)}
 							{@const typedPriority = priority as Priority}
 							{@const isSelected = currentPriority === priority}
 							{@const isUsedElsewhere =

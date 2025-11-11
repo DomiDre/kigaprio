@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, authStore } from '$lib/auth.store';
-	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/priorities.types';
+	import type { DayName, Priority, WeekData } from '$lib/priorities.types';
 	import type { VacationDay } from '$lib/vacation-days.types';
 
 	// Import components
@@ -22,13 +22,13 @@
 		parseMonthString,
 		getDayDates,
 		formatMonthForAPI,
-		isWeekComplete as isWeekCompleteUtil,
 		getWeekStatus as getWeekStatusUtil
 	} from '$lib/dateHelpers.utils';
 	import { apiService } from '$lib/api.service';
 	import Loading from '$lib/components/Loading.svelte';
 	import { dayKeys } from '$lib/priorities.config';
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -53,7 +53,7 @@
 
 	// Create a map of vacation days by date (YYYY-MM-DD format)
 	let vacationDaysMap = $derived.by(() => {
-		const map = new Map<string, VacationDay>();
+		const map = new SvelteMap<string, VacationDay>();
 		vacationDays.forEach((vd) => {
 			// Extract YYYY-MM-DD from the timestamp format (YYYY-MM-DD HH:mm:ss.SSSZ)
 			const dateMatch = vd.date.match(/^(\d{4}-\d{2}-\d{2})/);

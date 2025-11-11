@@ -198,10 +198,7 @@ export class ApiService {
 		});
 	}
 
-	async getVacationDays(params?: {
-		year?: number;
-		type?: string;
-	}): Promise<VacationDayAdmin[]> {
+	async getVacationDays(params?: { year?: number; type?: string }): Promise<VacationDayAdmin[]> {
 		const queryParams = new URLSearchParams();
 		if (params?.year) queryParams.append('year', params.year.toString());
 		if (params?.type) queryParams.append('type', params.type);

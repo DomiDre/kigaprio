@@ -166,7 +166,10 @@ function getWeekVacationDays(
 /**
  * Checks if a week is complete (all non-vacation days have unique priorities)
  */
-export function isWeekComplete(week: WeekData, vacationDaysMap?: Map<string, VacationDay>): boolean {
+export function isWeekComplete(
+	week: WeekData,
+	vacationDaysMap?: Map<string, VacationDay>
+): boolean {
 	const vacationDays = getWeekVacationDays(week, vacationDaysMap);
 	const dayKeysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
 
@@ -205,6 +208,30 @@ export function getWeekStatus(
 	} else {
 		return 'empty';
 	}
+}
+
+/**
+ * Gets the valid priority range for a week based on vacation days
+ * Priority 1 is highest (most important), 5 is lowest
+ * With 1 vacation day: priorities 1-4 (remove lowest priority 5)
+ * With 2 vacation days: priorities 1-3, etc.
+ * @param week Week data
+ * @param vacationDaysMap Map of vacation days
+ * @returns Array of valid priority numbers (e.g., [1, 2, 3, 4] if 1 vacation day)
+ */
+export function getValidPriorities(
+	week: WeekData,
+	vacationDaysMap?: Map<string, VacationDay>
+): number[] {
+	const vacationDays = getWeekVacationDays(week, vacationDaysMap);
+	const vacationCount = vacationDays.size;
+	const totalWorkDays = 5 - vacationCount;
+
+	// If there are 5 or more vacation days, return empty array
+	if (totalWorkDays <= 0) return [];
+
+	// Return priorities from 1 to totalWorkDays (1 is highest, remove lowest priorities)
+	return Array.from({ length: totalWorkDays }, (_, i) => i + 1);
 }
 
 /**
