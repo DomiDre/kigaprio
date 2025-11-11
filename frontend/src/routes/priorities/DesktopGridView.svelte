@@ -98,7 +98,7 @@
 								? priorityColors[priority as 1 | 2 | 3 | 4 | 5]
 								: 'bg-gray-200 text-gray-400 dark:bg-gray-600'}"
 						>
-							{priority || '?'}
+							{priority || vacationDay ? '' : '?'}
 						</span>
 					</div>
 				{/each}
