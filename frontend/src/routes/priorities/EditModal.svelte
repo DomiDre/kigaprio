@@ -367,7 +367,8 @@
 							</span>
 							{#if dayDates && dayDates[dayIndex]}
 								<span class="text-sm text-gray-500 dark:text-gray-400">
-									{dayDates[dayIndex]}. {monthName}
+									{dayDates[dayIndex]}
+									{monthName}
 								</span>
 							{/if}
 							{#if vacationDay}

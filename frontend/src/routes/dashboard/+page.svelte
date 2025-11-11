@@ -177,8 +177,8 @@
 			}
 		});
 
-		mostCommonHighPriorityDay = maxHighCount > 0 ? dayNames[maxHighDay] : '';
-		mostCommonLowPriorityDay = maxLowCount > 0 ? dayNames[maxLowDay] : '';
+		mostCommonHighPriorityDay = maxLowCount > 0 ? dayNames[maxLowDay] : '';
+		mostCommonLowPriorityDay = maxHighCount > 0 ? dayNames[maxHighDay] : '';
 	}
 
 	async function handleLogout() {
@@ -315,7 +315,7 @@
 							{mostCommonHighPriorityDay || '-'}
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{mostCommonHighPriorityDay ? 'Oft mit hoher Priorität (4-5)' : 'Keine Daten'}
+							{mostCommonHighPriorityDay ? 'Oft mit hoher Priorität (1-2)' : 'Keine Daten'}
 						</div>
 					</div>
 
@@ -331,7 +331,7 @@
 							{mostCommonLowPriorityDay || '-'}
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{mostCommonLowPriorityDay ? 'Oft mit niedriger Priorität (1-2)' : 'Keine Daten'}
+							{mostCommonLowPriorityDay ? 'Oft mit niedriger Priorität (4-5)' : 'Keine Daten'}
 						</div>
 					</div>
 				</div>
