@@ -20,7 +20,7 @@
 	let saveTimeout: NodeJS.Timeout;
 	let isSaveInFlight = false;
 
-	let weekCompleted = $derived(isWeekComplete(week));
+	let weekCompleted = $derived(isWeekComplete(week, vacationDaysMap));
 
 	// Make vacation day lookups reactive by creating a derived helper
 	let getVacation = $derived.by(() => {
@@ -90,7 +90,41 @@
 	}
 
 	function getCompletedDaysCount() {
-		return dayKeys.filter((day) => week[day] !== null && week[day] !== undefined).length;
+		// Count only non-vacation days that have priorities
+		let count = 0;
+		dayKeys.forEach((dayKey, index) => {
+			const dayDates = getDayDates(week);
+			const startDateParts = week.startDate?.split('.');
+			const fullDate =
+				startDateParts && dayDates[index]
+					? `${dayDates[index].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: '';
+			const isVacationDay = fullDate ? !!getVacation(fullDate) : false;
+
+			if (!isVacationDay && week[dayKey] !== null && week[dayKey] !== undefined) {
+				count++;
+			}
+		});
+		return count;
+	}
+
+	function getTotalNonVacationDays() {
+		// Count total non-vacation days
+		let count = 0;
+		dayKeys.forEach((dayKey, index) => {
+			const dayDates = getDayDates(week);
+			const startDateParts = week.startDate?.split('.');
+			const fullDate =
+				startDateParts && dayDates[index]
+					? `${dayDates[index].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: '';
+			const isVacationDay = fullDate ? !!getVacation(fullDate) : false;
+
+			if (!isVacationDay) {
+				count++;
+			}
+		});
+		return count;
 	}
 </script>
 
@@ -161,7 +195,7 @@
 				{weekCompleted
 					? '✓ Fertig'
 					: getCompletedDaysCount() > 0
-						? `${getCompletedDaysCount()}/5`
+						? `${getCompletedDaysCount()}/${getTotalNonVacationDays()}`
 						: 'Offen'}
 			</span>
 		</div>
@@ -173,7 +207,7 @@
 			<div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 				<div
 					class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-300"
-					style="width: {(getCompletedDaysCount() / 5) * 100}%"
+					style="width: {getTotalNonVacationDays() > 0 ? (getCompletedDaysCount() / getTotalNonVacationDays()) * 100 : 0}%"
 				></div>
 			</div>
 		</div>
@@ -251,19 +285,27 @@
 							? dayKeys.find((day) => week[day] === priority)
 							: null}
 						{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
+						{@const isDisabled = !!vacationDay}
 
 						<button
 							class="relative h-10 w-10 transform rounded-full text-sm font-bold shadow transition-all
-							{isSelected
-								? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white ring-2 ring-purple-300 dark:ring-purple-700'
+							{isDisabled
+								? 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600'
+								: isSelected
+									? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white ring-2 ring-purple-300 dark:ring-purple-700'
+									: isUsedElsewhere
+										? 'border border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 dark:border-orange-600 dark:bg-orange-900 dark:text-orange-400'
+										: 'border border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
+							onclick={() => !isDisabled && handlePrioritySelect(dayKey, typedPriority)}
+							disabled={isDisabled}
+							title={isDisabled
+								? 'Prioritäten können nicht für Abwesenheitstage gesetzt werden'
 								: isUsedElsewhere
-									? 'border border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 dark:border-orange-600 dark:bg-orange-900 dark:text-orange-400'
-									: 'border border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
-							onclick={() => handlePrioritySelect(dayKey, typedPriority)}
-							title={isUsedElsewhere ? `Tauschen mit ${usedByDayName}` : `Priorität ${priority}`}
+									? `Tauschen mit ${usedByDayName}`
+									: `Priorität ${priority}`}
 						>
 							{priority}
-							{#if isUsedElsewhere}
+							{#if isUsedElsewhere && !isDisabled}
 								<span
 									class="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-orange-500 text-[8px] text-white"
 								>

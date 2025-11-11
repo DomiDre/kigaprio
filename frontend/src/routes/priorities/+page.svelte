@@ -21,7 +21,9 @@
 		getMonthOptions,
 		parseMonthString,
 		getDayDates,
-		formatMonthForAPI
+		formatMonthForAPI,
+		isWeekComplete as isWeekCompleteUtil,
+		getWeekStatus as getWeekStatusUtil
 	} from '$lib/dateHelpers.utils';
 	import { apiService } from '$lib/api.service';
 	import Loading from '$lib/components/Loading.svelte';
@@ -43,30 +45,10 @@
 	let dekMissing = $state(false);
 	let vacationDays = $state<VacationDay[]>([]);
 
-	// Helper function to check if a week is complete
-	function isWeekComplete(week: WeekData): boolean {
-		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
-
-		return validPriorities.length === 5 && new Set(validPriorities).size === 5;
-	}
-
-	// Helper function to calculate week status
-	function calculateWeekStatus(week: WeekData): WeekStatus {
-		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-		const validCount = priorities.filter((p) => p !== null && p !== undefined).length;
-
-		if (isWeekComplete(week)) {
-			return 'completed';
-		} else if (validCount > 0) {
-			return 'pending';
-		} else {
-			return 'empty';
-		}
-	}
-
 	// Derived state
-	let completedWeeks = $derived(weeks.filter((w) => calculateWeekStatus(w) === 'completed').length);
+	let completedWeeks = $derived(
+		weeks.filter((w) => getWeekStatusUtil(w, vacationDaysMap) === 'completed').length
+	);
 	let progressPercentage = $derived(weeks.length > 0 ? (completedWeeks / weeks.length) * 100 : 0);
 
 	// Create a map of vacation days by date (YYYY-MM-DD format)
@@ -81,15 +63,6 @@
 		});
 		return map;
 	});
-
-	// Helper function to get vacation day for a specific date string (DD.MM.YYYY format)
-	function getVacationDayForDate(dateStr: string): VacationDay | undefined {
-		// Convert DD.MM.YYYY to YYYY-MM-DD
-		const parts = dateStr.split('.');
-		if (parts.length !== 3) return undefined;
-		const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-		return vacationDaysMap.get(isoDate);
-	}
 
 	// Check authentication and DEK availability on mount
 	onMount(() => {
@@ -141,7 +114,7 @@
 					weeks[weekIndex].wednesday = record.wednesday;
 					weeks[weekIndex].thursday = record.thursday;
 					weeks[weekIndex].friday = record.friday;
-					weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
+					weeks[weekIndex].status = getWeekStatusUtil(weeks[weekIndex], vacationDaysMap);
 				}
 			});
 			weeks = [...weeks];
@@ -188,7 +161,7 @@
 		});
 
 		weeks[weekIndex][day] = priority;
-		weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
+		weeks[weekIndex].status = getWeekStatusUtil(weeks[weekIndex], vacationDaysMap);
 	}
 
 	function openEditModal(week: WeekData, index: number) {
@@ -230,7 +203,7 @@
 			// Update local state with response if needed
 			weeks = weeks.map((week) => ({
 				...week,
-				status: calculateWeekStatus(week)
+				status: getWeekStatusUtil(week, vacationDaysMap)
 			}));
 
 			saveSuccess = 'Prioritäten erfolgreich gespeichert';
