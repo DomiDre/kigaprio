@@ -3,8 +3,8 @@
 	import type { VacationDay } from '$lib/vacation-days.types';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { dayKeys, dayNames } from '$lib/priorities.config';
-	import { getVacationDayForDate, getValidPriorities } from '$lib/dateHelpers.utils';
+	import { dayKeys, dayNames, priorityColors } from '$lib/priorities.config';
+	import { getVacationDayForDate, getValidPriorities, isWeekStarted } from '$lib/dateHelpers.utils';
 
 	type Props = {
 		editingWeek: WeekData;
@@ -35,6 +35,9 @@
 	});
 
 	let validPriorities = $derived(getValidPriorities(editingWeek, vacationDaysMap));
+
+	// Check if the week has already started
+	let weekHasStarted = $derived(isWeekStarted(editingWeek));
 
 	// Helper function to check if week is complete (accounting for vacation days)
 	function isWeekCompleteLocal(week: WeekData): boolean {
@@ -218,7 +221,8 @@
 			<div class="flex items-center gap-4">
 				<div>
 					<h3 class="text-xl font-bold text-gray-800 dark:text-white">
-						Woche {editingWeek.weekNumber} bearbeiten
+						Woche {editingWeek.weekNumber}
+						{weekHasStarted ? 'ansehen' : 'bearbeiten'}
 					</h3>
 					{#if editingWeek.startDate && editingWeek.endDate}
 						<p class="text-sm text-gray-500 dark:text-gray-400">
@@ -298,8 +302,30 @@
 			</button>
 		</div>
 
-		<!-- Completion Progress -->
-		{#if isWeekCompleteLocal(editingWeek)}
+		<!-- Week Started Warning -->
+		{#if weekHasStarted}
+			<div
+				class="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-800 dark:bg-orange-900/20"
+				transition:scale={{ duration: 300 }}
+			>
+				<div class="flex items-center gap-2">
+					<svg
+						class="h-5 w-5 text-orange-600 dark:text-orange-400"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<span class="text-sm font-medium text-orange-800 dark:text-orange-200">
+						Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden.
+					</span>
+				</div>
+			</div>
+		{:else if isWeekCompleteLocal(editingWeek)}
 			<div
 				class="mb-4 rounded-lg bg-green-50 p-3 dark:bg-green-900/20"
 				transition:scale={{ duration: 300 }}
@@ -409,24 +435,28 @@
 								? dayKeys.find((day) => editingWeek[day] === priority)
 								: null}
 							{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
-							{@const isDisabled = !!vacationDay}
+							{@const isDisabled = !!vacationDay || weekHasStarted}
 
 							<button
 								class="relative h-12 w-12 transform rounded-full font-bold shadow-md transition-all duration-200 sm:h-14 sm:w-14
-								{isDisabled
+								{vacationDay
 									? 'cursor-not-allowed border-2 border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600'
 									: isSelected
-										? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white ring-4 ring-purple-300 dark:ring-purple-700'
-										: isUsedElsewhere
-											? 'border-2 border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 hover:border-orange-400 hover:shadow-lg dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-											: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-purple-400'}"
+										? `scale-110 ${priorityColors[typedPriority as 1 | 2 | 3 | 4 | 5]} ring-opacity-50 text-white ring-4 ${weekHasStarted ? 'cursor-not-allowed' : ''}`
+										: weekHasStarted && !isSelected
+											? 'cursor-not-allowed border-2 border-gray-300 bg-white text-gray-500 opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400'
+											: isUsedElsewhere
+												? 'border-2 border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 hover:border-orange-400 hover:shadow-lg dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+												: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-purple-400'}"
 								onclick={() => !isDisabled && selectEditPriority(dayKey, typedPriority)}
 								disabled={isDisabled}
-								title={isDisabled
+								title={vacationDay
 									? 'Prioritäten können nicht für Abwesenheitstage gesetzt werden'
-									: isUsedElsewhere
-										? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
-										: `Priorität ${priority} wählen`}
+									: weekHasStarted
+										? 'Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden'
+										: isUsedElsewhere
+											? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
+											: `Priorität ${priority} wählen`}
 							>
 								{priority}
 								{#if isUsedElsewhere && !isDisabled}

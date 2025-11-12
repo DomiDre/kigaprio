@@ -2,7 +2,7 @@
 	import type { WeekData, WeekPriority } from '$lib/priorities.types';
 	import type { VacationDay } from '$lib/vacation-days.types';
 	import { dayNames, priorityColors } from '$lib/priorities.config';
-	import { getVacationDayForDate } from '$lib/dateHelpers.utils';
+	import { getVacationDayForDate, isWeekStarted } from '$lib/dateHelpers.utils';
 	import { SvelteDate } from 'svelte/reactivity';
 
 	type Props = {
@@ -36,14 +36,23 @@
 
 <div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-{weeks.length}">
 	{#each weeks as week, index (index)}
+		{@const weekStarted = isWeekStarted(week)}
 		<div
 			class="rounded-xl bg-white p-4 shadow-xl transition hover:translate-y-[-2px] dark:bg-gray-800
-			{week.status === 'pending' ? 'border-2 border-purple-400' : ''}"
+			{week.status === 'pending' ? 'border-2 border-purple-400' : ''}
+			{weekStarted ? 'opacity-75' : ''}"
 		>
 			<div class="mb-4 flex items-center justify-between">
-				<h3 class="font-bold text-gray-800 dark:text-white">
-					Woche {week.weekNumber}
-				</h3>
+				<div class="flex items-center gap-2">
+					<h3 class="font-bold text-gray-800 dark:text-white">
+						Woche {week.weekNumber}
+					</h3>
+					{#if weekStarted}
+						<span class="text-orange-600 dark:text-orange-400" title="Woche bereits gestartet">
+							🔒
+						</span>
+					{/if}
+				</div>
 				<span
 					class="rounded-full px-2 py-1 text-xs
 					{week.status === 'completed'
@@ -105,10 +114,13 @@
 			</div>
 
 			<button
-				class="mt-3 w-full rounded-lg bg-purple-600 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+				class="mt-3 w-full rounded-lg py-2 text-sm font-semibold transition
+				{weekStarted
+					? 'cursor-default bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-400'
+					: 'bg-purple-600 text-white hover:bg-purple-700'}"
 				onclick={() => openEditModal(week, index)}
 			>
-				Bearbeiten
+				{weekStarted ? 'Ansehen' : 'Bearbeiten'}
 			</button>
 		</div>
 	{/each}

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import httpx
 import redis
 from cryptography.exceptions import InvalidTag
@@ -13,6 +15,7 @@ from priotag.models.pocketbase_schemas import PriorityRecord
 from priotag.models.priorities import (
     PriorityResponse,
     WeekPriority,
+    get_week_start_date,
     validate_month_format_and_range,
 )
 from priotag.models.request import SuccessResponse
@@ -176,6 +179,7 @@ async def save_priority(
 ):
     """Create or update a priority record for the authenticated user."""
 
+    print(weeks)
     user_id = auth_data.id
 
     # Validate month
@@ -209,14 +213,54 @@ async def save_priority(
                 check_response.json() if check_response.status_code == 200 else None
             )
             existing_id = None
+            existing_weeks_data = {}
 
             if existing and existing.get("totalItems", 0) > 0:
                 existing_id = existing["items"][0]["id"]
 
-            # Encrypt the weeks data
+                # Decrypt existing weeks to preserve data for started weeks
+                encrypted_record = PriorityRecord(**existing["items"][0])
+                try:
+                    decrypted_data = EncryptionManager.decrypt_fields(
+                        encrypted_record.encrypted_fields,
+                        dek,
+                    )
+                    # Create a map of weekNumber -> week data
+                    for week in decrypted_data.get("weeks", []):
+                        existing_weeks_data[week.get("weekNumber")] = week
+                except Exception:
+                    # If decryption fails, treat as no existing data
+                    existing_weeks_data = {}
+
+            # Merge weeks: use old data for started weeks, new data for future weeks
+            month_date = datetime.strptime(month, "%Y-%m")
+            final_weeks = []
+
+            for new_week in weeks:
+                week_start = get_week_start_date(
+                    month_date.year, month_date.month, new_week.weekNumber
+                )
+                week_start_midnight = datetime(
+                    week_start.year, week_start.month, week_start.day
+                )
+                now = datetime.now()
+                today = datetime(now.year, now.month, now.day)
+
+                # If week has started and we have existing data, use the old data
+                if (
+                    today >= week_start_midnight
+                    and new_week.weekNumber in existing_weeks_data
+                ):
+                    # Keep the existing week data unchanged
+                    final_weeks.append(existing_weeks_data[new_week.weekNumber])
+                else:
+                    # Use the new data (week hasn't started or no existing data)
+                    final_weeks.append(new_week.model_dump())
+
+            # Encrypt the weeks data (use final_weeks which has the merged data)
             try:
                 encrypted_data = EncryptionManager.encrypt_fields(
-                    {"weeks": [week.model_dump() for week in weeks]},
+                    {"weeks": final_weeks},
                     dek,
                 )
             except Exception as e:
