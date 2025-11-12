@@ -214,6 +214,7 @@
 	class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
 	transition:fade={{ duration: 200 }}
 	onclick={onClose}
+	onkeydown={(e) => e.key === 'Enter' && onClose()}
 	role="button"
 	tabindex="-1"
 >
@@ -221,6 +222,7 @@
 		class="flex h-[95vh] w-full max-w-5xl flex-col rounded-t-2xl bg-white shadow-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-2xl dark:bg-gray-800"
 		transition:scale={{ duration: 300, easing: cubicOut, start: 0.9 }}
 		onclick={handleStopPropagation}
+		onkeydown={(e) => e.key === 'Enter' && handleStopPropagation(e)}
 		role="dialog"
 		aria-modal="true"
 		tabindex="0"
@@ -373,10 +375,14 @@
 					<div class="space-y-4">
 						<!-- Type Selection -->
 						<div>
-							<label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+							<label
+								for="vacation-type"
+								class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+							>
 								Typ:
 							</label>
 							<select
+								id="vacation-type"
 								bind:value={formType}
 								class="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 transition-colors focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 							>
@@ -388,10 +394,14 @@
 
 						<!-- Description -->
 						<div>
-							<label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+							<label
+								for="vacation-description"
+								class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+							>
 								Beschreibung (optional):
 							</label>
 							<input
+								id="vacation-description"
 								type="text"
 								bind:value={formDescription}
 								placeholder="z.B. Weihnachten, Neujahr, etc."
