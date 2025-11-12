@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Plus from 'virtual:icons/mdi/plus';
 	import Download from 'virtual:icons/mdi/download';
+	import Calendar from 'virtual:icons/mdi/calendar';
 	import type { Stats } from '$lib/dashboard.types';
 
 	interface Props {
@@ -9,9 +10,17 @@
 		decryptedUsersCount: number;
 		onManualEntry: () => void;
 		onExportExcel: () => void;
+		onManageVacationDays: () => void;
 	}
 
-	let { keyUploaded, stats, decryptedUsersCount, onManualEntry, onExportExcel }: Props = $props();
+	let {
+		keyUploaded,
+		stats,
+		decryptedUsersCount,
+		onManualEntry,
+		onExportExcel,
+		onManageVacationDays
+	}: Props = $props();
 </script>
 
 <div class="space-y-6">
@@ -28,6 +37,15 @@
 			>
 				<Plus class="h-5 w-5" />
 				Manuelle Eingabe
+			</button>
+
+			<button
+				type="button"
+				class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-600 to-red-600 px-4 py-3 font-semibold text-white shadow-lg transition-all hover:scale-105"
+				onclick={onManageVacationDays}
+			>
+				<Calendar class="h-5 w-5" />
+				Abwesenheitstage
 			</button>
 
 			<button
