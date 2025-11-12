@@ -1,5 +1,6 @@
 import { SvelteDate } from 'svelte/reactivity';
 import type { WeekData } from '$lib/priorities.types';
+import type { VacationDay } from '$lib/vacation-days.types';
 import { monthNames } from '$lib/priorities.config';
 
 export function getWeeksForMonth(year: number, month: number): WeekData[] {
@@ -132,27 +133,124 @@ export function getDayDates(weekData: WeekData): string[] {
 }
 
 /**
- * Checks if a week is complete (all 5 days have unique priorities 1-5)
+ * Helper to get vacation days for a week
  */
-export function isWeekComplete(week: WeekData): boolean {
-	// Only check the 5 weekday priorities, not other properties
-	const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-	const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
+function getWeekVacationDays(
+	week: WeekData,
+	vacationDaysMap?: Map<string, VacationDay>
+): Set<string> {
+	if (!vacationDaysMap || !week.startDate) return new Set();
 
-	// Must have all 5 days filled with unique values
-	return validPriorities.length === 5 && new Set(validPriorities).size === 5;
+	const vacationDayKeys = new Set<string>();
+	const dayKeysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+
+	dayKeysList.forEach((dayKey, index) => {
+		const [day, month, year] = week.startDate!.split('.');
+		const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+		const currentDate = new Date(startDate);
+		currentDate.setDate(currentDate.getDate() + index);
+
+		const dayStr = currentDate.getDate().toString().padStart(2, '0');
+		const monthStr = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+		const yearStr = currentDate.getFullYear();
+		const fullDate = `${dayStr}.${monthStr}.${yearStr}`;
+
+		if (getVacationDayForDate(fullDate, vacationDaysMap)) {
+			vacationDayKeys.add(dayKey);
+		}
+	});
+
+	return vacationDayKeys;
 }
 
-export function getWeekStatus(week: WeekData): 'completed' | 'pending' | 'empty' {
-	// Only check the 5 weekday priorities
-	const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-	const validCount = priorities.filter((p) => p !== null && p !== undefined).length;
+/**
+ * Checks if a week is complete (all non-vacation days have unique priorities)
+ */
+export function isWeekComplete(
+	week: WeekData,
+	vacationDaysMap?: Map<string, VacationDay>
+): boolean {
+	const vacationDays = getWeekVacationDays(week, vacationDaysMap);
+	const dayKeysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
 
-	if (isWeekComplete(week)) {
+	// Get priorities for non-vacation days only
+	const priorities = dayKeysList
+		.filter((dayKey) => !vacationDays.has(dayKey))
+		.map((dayKey) => week[dayKey])
+		.filter((p) => p !== null && p !== undefined);
+
+	// Count how many non-vacation days exist
+	const nonVacationDaysCount = dayKeysList.filter((dayKey) => !vacationDays.has(dayKey)).length;
+
+	// All non-vacation days must have unique priorities
+	return (
+		priorities.length === nonVacationDaysCount && new Set(priorities).size === nonVacationDaysCount
+	);
+}
+
+export function getWeekStatus(
+	week: WeekData,
+	vacationDaysMap?: Map<string, VacationDay>
+): 'completed' | 'pending' | 'empty' {
+	const vacationDays = getWeekVacationDays(week, vacationDaysMap);
+	const dayKeysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+
+	// Get priorities for non-vacation days only
+	const priorities = dayKeysList
+		.filter((dayKey) => !vacationDays.has(dayKey))
+		.map((dayKey) => week[dayKey])
+		.filter((p) => p !== null && p !== undefined);
+
+	if (isWeekComplete(week, vacationDaysMap)) {
 		return 'completed';
-	} else if (validCount > 0) {
+	} else if (priorities.length > 0) {
 		return 'pending';
 	} else {
 		return 'empty';
 	}
+}
+
+/**
+ * Gets the valid priority range for a week based on vacation days
+ * Priority 1 is highest (most important), 5 is lowest
+ * With 1 vacation day: priorities 1-4 (remove lowest priority 5)
+ * With 2 vacation days: priorities 1-3, etc.
+ * @param week Week data
+ * @param vacationDaysMap Map of vacation days
+ * @returns Array of valid priority numbers (e.g., [1, 2, 3, 4] if 1 vacation day)
+ */
+export function getValidPriorities(
+	week: WeekData,
+	vacationDaysMap?: Map<string, VacationDay>
+): number[] {
+	const vacationDays = getWeekVacationDays(week, vacationDaysMap);
+	const vacationCount = vacationDays.size;
+	const totalWorkDays = 5 - vacationCount;
+
+	// If there are 5 or more vacation days, return empty array
+	if (totalWorkDays <= 0) return [];
+
+	// Return priorities from 1 to totalWorkDays (1 is highest, remove lowest priorities)
+	return Array.from({ length: totalWorkDays }, (_, i) => i + 1);
+}
+
+/**
+ * Gets vacation day for a date string from the vacation days map
+ * @param dateStr Date in DD.MM.YYYY format
+ * @param vacationDaysMap Map of vacation days with YYYY-MM-DD keys
+ * @returns VacationDay object if found, undefined otherwise
+ */
+export function getVacationDayForDate(
+	dateStr: string,
+	vacationDaysMap: Map<string, VacationDay>
+): VacationDay | undefined {
+	if (!dateStr) return undefined;
+	// Convert DD.MM.YYYY to YYYY-MM-DD with zero-padding
+	const parts = dateStr.split('.');
+	if (parts.length !== 3) return undefined;
+	const day = parts[0].padStart(2, '0');
+	const month = parts[1].padStart(2, '0');
+	const year = parts[2];
+	const isoDate = `${year}-${month}-${day}`;
+	return vacationDaysMap.get(isoDate);
 }

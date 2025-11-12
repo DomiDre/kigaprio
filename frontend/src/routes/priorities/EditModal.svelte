@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
+	import type { VacationDay } from '$lib/vacation-days.types';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { dayKeys, dayNames } from '$lib/priorities.config';
+	import { getVacationDayForDate, getValidPriorities } from '$lib/dateHelpers.utils';
 
 	type Props = {
 		editingWeek: WeekData;
@@ -11,19 +13,67 @@
 		saveWeek: (weekIndex: number) => Promise<void>;
 		getDayDates: (weekData: WeekData) => string[];
 		onWeekChange: (dayKey: DayName, priority: Priority) => void;
+		vacationDaysMap: Map<string, VacationDay>;
 	};
-	let { editingWeek, activeWeekIndex, closeEditModal, saveWeek, getDayDates, onWeekChange }: Props =
-		$props();
+	let {
+		editingWeek,
+		activeWeekIndex,
+		closeEditModal,
+		saveWeek,
+		getDayDates,
+		onWeekChange,
+		vacationDaysMap
+	}: Props = $props();
 
 	let saveStatus: 'idle' | 'saving' | 'saved' | 'error' = $state('idle');
 	let saveTimeout: NodeJS.Timeout;
 	let pendingSavePromise: Promise<void> | null = null;
 
-	// Helper function to check if week is complete
-	function isWeekComplete(week: WeekData): boolean {
-		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
-		return validPriorities.length === 5 && new Set(validPriorities).size === 5;
+	// Make vacation day lookups reactive by creating a derived helper
+	let getVacation = $derived.by(() => {
+		return (dateStr: string) => getVacationDayForDate(dateStr, vacationDaysMap);
+	});
+
+	let validPriorities = $derived(getValidPriorities(editingWeek, vacationDaysMap));
+
+	// Helper function to check if week is complete (accounting for vacation days)
+	function isWeekCompleteLocal(week: WeekData): boolean {
+		const dayKeysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+		let nonVacationDays = 0;
+		let filledDays = 0;
+
+		dayKeysList.forEach((dayKey, index) => {
+			const dayDates = getDayDates(week);
+			const startDateParts = week.startDate?.split('.');
+			const fullDate =
+				startDateParts && dayDates && dayDates[index]
+					? `${dayDates[index].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: '';
+			const isVacationDay = fullDate ? !!getVacation(fullDate) : false;
+
+			if (!isVacationDay) {
+				nonVacationDays++;
+				if (week[dayKey] !== null && week[dayKey] !== undefined) {
+					filledDays++;
+				}
+			}
+		});
+
+		// Get priorities for non-vacation days
+		const priorities = dayKeysList
+			.map((dayKey, index) => {
+				const dayDates = getDayDates(week);
+				const startDateParts = week.startDate?.split('.');
+				const fullDate =
+					startDateParts && dayDates && dayDates[index]
+						? `${dayDates[index].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+						: '';
+				const isVacationDay = fullDate ? !!getVacation(fullDate) : false;
+				return isVacationDay ? null : week[dayKey];
+			})
+			.filter((p) => p !== null && p !== undefined);
+
+		return filledDays === nonVacationDays && new Set(priorities).size === nonVacationDays;
 	}
 
 	async function selectEditPriority(dayKey: DayName, priority: Priority) {
@@ -101,9 +151,42 @@
 		event.stopPropagation();
 	}
 
-	// Count how many days have priorities assigned
+	// Count how many non-vacation days have priorities assigned
 	function getAssignedDaysCount(week: WeekData): number {
-		return dayKeys.filter((day) => week[day] !== null && week[day] !== undefined).length;
+		let count = 0;
+		dayKeys.forEach((dayKey, index) => {
+			const dayDates = getDayDates(week);
+			const startDateParts = week.startDate?.split('.');
+			const fullDate =
+				startDateParts && dayDates && dayDates[index]
+					? `${dayDates[index].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: '';
+			const isVacationDay = fullDate ? !!getVacation(fullDate) : false;
+
+			if (!isVacationDay && week[dayKey] !== null && week[dayKey] !== undefined) {
+				count++;
+			}
+		});
+		return count;
+	}
+
+	// Count total non-vacation days
+	function getTotalNonVacationDays(week: WeekData): number {
+		let count = 0;
+		dayKeys.forEach((dayKey, index) => {
+			const dayDates = getDayDates(week);
+			const startDateParts = week.startDate?.split('.');
+			const fullDate =
+				startDateParts && dayDates && dayDates[index]
+					? `${dayDates[index].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+					: '';
+			const isVacationDay = fullDate ? !!getVacation(fullDate) : false;
+
+			if (!isVacationDay) {
+				count++;
+			}
+		});
+		return count;
 	}
 </script>
 
@@ -216,7 +299,7 @@
 		</div>
 
 		<!-- Completion Progress -->
-		{#if isWeekComplete(editingWeek)}
+		{#if isWeekCompleteLocal(editingWeek)}
 			<div
 				class="mb-4 rounded-lg bg-green-50 p-3 dark:bg-green-900/20"
 				transition:scale={{ duration: 300 }}
@@ -237,12 +320,16 @@
 			<div class="mb-4">
 				<div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
 					<span>Fortschritt</span>
-					<span>{getAssignedDaysCount(editingWeek)} / 5 Tage</span>
+					<span
+						>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)} Tage</span
+					>
 				</div>
 				<div class="mt-1 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 					<div
 						class="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-300"
-						style="width: {(getAssignedDaysCount(editingWeek) / 5) * 100}%"
+						style="width: {getTotalNonVacationDays(editingWeek) > 0
+							? (getAssignedDaysCount(editingWeek) / getTotalNonVacationDays(editingWeek)) * 100
+							: 0}%"
 					></div>
 				</div>
 			</div>
@@ -260,6 +347,12 @@
 					: ''}
 				{@const currentPriority = editingWeek[dayKey]}
 				{@const dayName = dayNames[dayKey]}
+				{@const startDateParts = editingWeek.startDate?.split('.')}
+				{@const fullDate =
+					startDateParts && dayDates && dayDates[dayIndex]
+						? `${dayDates[dayIndex].replace('.', '')}.${startDateParts[1]}.${startDateParts[2]}`
+						: ''}
+				{@const vacationDay = fullDate ? getVacation(fullDate) : undefined}
 
 				<div
 					class="group rounded-lg border-2 p-4 transition-all
@@ -274,7 +367,25 @@
 							</span>
 							{#if dayDates && dayDates[dayIndex]}
 								<span class="text-sm text-gray-500 dark:text-gray-400">
-									{dayDates[dayIndex]}. {monthName}
+									{dayDates[dayIndex]}
+									{monthName}
+								</span>
+							{/if}
+							{#if vacationDay}
+								<span
+									class="rounded px-2 py-1 text-xs font-medium
+									{vacationDay.type === 'vacation'
+										? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+										: vacationDay.type === 'public_holiday'
+											? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+											: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'}"
+									title={vacationDay.description}
+								>
+									{vacationDay.type === 'vacation'
+										? '🏖️ Urlaub'
+										: vacationDay.type === 'public_holiday'
+											? '🎉 Feiertag'
+											: '📋 Abwesend'}
 								</span>
 							{/if}
 						</div>
@@ -288,7 +399,7 @@
 					</div>
 
 					<div class="flex justify-center gap-2 sm:gap-3">
-						{#each [1, 2, 3, 4, 5] as priority (priority)}
+						{#each validPriorities as priority (priority)}
 							{@const typedPriority = priority as Priority}
 							{@const isSelected = currentPriority === priority}
 							{@const isUsedElsewhere =
@@ -298,21 +409,27 @@
 								? dayKeys.find((day) => editingWeek[day] === priority)
 								: null}
 							{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
+							{@const isDisabled = !!vacationDay}
 
 							<button
 								class="relative h-12 w-12 transform rounded-full font-bold shadow-md transition-all duration-200 sm:h-14 sm:w-14
-								{isSelected
-									? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white ring-4 ring-purple-300 dark:ring-purple-700'
+								{isDisabled
+									? 'cursor-not-allowed border-2 border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600'
+									: isSelected
+										? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white ring-4 ring-purple-300 dark:ring-purple-700'
+										: isUsedElsewhere
+											? 'border-2 border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 hover:border-orange-400 hover:shadow-lg dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+											: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-purple-400'}"
+								onclick={() => !isDisabled && selectEditPriority(dayKey, typedPriority)}
+								disabled={isDisabled}
+								title={isDisabled
+									? 'Prioritäten können nicht für Abwesenheitstage gesetzt werden'
 									: isUsedElsewhere
-										? 'border-2 border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 hover:border-orange-400 hover:shadow-lg dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-										: 'border-2 border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-purple-400'}"
-								onclick={() => selectEditPriority(dayKey, typedPriority)}
-								title={isUsedElsewhere
-									? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
-									: `Priorität ${priority} wählen`}
+										? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
+										: `Priorität ${priority} wählen`}
 							>
 								{priority}
-								{#if isUsedElsewhere}
+								{#if isUsedElsewhere && !isDisabled}
 									<span
 										class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white"
 										title="Wird getauscht"

@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, authStore } from '$lib/auth.store';
-	import type { DayName, Priority, WeekData, WeekStatus } from '$lib/priorities.types';
+	import type { DayName, Priority, WeekData } from '$lib/priorities.types';
+	import type { VacationDay } from '$lib/vacation-days.types';
 
 	// Import components
 	import Legend from '$lib/components/Legend.svelte';
@@ -20,12 +21,14 @@
 		getMonthOptions,
 		parseMonthString,
 		getDayDates,
-		formatMonthForAPI
+		formatMonthForAPI,
+		getWeekStatus as getWeekStatusUtil
 	} from '$lib/dateHelpers.utils';
 	import { apiService } from '$lib/api.service';
 	import Loading from '$lib/components/Loading.svelte';
 	import { dayKeys } from '$lib/priorities.config';
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -40,32 +43,26 @@
 	let weeks = $state<WeekData[]>([]);
 	let isLoading = $state(true);
 	let dekMissing = $state(false);
-
-	// Helper function to check if a week is complete
-	function isWeekComplete(week: WeekData): boolean {
-		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-		const validPriorities = priorities.filter((p) => p !== null && p !== undefined);
-
-		return validPriorities.length === 5 && new Set(validPriorities).size === 5;
-	}
-
-	// Helper function to calculate week status
-	function calculateWeekStatus(week: WeekData): WeekStatus {
-		const priorities = [week.monday, week.tuesday, week.wednesday, week.thursday, week.friday];
-		const validCount = priorities.filter((p) => p !== null && p !== undefined).length;
-
-		if (isWeekComplete(week)) {
-			return 'completed';
-		} else if (validCount > 0) {
-			return 'pending';
-		} else {
-			return 'empty';
-		}
-	}
+	let vacationDays = $state<VacationDay[]>([]);
 
 	// Derived state
-	let completedWeeks = $derived(weeks.filter((w) => calculateWeekStatus(w) === 'completed').length);
+	let completedWeeks = $derived(
+		weeks.filter((w) => getWeekStatusUtil(w, vacationDaysMap) === 'completed').length
+	);
 	let progressPercentage = $derived(weeks.length > 0 ? (completedWeeks / weeks.length) * 100 : 0);
+
+	// Create a map of vacation days by date (YYYY-MM-DD format)
+	let vacationDaysMap = $derived.by(() => {
+		const map = new SvelteMap<string, VacationDay>();
+		vacationDays.forEach((vd) => {
+			// Extract YYYY-MM-DD from the timestamp format (YYYY-MM-DD HH:mm:ss.SSSZ)
+			const dateMatch = vd.date.match(/^(\d{4}-\d{2}-\d{2})/);
+			if (dateMatch) {
+				map.set(dateMatch[1], vd);
+			}
+		});
+		return map;
+	});
 
 	// Check authentication and DEK availability on mount
 	onMount(() => {
@@ -79,6 +76,9 @@
 
 		isLoading = false;
 
+		// Load initial data
+		loadVacationDays();
+
 		return () => window.removeEventListener('resize', checkMobile);
 	});
 
@@ -90,6 +90,7 @@
 		if (!dekMissing && $isAuthenticated) {
 			console.log('Getting that week data');
 			loadUserData();
+			loadVacationDays();
 		}
 	});
 
@@ -113,7 +114,7 @@
 					weeks[weekIndex].wednesday = record.wednesday;
 					weeks[weekIndex].thursday = record.thursday;
 					weeks[weekIndex].friday = record.friday;
-					weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
+					weeks[weekIndex].status = getWeekStatusUtil(weeks[weekIndex], vacationDaysMap);
 				}
 			});
 			weeks = [...weeks];
@@ -135,6 +136,21 @@
 		}
 	}
 
+	async function loadVacationDays() {
+		if (!$isAuthenticated) return;
+
+		try {
+			const { year, month } = parseMonthString(selectedMonth);
+			vacationDays = await apiService.getVacationDays({
+				year,
+				month: month + 1 // month is 0-indexed
+			});
+		} catch (error: any) {
+			console.error('Error loading vacation days:', error);
+			// Don't show error to user, vacation days are optional information
+		}
+	}
+
 	function selectPriority(weekIndex: number, day: DayName, priority: Priority) {
 		const currentWeek = weeks[weekIndex];
 
@@ -145,7 +161,7 @@
 		});
 
 		weeks[weekIndex][day] = priority;
-		weeks[weekIndex].status = calculateWeekStatus(weeks[weekIndex]);
+		weeks[weekIndex].status = getWeekStatusUtil(weeks[weekIndex], vacationDaysMap);
 	}
 
 	function openEditModal(week: WeekData, index: number) {
@@ -187,7 +203,7 @@
 			// Update local state with response if needed
 			weeks = weeks.map((week) => ({
 				...week,
-				status: calculateWeekStatus(week)
+				status: getWeekStatusUtil(week, vacationDaysMap)
 			}));
 
 			saveSuccess = 'Prioritäten erfolgreich gespeichert';
@@ -304,9 +320,10 @@
 							{selectPriority}
 							{saveWeek}
 							{getDayDates}
+							{vacationDaysMap}
 						/>
 					{:else}
-						<DesktopGridView {weeks} {openEditModal} />
+						<DesktopGridView {weeks} {openEditModal} {vacationDaysMap} />
 					{/if}
 				{/if}
 				<Notifications {saveError} {saveSuccess} />
@@ -320,6 +337,7 @@
 					saveWeek={saveEditingWeek}
 					{getDayDates}
 					onWeekChange={handleWeekChange}
+					{vacationDaysMap}
 				/>
 			{/if}
 		</div>

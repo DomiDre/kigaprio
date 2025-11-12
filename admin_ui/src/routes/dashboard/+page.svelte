@@ -12,18 +12,21 @@
 	import UserSubmissionsTable from '$lib/components/UserSubmissionsTable.svelte';
 	import SidebarActions from '$lib/components/SidebarActions.svelte';
 	import ManualEntryModal from '$lib/components/ManualEntryModal.svelte';
+	import VacationDayModal from '$lib/components/VacationDayModal.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import LoadingIndicator from '$lib/components/LoadingIndicator.svelte';
 	import type { DecryptedData, UserDisplay } from '$lib/dashboard.types';
 	import { dayKeys } from '$lib/priorities.config';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { WeekPriority } from '$lib/priorities.types';
+	import type { VacationDayAdmin, VacationDayType } from '$lib/vacation-days.types';
 	import { formatMonthForAPI, getMonthOptions } from '$lib/dateHelpers.utils';
 
 	// Daten beim Laden abrufen
 	onMount(() => {
 		fetchTotalUsers();
 		fetchUserSubmissions();
+		fetchVacationDays();
 		initialFetchDone = true;
 	});
 
@@ -34,6 +37,7 @@
 	let selectedMonth = $state(monthOptions[0]);
 	let keyUploaded = $state(false);
 	let showManualEntry = $state(false);
+	let showVacationDayModal = $state(false);
 	let searchQuery = $state('');
 	let keyFile = $state<File | null>(null);
 	let isLoading = $state(true);
@@ -55,6 +59,7 @@
 	// Daten
 	let users = $state<UserDisplay[]>([]);
 	let totalRegisteredUsers = $state(0);
+	let vacationDays = $state<VacationDayAdmin[]>([]);
 
 	// Passphrase-Zustand
 	let passphraseInput = $state('');
@@ -444,6 +449,50 @@
 		showManualEntry = true;
 	}
 
+	function openVacationDayModal() {
+		showVacationDayModal = true;
+	}
+
+	// Fetch vacation days from API
+	async function fetchVacationDays() {
+		try {
+			vacationDays = await apiService.getVacationDays();
+		} catch (err) {
+			console.error('Fehler beim Abrufen der Abwesenheitstage:', err);
+		}
+	}
+
+	// Create or update a vacation day
+	async function handleSaveVacationDay(date: string, type: VacationDayType, description: string) {
+		await apiService.createVacationDay({ date, type, description });
+		await fetchVacationDays();
+		successMessage = 'Abwesenheitstag erfolgreich gespeichert!';
+		showSuccessToast = true;
+		setTimeout(() => {
+			showSuccessToast = false;
+		}, 3000);
+	}
+
+	async function handleUpdateVacationDay(date: string, type: VacationDayType, description: string) {
+		await apiService.updateVacationDay(date, { type, description });
+		await fetchVacationDays();
+		successMessage = 'Abwesenheitstag erfolgreich aktualisiert!';
+		showSuccessToast = true;
+		setTimeout(() => {
+			showSuccessToast = false;
+		}, 3000);
+	}
+
+	async function handleDeleteVacationDay(date: string) {
+		await apiService.deleteVacationDay(date);
+		await fetchVacationDays();
+		successMessage = 'Abwesenheitstag erfolgreich gelöscht!';
+		showSuccessToast = true;
+		setTimeout(() => {
+			showSuccessToast = false;
+		}, 3000);
+	}
+
 	async function handleRefresh() {
 		if (isRefreshing || isLoading) return;
 
@@ -652,6 +701,7 @@
 						decryptedUsersCount={decryptedUsers.size}
 						onManualEntry={openManualEntry}
 						onExportExcel={exportToExcel}
+						onManageVacationDays={openVacationDayModal}
 					/>
 				</div>
 			</div>
@@ -676,6 +726,18 @@
 		}}
 		onSubmit={handleManualSubmit}
 		onSubmitAndContinue={handleManualSubmitAndContinue}
+	/>
+{/if}
+
+{#if showVacationDayModal}
+	<VacationDayModal
+		onClose={() => {
+			showVacationDayModal = false;
+		}}
+		onSave={handleSaveVacationDay}
+		onUpdate={handleUpdateVacationDay}
+		onDelete={handleDeleteVacationDay}
+		{vacationDays}
 	/>
 {/if}
 

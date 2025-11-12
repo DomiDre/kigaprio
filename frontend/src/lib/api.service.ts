@@ -2,6 +2,7 @@ import { authStore } from '$lib/auth.store';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
 import type { PriorityResponse, WeekData } from '$lib/priorities.types';
+import type { VacationDay } from '$lib/vacation-days.types';
 
 export class ApiService {
 	public baseUrl: string;
@@ -196,6 +197,48 @@ export class ApiService {
 
 	async getUserSubmissions(month: string) {
 		return this.requestJson(`/admin/users/${month}`, {
+			method: 'GET'
+		});
+	}
+
+	// ==================== Vacation Days ====================
+
+	async getVacationDays(params?: {
+		year?: number;
+		month?: number;
+		type?: string;
+	}): Promise<VacationDay[]> {
+		const queryParams = new URLSearchParams();
+		if (params?.year) queryParams.append('year', params.year.toString());
+		if (params?.month) queryParams.append('month', params.month.toString());
+		if (params?.type) queryParams.append('type', params.type);
+
+		const query = queryParams.toString();
+		const endpoint = `/vacation-days${query ? `?${query}` : ''}`;
+
+		return this.requestJson(endpoint, {
+			method: 'GET'
+		});
+	}
+
+	async getVacationDaysInRange(
+		startDate: string,
+		endDate: string,
+		type?: string
+	): Promise<VacationDay[]> {
+		const queryParams = new URLSearchParams({
+			start_date: startDate,
+			end_date: endDate
+		});
+		if (type) queryParams.append('type', type);
+
+		return this.requestJson(`/vacation-days/range?${queryParams.toString()}`, {
+			method: 'GET'
+		});
+	}
+
+	async getVacationDay(date: string): Promise<VacationDay> {
+		return this.requestJson(`/vacation-days/${date}`, {
 			method: 'GET'
 		});
 	}
