@@ -235,6 +235,27 @@ export function getValidPriorities(
 }
 
 /**
+ * Checks if a week has already started (Monday has passed)
+ * @param week Week data with startDate in DD.MM.YYYY format
+ * @returns true if the week has started (current date is Monday or later)
+ */
+export function isWeekStarted(week: WeekData): boolean {
+	if (!week.startDate) return false;
+
+	const [day, month, year] = week.startDate.split('.');
+	const weekStartDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+	// Set time to start of day for accurate comparison
+	weekStartDate.setHours(0, 0, 0, 0);
+
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+
+	// Week has started if today is on or after Monday
+	return today >= weekStartDate;
+}
+
+/**
  * Gets vacation day for a date string from the vacation days map
  * @param dateStr Date in DD.MM.YYYY format
  * @param vacationDaysMap Map of vacation days with YYYY-MM-DD keys

@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
 	import type { VacationDay } from '$lib/vacation-days.types';
-	import { dayNames, dayKeys } from '$lib/priorities.config';
+	import { dayNames, dayKeys, priorityColors } from '$lib/priorities.config';
 	import { scale } from 'svelte/transition';
 	import {
 		isWeekComplete,
 		getVacationDayForDate,
-		getValidPriorities
+		getValidPriorities,
+		isWeekStarted
 	} from '$lib/dateHelpers.utils';
 
 	type Props = {
@@ -26,6 +27,7 @@
 
 	let weekCompleted = $derived(isWeekComplete(week, vacationDaysMap));
 	let validPriorities = $derived(getValidPriorities(week, vacationDaysMap));
+	let weekHasStarted = $derived(isWeekStarted(week));
 
 	// Make vacation day lookups reactive by creating a derived helper
 	let getVacation = $derived.by(() => {
@@ -206,6 +208,16 @@
 		</div>
 	</div>
 
+	<!-- Week Started Warning -->
+	{#if weekHasStarted}
+		<div
+			class="mb-3 rounded-lg border border-orange-200 bg-orange-50 p-2 text-xs text-orange-800 dark:border-orange-800 dark:bg-orange-900/20 dark:text-orange-200"
+			transition:scale={{ duration: 300 }}
+		>
+			⚠️ Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden.
+		</div>
+	{/if}
+
 	<!-- Progress Bar -->
 	{#if !weekCompleted}
 		<div class="mb-4">
@@ -294,24 +306,28 @@
 							? dayKeys.find((day) => week[day] === priority)
 							: null}
 						{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
-						{@const isDisabled = !!vacationDay}
+						{@const isDisabled = !!vacationDay || weekHasStarted}
 
 						<button
 							class="relative h-10 w-10 transform rounded-full text-sm font-bold shadow transition-all
-							{isDisabled
+							{vacationDay
 								? 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600'
 								: isSelected
-									? 'scale-110 bg-gradient-to-r from-purple-600 to-blue-600 text-white ring-2 ring-purple-300 dark:ring-purple-700'
-									: isUsedElsewhere
-										? 'border border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 dark:border-orange-600 dark:bg-orange-900 dark:text-orange-400'
-										: 'border border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
+									? `scale-110 ${priorityColors[typedPriority as 1 | 2 | 3 | 4 | 5]} ring-opacity-50 text-white ring-2 ${weekHasStarted ? 'cursor-not-allowed' : ''}`
+									: weekHasStarted && !isSelected
+										? 'cursor-not-allowed border border-gray-300 bg-white text-gray-500 opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400'
+										: isUsedElsewhere
+											? 'border border-orange-300 bg-orange-50 text-orange-600 hover:scale-105 dark:border-orange-600 dark:bg-orange-900 dark:text-orange-400'
+											: 'border border-gray-300 bg-white text-gray-700 hover:scale-105 hover:border-purple-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'}"
 							onclick={() => !isDisabled && handlePrioritySelect(dayKey, typedPriority)}
 							disabled={isDisabled}
-							title={isDisabled
+							title={vacationDay
 								? 'Prioritäten können nicht für Abwesenheitstage gesetzt werden'
-								: isUsedElsewhere
-									? `Tauschen mit ${usedByDayName}`
-									: `Priorität ${priority}`}
+								: weekHasStarted
+									? 'Diese Woche hat bereits begonnen'
+									: isUsedElsewhere
+										? `Tauschen mit ${usedByDayName}`
+										: `Priorität ${priority}`}
 						>
 							{priority}
 							{#if isUsedElsewhere && !isDisabled}
