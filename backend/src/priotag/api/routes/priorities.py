@@ -189,9 +189,6 @@ async def save_priority(
 
     # Check for duplicate month
     rate_limit_key = f"priority_check:{user_id}:{month}"
-    import time
-
-    print(time.time(), rate_limit_key)
     if redis_client.exists(rate_limit_key):
         raise HTTPException(
             status_code=429,
