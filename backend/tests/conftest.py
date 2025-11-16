@@ -104,14 +104,19 @@ def mock_admin_key(monkeypatch, admin_rsa_keypair, tmp_path):
     # Mock the Path objects in EncryptionManager
     from priotag.services.encryption import EncryptionManager
 
-    # Reset class variables to force re-reading
+    # Save original values
+    original_admin_key = EncryptionManager.ADMIN_PUBLIC_KEY_PEM
+    original_cache_key = EncryptionManager._SERVER_CACHE_KEY
+
+    # Set test values
     EncryptionManager.ADMIN_PUBLIC_KEY_PEM = admin_rsa_keypair["public_pem"]
     EncryptionManager._SERVER_CACHE_KEY = b"test_cache_key_32_bytes_long_!!"
 
     yield
 
-    # Reset after test
-    EncryptionManager._SERVER_CACHE_KEY = None
+    # Restore original values (important for integration tests)
+    EncryptionManager.ADMIN_PUBLIC_KEY_PEM = original_admin_key
+    EncryptionManager._SERVER_CACHE_KEY = original_cache_key
 
 
 @pytest.fixture
