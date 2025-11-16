@@ -40,8 +40,9 @@ export class ApiService {
 			// Clear auth state (don't call logout endpoint - already unauthorized)
 			authStore.clearAuth(false);
 
-			// Only redirect if not already on login page (prevent loop)
-			if (browser && window.location.pathname !== '/login') {
+			// Only redirect if not already on login/register page (prevent loop)
+			const currentPath = browser ? window.location.pathname : '';
+			if (browser && currentPath !== '/login' && currentPath !== '/register') {
 				goto('/login', { replaceState: true });
 			}
 			throw new Error('Sitzung abgelaufen. Bitte melden Sie sich erneut an.');
