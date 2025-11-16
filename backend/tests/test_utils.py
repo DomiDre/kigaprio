@@ -539,3 +539,135 @@ class TestVerifyToken:
                 result = await verify_token(mock_response, "token123", fake_redis)
 
                 assert result.id == "user123"
+
+
+    @pytest.mark.asyncio
+    async def test_verify_token_blacklist_check_error(self, fake_redis):
+        """Should continue if blacklist check fails (don't block valid users)."""
+        mock_response = Response()
+
+        # Make blacklist check raise error
+        def blacklist_error(key):
+            if key.startswith("blacklist:"):
+                raise Exception("Redis error")
+            return None
+
+        fake_redis.get = Mock(side_effect=blacklist_error)
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            mock_pb_response = Mock()
+            mock_pb_response.status_code = 200
+            mock_pb_response.json.return_value = {
+                "token": "token123",
+                "record": {
+                    "id": "user123",
+                    "username": "testuser",
+                    "email": "test@example.com",
+                    "emailVisibility": False,
+                    "role": "user",
+                    "salt": "dGVzdF9zYWx0",
+                    "user_wrapped_dek": "d3JhcHBlZF9kZWs=",
+                    "admin_wrapped_dek": "YWRtaW5fd3JhcHBlZA==",
+                    "encrypted_fields": "ZW5jcnlwdGVk",
+                    "lastSeen": "2024-01-01T00:00:00Z",
+                    "verified": True,
+                    "collectionId": "coll",
+                    "collectionName": "users",
+                    "created": "2024-01-01T00:00:00Z",
+                    "updated": "2024-01-01T00:00:00Z",
+                },
+            }
+            mock_client.post.return_value = mock_pb_response
+
+            with patch("priotag.utils.update_last_seen"):
+                # Should not raise, continues even if blacklist check fails
+                result = await verify_token(mock_response, "token123", fake_redis)
+                assert result.id == "user123"
+
+    @pytest.mark.asyncio
+    async def test_verify_token_session_deletion_error(
+        self, fake_redis, sample_user_data
+    ):
+        """Should handle error when deleting old session."""
+        mock_response = Response()
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            # Mock token refresh response
+            mock_pb_response = Mock()
+            mock_pb_response.status_code = 200
+            mock_pb_response.json.return_value = {
+                "token": "new_token",  # Different token triggers deletion
+                "record": sample_user_data,
+            }
+            mock_client.post.return_value = mock_pb_response
+
+            # Make delete raise error for old session
+            original_delete = fake_redis.delete
+            def delete_error(key):
+                if "old_token" in str(key):
+                    raise Exception("Redis delete failed")
+                return original_delete(key)
+
+            fake_redis.delete = Mock(side_effect=delete_error)
+
+            with patch("priotag.utils.update_last_seen"):
+                # Should not raise, logs warning and continues
+                result = await verify_token(mock_response, "old_token", fake_redis)
+                assert result.id == sample_user_data["id"]
+
+    @pytest.mark.asyncio
+    async def test_verify_token_setex_error(self, fake_redis, sample_user_data):
+        """Should handle error when setting new session in Redis."""
+        mock_response = Response()
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            mock_pb_response = Mock()
+            mock_pb_response.status_code = 200
+            mock_pb_response.json.return_value = {
+                "token": "new_token",
+                "record": sample_user_data,
+            }
+            mock_client.post.return_value = mock_pb_response
+
+            # Make setex raise error
+            fake_redis.setex = Mock(side_effect=Exception("Redis setex failed"))
+
+            with patch("priotag.utils.update_last_seen"):
+                # Should not raise, logs warning and continues
+                result = await verify_token(mock_response, "token123", fake_redis)
+                assert result.id == sample_user_data["id"]
+
+    @pytest.mark.asyncio
+    async def test_update_last_seen_setex_throttle_error(self, fake_redis):
+        """Should handle error when setting throttle key in Redis."""
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_client.patch.return_value = mock_response
+
+            # Make setex raise error for throttle key
+            original_setex = fake_redis.setex
+            def setex_error(key, ttl, value):
+                if key.startswith("lastseen:"):
+                    raise Exception("Redis setex failed")
+                return original_setex(key, ttl, value)
+
+            fake_redis.setex = Mock(side_effect=setex_error)
+
+            # Should not raise, logs warning and continues
+            await update_last_seen("user123", "token123", fake_redis)
+
+            # Should have attempted the update
+            mock_client.patch.assert_called_once()
