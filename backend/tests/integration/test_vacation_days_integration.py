@@ -663,13 +663,14 @@ class TestVacationDaysIntegration:
 
         date1 = (datetime.now() + timedelta(days=190)).strftime("%Y-%m-%d")
         date2 = (datetime.now() + timedelta(days=195)).strftime("%Y-%m-%d")
-        date3 = (datetime.now() + timedelta(days=210)).strftime("%Y-%m-%d")
+        date3 = (datetime.now() + timedelta(days=200)).strftime("%Y-%m-%d")
 
         for date in [date1, date2, date3]:
-            test_app.post(
+            create_response = test_app.post(
                 "/api/v1/admin/vacation-days",
                 json={"date": date, "type": "vacation", "description": "Test"},
             )
+            assert create_response.status_code == 200
 
         # Setup: Create regular user
         user_auth = self._register_and_login(test_app)
@@ -716,7 +717,7 @@ class TestVacationDaysIntegration:
         test_app.cookies = admin_auth["cookies"]
 
         future_date = (datetime.now() + timedelta(days=210)).strftime("%Y-%m-%d")
-        test_app.post(
+        create_response = test_app.post(
             "/api/v1/admin/vacation-days",
             json={
                 "date": future_date,
@@ -724,6 +725,7 @@ class TestVacationDaysIntegration:
                 "description": "Specific Day",
             },
         )
+        assert create_response.status_code == 200
 
         # Setup: Create regular user
         user_auth = self._register_and_login(test_app)
