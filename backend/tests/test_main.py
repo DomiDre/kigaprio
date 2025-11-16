@@ -122,8 +122,8 @@ class TestMetricsEndpoint:
 
         from priotag import main
 
-        # Patch the METRICS_TOKEN constant directly
-        with patch.object(main, "METRICS_TOKEN", "secret_token"):
+        # Patch the METRICS_TOKEN constant - use create=True since it may not exist
+        with patch.object(main, "METRICS_TOKEN", "secret_token", create=True):
             credentials = HTTPAuthorizationCredentials(
                 scheme="Bearer", credentials="secret_token"
             )
@@ -139,8 +139,8 @@ class TestMetricsEndpoint:
 
         from priotag import main
 
-        # Patch the METRICS_TOKEN constant directly
-        with patch.object(main, "METRICS_TOKEN", "secret_token"):
+        # Patch the METRICS_TOKEN constant - use create=True since it may not exist
+        with patch.object(main, "METRICS_TOKEN", "secret_token", create=True):
             credentials = HTTPAuthorizationCredentials(
                 scheme="Bearer", credentials="wrong_token"
             )
