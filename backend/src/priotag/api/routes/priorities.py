@@ -235,27 +235,53 @@ async def save_priority(
             # Merge weeks: use old data for started weeks, new data for future weeks
             month_date = datetime.strptime(month, "%Y-%m")
             final_weeks = []
+            locked_weeks = []  # Track which weeks are locked
 
             for new_week in weeks:
                 week_start = get_week_start_date(
                     month_date.year, month_date.month, new_week.weekNumber
                 )
-                week_start_midnight = datetime(
+                # Allow changes until end of Monday (first day of week)
+                # This gives users all of Monday to fix any mistakes
+                week_lock_time = datetime(
                     week_start.year, week_start.month, week_start.day
-                )
-                now = datetime.now()
-                today = datetime(now.year, now.month, now.day)
+                ) + timedelta(days=1)  # Tuesday at 00:00:00
 
-                # If week has started and we have existing data, use the old data
+                now = datetime.now()
+
+                # If week's first day has passed and we have existing data, check if user is trying to change it
                 if (
-                    today >= week_start_midnight
+                    now >= week_lock_time
                     and new_week.weekNumber in existing_weeks_data
                 ):
+                    # Check if user is trying to make changes to a locked week
+                    old_week = existing_weeks_data[new_week.weekNumber]
+                    new_week_dict = new_week.model_dump()
+
+                    # Compare the data to see if changes are being attempted
+                    is_different = False
+                    for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']:
+                        if old_week.get(day) != new_week_dict.get(day):
+                            is_different = True
+                            break
+
+                    if is_different:
+                        # User is trying to change a locked week - record it
+                        locked_weeks.append(new_week.weekNumber)
+
                     # Keep the existing week data unchanged
-                    final_weeks.append(existing_weeks_data[new_week.weekNumber])
+                    final_weeks.append(old_week)
                 else:
                     # Use the new data (week hasn't started or no existing data)
                     final_weeks.append(new_week.model_dump())
+
+            # If user tried to change locked weeks, return an error
+            if locked_weeks:
+                week_str = ", ".join([f"KW{w}" for w in locked_weeks])
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Die folgenden Wochen können nicht mehr geändert werden (Änderungen nur bis Montag 23:59 Uhr möglich): {week_str}",
+                )
 
             # Encrypt the weeks data (use final_weeks which has the merged data)
             try:
