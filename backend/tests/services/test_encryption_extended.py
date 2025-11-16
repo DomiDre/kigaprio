@@ -92,11 +92,13 @@ class TestDEKPartEncryption:
     @pytest.fixture(autouse=True)
     def setup_server_cache_key(self):
         """Ensure server cache key is initialized for all tests."""
-        # Reset and set a valid 32-byte key
+        # Save original value
+        original_key = EncryptionManager._SERVER_CACHE_KEY
+        # Set a valid 32-byte key for testing
         EncryptionManager._SERVER_CACHE_KEY = b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
         yield
-        # Reset after test
-        EncryptionManager._SERVER_CACHE_KEY = None
+        # Restore original value (important for integration tests)
+        EncryptionManager._SERVER_CACHE_KEY = original_key
 
     def test_encrypt_dek_part(self):
         """Should encrypt DEK part."""
@@ -144,11 +146,13 @@ class TestGetDekFromRequest:
     @pytest.fixture(autouse=True)
     def setup_server_cache_key(self):
         """Ensure server cache key is initialized for all tests."""
-        # Reset and set a valid 32-byte key
+        # Save original value
+        original_key = EncryptionManager._SERVER_CACHE_KEY
+        # Set a valid 32-byte key for testing
         EncryptionManager._SERVER_CACHE_KEY = b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
         yield
-        # Reset after test
-        EncryptionManager._SERVER_CACHE_KEY = None
+        # Restore original value (important for integration tests)
+        EncryptionManager._SERVER_CACHE_KEY = original_key
 
     def test_get_dek_high_security_mode(self, test_dek, fake_redis):
         """High security mode should decode DEK directly from request."""
