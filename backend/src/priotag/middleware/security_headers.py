@@ -254,7 +254,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         return False
 
-    def _validate_content_type(self, content_type: str) -> bool:
+    def _validate_content_type(self, content_type: str | None) -> bool:
         """
         Validate content type to prevent header injection via content-type manipulation.
         """

@@ -1,5 +1,3 @@
-import uuid
-
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException
@@ -141,7 +139,7 @@ async def get_user_submissions(
 
         if priorities_response.status_code != 200:
             raise HTTPException(
-                status_code=500, detail="Fehler beim Abrufen der PrioritÃ¤ten"
+                status_code=500, detail="Fehler beim Abrufen der Prioritäten"
             )
 
         priorities_data = priorities_response.json().get("items", [])
@@ -240,6 +238,9 @@ async def get_user_for_admin(
                 raise HTTPException(status_code=204, detail="User nicht gefunden")
 
             user_record = UsersResponse(**response_data["items"][0])
+        except HTTPException:
+            # Re-raise HTTPExceptions (like the 204 from above)
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=500, detail="Unbekannter Fehler beim abrufen des Benutzer"
@@ -311,7 +312,7 @@ async def create_manual_priority(
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f'userId = null && month="{request.month}" && identifier="{identifier}"'
+                "filter": f'manual = true && month="{request.month}" && identifier="{identifier}"'
             },
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -341,7 +342,7 @@ async def create_manual_priority(
         priority_data = {
             "userId": auth_data.id,
             "month": request.month,
-            "identifier": uuid.uuid4().hex,
+            "identifier": identifier,
             "encrypted_fields": encrypted_data,
             "manual": True,
         }
@@ -484,7 +485,7 @@ async def delete_manual_entry(
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f'userId = null && month="{month}" && identifier="{identifier}"'
+                "filter": f'manual = true && month="{month}" && identifier="{identifier}"'
             },
             headers={"Authorization": f"Bearer {token}"},
         )

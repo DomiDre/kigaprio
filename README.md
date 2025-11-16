@@ -3,6 +3,7 @@
 <div align="center">
 
 [![CI Status](https://github.com/DomiDre/priotag/actions/workflows/ci.yml/badge.svg)](https://github.com/DomiDre/priotag/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/DomiDre/priotag/graph/badge.svg?token=1XUOS5Y6GF)](https://codecov.io/gh/DomiDre/priotag)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen.svg)](https://www.docker.com/)
 [![GDPR Compliant](https://img.shields.io/badge/GDPR-Compliant-green.svg)](ARCHITECTURE.md#gdpr-compliance)

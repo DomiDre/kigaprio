@@ -104,14 +104,19 @@ def mock_admin_key(monkeypatch, admin_rsa_keypair, tmp_path):
     # Mock the Path objects in EncryptionManager
     from priotag.services.encryption import EncryptionManager
 
-    # Reset class variables to force re-reading
+    # Save original values
+    original_admin_key = EncryptionManager.ADMIN_PUBLIC_KEY_PEM
+    original_cache_key = EncryptionManager._SERVER_CACHE_KEY
+
+    # Set test values
     EncryptionManager.ADMIN_PUBLIC_KEY_PEM = admin_rsa_keypair["public_pem"]
     EncryptionManager._SERVER_CACHE_KEY = b"test_cache_key_32_bytes_long_!!"
 
     yield
 
-    # Reset after test
-    EncryptionManager._SERVER_CACHE_KEY = None
+    # Restore original values (important for integration tests)
+    EncryptionManager.ADMIN_PUBLIC_KEY_PEM = original_admin_key
+    EncryptionManager._SERVER_CACHE_KEY = original_cache_key
 
 
 @pytest.fixture
@@ -281,8 +286,18 @@ def mock_httpx_client():
 
 
 @pytest.fixture(autouse=True)
-def reset_environment():
-    """Reset environment variables after each test."""
+def reset_environment(request):
+    """Reset environment variables after unit tests only (not integration tests)."""
+    # Skip this fixture for integration tests to avoid interfering with their environment setup
+    is_integration_test = "integration" in request.keywords or "integration" in str(
+        request.fspath
+    )
+
+    if is_integration_test:
+        yield
+        return
+
+    # Only reset environment for unit tests
     original_env = os.environ.copy()
     yield
     os.environ.clear()

@@ -174,10 +174,37 @@ export class ApiService {
 	}
 
 	async updatePriority(month: string, priorityData: WeekData[]) {
-		return this.requestJson(`/priorities/${month}`, {
-			method: 'PUT',
-			body: JSON.stringify(priorityData)
-		});
+		// Retry logic for rate limiting (429 responses)
+		const maxRetries = 3;
+		let lastError: Error | null = null;
+
+		for (let attempt = 0; attempt <= maxRetries; attempt++) {
+			try {
+				return await this.requestJson(`/priorities/${month}`, {
+					method: 'PUT',
+					body: JSON.stringify(priorityData)
+				});
+			} catch (error) {
+				// Check if it's a rate limit error
+				if (error instanceof Error && error.message.includes('Bitte warten Sie einen Moment')) {
+					lastError = error;
+
+					// If we have retries left, wait and try again
+					if (attempt < maxRetries) {
+						// Exponential backoff: 2s, 3s, 4s
+						const waitTime = 2000 + attempt * 1000;
+						await new Promise((resolve) => setTimeout(resolve, waitTime));
+						continue;
+					}
+				}
+
+				// If it's not a rate limit error, throw immediately
+				throw error;
+			}
+		}
+
+		// If we exhausted all retries, throw the last error
+		throw lastError || new Error('Fehler beim Speichern der Prioritäten');
 	}
 
 	// ==================== Admin Endpoints ====================

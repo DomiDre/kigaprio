@@ -218,6 +218,22 @@ def pocketbase_url(monkeypatch, pocketbase_container):
         monkeypatch.setattr(pocketbase_service, "POCKETBASE_URL", pocketbase_url)
         # Also patch service_account module which imports POCKETBASE_URL directly
         monkeypatch.setattr(service_account, "POCKETBASE_URL", pocketbase_url)
+
+        # Patch all route modules that import POCKETBASE_URL directly
+        # This is necessary because Python imports create local copies of the constant
+        try:
+            from priotag.api.routes import account, auth, priorities, vacation_days
+            from priotag.services import magic_word
+
+            monkeypatch.setattr(priorities, "POCKETBASE_URL", pocketbase_url)
+            monkeypatch.setattr(vacation_days, "POCKETBASE_URL", pocketbase_url)
+            monkeypatch.setattr(account, "POCKETBASE_URL", pocketbase_url)
+            monkeypatch.setattr(auth, "POCKETBASE_URL", pocketbase_url)
+            monkeypatch.setattr(magic_word, "POCKETBASE_URL", pocketbase_url)
+        except (ImportError, AttributeError):
+            # Modules may not be imported yet
+            pass
+
     return pocketbase_url
 
 
@@ -252,6 +268,26 @@ def pocketbase_admin_client(pocketbase_url: str) -> Generator[httpx.Client, None
     client.close()
 
 
+@pytest.fixture(scope="function", autouse=True)
+def reset_redis_singleton():
+    """
+    Reset Redis service singleton state before each integration test.
+
+    This is necessary because unit tests may have already imported and
+    initialized the redis_service module, leaving stale state.
+    """
+    from priotag.services import redis_service
+
+    # Reset singleton state
+    redis_service._redis_service._redis_url = None
+    redis_service._redis_service._pool = None
+
+    yield
+
+    # Clean up after test
+    redis_service.close_redis()
+
+
 @pytest.fixture(scope="function")
 def test_app(pocketbase_url: str, clean_redis: redis.Redis):
     """
@@ -259,12 +295,22 @@ def test_app(pocketbase_url: str, clean_redis: redis.Redis):
 
     Uses the real PocketBase and Redis containers.
     """
+    # Import app fresh to avoid stale state from unit tests
+    import sys
+
     from fastapi.testclient import TestClient
 
-    from priotag.main import app
     from priotag.services.redis_service import get_redis
 
-    # Override get_redis dependency when not using docker-compose
+    # Remove cached module if it exists
+    if "priotag.main" in sys.modules:
+        del sys.modules["priotag.main"]
+
+    # Import fresh app instance
+    from priotag.main import app
+
+    # Override get_redis dependency BEFORE creating TestClient
+    # This ensures the dependency override is in place before lifespan runs
     if not USE_DOCKER_SERVICES:
 
         def get_test_redis():
@@ -272,7 +318,9 @@ def test_app(pocketbase_url: str, clean_redis: redis.Redis):
 
         app.dependency_overrides[get_redis] = get_test_redis
 
-    client = TestClient(app)
+    # Create test client (this triggers lifespan startup)
+    # NOTE: raise_server_exceptions=False to avoid masking the actual HTTP error
+    client = TestClient(app, raise_server_exceptions=False)
 
     yield client
 
