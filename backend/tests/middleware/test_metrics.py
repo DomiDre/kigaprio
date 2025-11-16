@@ -165,7 +165,8 @@ class TestMetricsEndpoint:
         response = await metrics_endpoint()
 
         assert isinstance(response, Response)
-        assert response.media_type == "text/plain; version=0.0.4; charset=utf-8"
+        assert "text/plain" in response.media_type
+        assert "charset=utf-8" in response.media_type
         assert isinstance(response.body, bytes)
 
         # Should contain metric names

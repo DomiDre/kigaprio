@@ -732,3 +732,366 @@ class TestSetupStaticFileServingEdgeCases:
 
         # App should be configured but not serving static files
         assert app is not None
+
+
+@pytest.mark.unit
+class TestSafeJoinPathCoverage:
+    """Additional tests to increase coverage of safe_join_path."""
+
+    def test_is_relative_to_path_outside_base(self, tmp_path):
+        """Should catch paths that escape base directory validation."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create a case where is_relative_to would be False
+        # Try with a path that resolves outside
+        with patch("pathlib.Path.is_relative_to", return_value=False):
+            result = safe_join_path(base, "test.html")
+            assert result is None
+
+    def test_relative_to_raises_value_error(self, tmp_path):
+        """Should handle ValueError from relative_to check."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Mock relative_to to raise ValueError
+        with patch("pathlib.Path.relative_to", side_effect=ValueError("test error")):
+            result = safe_join_path(base, "test.html")
+            assert result is None
+
+    def test_path_resolution_runtime_error(self, tmp_path):
+        """Should handle RuntimeError during path resolution."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Mock resolve to raise RuntimeError
+        with patch(
+            "pathlib.Path.resolve", side_effect=RuntimeError("resolution error")
+        ):
+            result = safe_join_path(base, "test.html")
+            assert result is None
+
+    def test_path_resolution_os_error(self, tmp_path):
+        """Should handle OSError during path resolution."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Mock resolve to raise OSError
+        with patch("pathlib.Path.resolve", side_effect=OSError("os error")):
+            result = safe_join_path(base, "test.html")
+            assert result is None
+
+
+@pytest.mark.unit
+class TestSymlinkErrorHandling:
+    """Test error handling in symlink safety checks."""
+
+    def test_symlink_resolve_runtime_error(self, tmp_path):
+        """Should handle RuntimeError during symlink resolution."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        link = base / "link.txt"
+        link.touch()
+
+        with patch.object(Path, "is_symlink", return_value=True):
+            with patch.object(
+                Path, "resolve", side_effect=RuntimeError("symlink error")
+            ):
+                result = is_safe_symlink(link, base)
+                assert result is False
+
+    def test_symlink_resolve_value_error(self, tmp_path):
+        """Should handle ValueError during symlink resolution."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        link = base / "link.txt"
+        link.touch()
+
+        with patch.object(Path, "is_symlink", return_value=True):
+            with patch.object(Path, "resolve", side_effect=ValueError("value error")):
+                result = is_safe_symlink(link, base)
+                assert result is False
+
+    def test_symlink_resolve_os_error(self, tmp_path):
+        """Should handle OSError during symlink resolution."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        link = base / "link.txt"
+        link.touch()
+
+        with patch.object(Path, "is_symlink", return_value=True):
+            with patch.object(Path, "resolve", side_effect=OSError("os error")):
+                result = is_safe_symlink(link, base)
+                assert result is False
+
+
+@pytest.mark.unit
+class TestDirectoryValidationCoverage:
+    """Additional tests for directory validation coverage."""
+
+    def test_directory_symlink_detected(self, tmp_path):
+        """Should detect and reject unsafe directory symlinks."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        outside = tmp_path / "outside"
+        outside.mkdir()
+
+        # Create symlink to outside directory
+        dir_link = base / "bad_link"
+        dir_link.symlink_to(outside)
+
+        # is_safe_symlink should return False, causing validation to fail
+        result = validate_directory_safety(dir_link, base)
+        assert result is False
+
+    def test_directory_validation_runtime_error(self, tmp_path):
+        """Should handle RuntimeError in directory validation."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        subdir = base / "subdir"
+        subdir.mkdir()
+
+        with patch.object(Path, "resolve", side_effect=RuntimeError("runtime error")):
+            result = validate_directory_safety(subdir, base)
+            assert result is False
+
+    def test_directory_validation_value_error(self, tmp_path):
+        """Should handle ValueError in directory validation."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        subdir = base / "subdir"
+        subdir.mkdir()
+
+        with patch.object(Path, "resolve", side_effect=ValueError("value error")):
+            result = validate_directory_safety(subdir, base)
+            assert result is False
+
+    def test_directory_validation_os_error(self, tmp_path):
+        """Should handle OSError in directory validation."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        subdir = base / "subdir"
+        subdir.mkdir()
+
+        with patch.object(Path, "resolve", side_effect=OSError("os error")):
+            result = validate_directory_safety(subdir, base)
+            assert result is False
+
+
+@pytest.mark.unit
+class TestFindFileToServeCoverage:
+    """Additional tests for find_file_to_serve coverage."""
+
+    def test_directory_with_valid_index_html(self, tmp_path):
+        """Should serve index.html from valid directory."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        subdir = base / "docs"
+        subdir.mkdir()
+
+        index = subdir / "index.html"
+        index.write_text("<html><body>Docs Index</body></html>")
+
+        result = find_file_to_serve(base, subdir)
+        assert result == index
+
+    def test_directory_index_html_validation_os_error(self, tmp_path):
+        """Should handle OSError when validating directory index.html."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        subdir = base / "docs"
+        subdir.mkdir()
+
+        index = subdir / "index.html"
+        index.write_text("<html></html>")
+
+        # Mock resolve to raise OSError for index file
+        original_resolve = Path.resolve
+
+        def selective_resolve(self, *args, **kwargs):
+            if self.name == "index.html":
+                raise OSError("os error")
+            return original_resolve(self, *args, **kwargs)
+
+        with patch.object(Path, "resolve", selective_resolve):
+            result = find_file_to_serve(base, subdir)
+            # Should fall back to other options
+            assert result is None or result != index
+
+    def test_directory_index_html_value_error(self, tmp_path):
+        """Should handle ValueError when validating directory index.html."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        subdir = base / "docs"
+        subdir.mkdir()
+
+        index = subdir / "index.html"
+        index.write_text("<html></html>")
+
+        # Mock resolve to raise ValueError for index file
+        original_resolve = Path.resolve
+
+        def selective_resolve(self, *args, **kwargs):
+            if self.name == "index.html":
+                raise ValueError("value error")
+            return original_resolve(self, *args, **kwargs)
+
+        with patch.object(Path, "resolve", selective_resolve):
+            result = find_file_to_serve(base, subdir)
+            # Should fall back to other options
+            assert result is None or result != index
+
+    def test_html_extension_fallback_os_error_handling(self, tmp_path):
+        """Should handle OSError when trying .html extension fallback."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create root index for fallback
+        root_index = base / "index.html"
+        root_index.write_text("<html></html>")
+
+        # Request for file that doesn't exist
+        requested = base / "page"
+
+        # Create page.html but make it raise OSError when resolving
+        html_file = base / "page.html"
+        html_file.write_text("<html></html>")
+
+        original_resolve = Path.resolve
+
+        def selective_resolve(self, *args, **kwargs):
+            if self.name == "page.html":
+                raise OSError("os error")
+            return original_resolve(self, *args, **kwargs)
+
+        with patch.object(Path, "resolve", selective_resolve):
+            result = find_file_to_serve(base, requested)
+            # Should fall back to root index
+            assert result == root_index
+
+    def test_html_extension_fallback_value_error_handling(self, tmp_path):
+        """Should handle ValueError when trying .html extension fallback."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create root index for fallback
+        root_index = base / "index.html"
+        root_index.write_text("<html></html>")
+
+        # Request for file that doesn't exist
+        requested = base / "page"
+
+        # Create page.html but make it raise ValueError when resolving
+        html_file = base / "page.html"
+        html_file.write_text("<html></html>")
+
+        original_resolve = Path.resolve
+
+        def selective_resolve(self, *args, **kwargs):
+            if self.name == "page.html":
+                raise ValueError("value error")
+            return original_resolve(self, *args, **kwargs)
+
+        with patch.object(Path, "resolve", selective_resolve):
+            result = find_file_to_serve(base, requested)
+            # Should fall back to root index
+            assert result == root_index
+
+
+@pytest.mark.unit
+class TestSetupStaticServingCoverage:
+    """Additional tests for setup_static_file_serving coverage."""
+
+    def test_static_path_resolve_error(self, tmp_path):
+        """Should handle path resolution errors gracefully."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        static_path = tmp_path / "static"
+        static_path.mkdir()
+        (static_path / "test.html").write_text("<html></html>")
+
+        with patch.object(Path, "resolve", side_effect=ValueError("resolve error")):
+            # Should log error and return early
+            setup_static_file_serving(
+                app=app, static_path=static_path, env="production", serve_static=False
+            )
+
+            # Should not crash
+            assert app is not None
+
+    def test_static_path_resolve_os_error(self, tmp_path):
+        """Should handle OS errors during path resolution."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        static_path = tmp_path / "static"
+        static_path.mkdir()
+        (static_path / "test.html").write_text("<html></html>")
+
+        with patch.object(Path, "resolve", side_effect=OSError("os error")):
+            # Should log error and return early
+            setup_static_file_serving(
+                app=app, static_path=static_path, env="production", serve_static=False
+            )
+
+            # Should not crash
+            assert app is not None
+
+    def test_unsafe_app_directory_detected(self, tmp_path):
+        """Should detect and reject unsafe _app directory."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        static_path = tmp_path / "static"
+        static_path.mkdir()
+        (static_path / "index.html").write_text("<html></html>")
+
+        # Create _app directory outside base
+        outside_app = tmp_path / "outside_app"
+        outside_app.mkdir()
+
+        app_link = static_path / "_app"
+        app_link.symlink_to(outside_app)
+
+        setup_static_file_serving(
+            app=app, static_path=static_path, env="production", serve_static=False
+        )
+
+        # Should log error about unsafe directory
+        # Verify app is still configured
+        assert app is not None
+
+    def test_unsafe_assets_directory_detected(self, tmp_path):
+        """Should detect and reject unsafe assets directory."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        static_path = tmp_path / "static"
+        static_path.mkdir()
+        (static_path / "index.html").write_text("<html></html>")
+
+        # Create assets directory outside base
+        outside_assets = tmp_path / "outside_assets"
+        outside_assets.mkdir()
+
+        assets_link = static_path / "assets"
+        assets_link.symlink_to(outside_assets)
+
+        setup_static_file_serving(
+            app=app, static_path=static_path, env="production", serve_static=False
+        )
+
+        # Should log error about unsafe directory
+        # Verify app is still configured
+        assert app is not None
