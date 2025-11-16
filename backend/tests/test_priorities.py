@@ -166,6 +166,28 @@ class TestGetUserPriorities:
 
             assert exc_info.value.status_code == 500
 
+    @pytest.mark.asyncio
+    async def test_get_user_priorities_connection_error(
+        self, sample_session_info, test_dek
+    ):
+        """Should raise HTTPException when connection to PocketBase fails."""
+        import httpx
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_async_client = AsyncMock()
+            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_client.return_value.__aenter__.return_value = mock_async_client
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_user_priorities(
+                    auth_data=sample_session_info,
+                    token="test_token",
+                    dek=test_dek,
+                )
+
+            assert exc_info.value.status_code == 500
+            assert "Verbindungsfehler" in exc_info.value.detail
+
 
 @pytest.mark.unit
 class TestGetPriority:
@@ -324,6 +346,118 @@ class TestGetPriority:
                 )
 
             assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_get_priority_404_response(
+        self, sample_session_info, test_dek, mock_httpx_client
+    ):
+        """Should raise 404 when PocketBase returns 404."""
+        mock_response = MagicMock(spec=Response)
+        mock_response.status_code = 404
+        mock_httpx_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = mock_httpx_client
+            with pytest.raises(HTTPException) as exc_info:
+                await get_priority(
+                    month="2025-01",
+                    auth_data=sample_session_info,
+                    token="test_token",
+                    dek=test_dek,
+                )
+
+            assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_priority_non_200_response(
+        self, sample_session_info, test_dek, mock_httpx_client
+    ):
+        """Should raise HTTPException for non-200 responses."""
+        mock_response = MagicMock(spec=Response)
+        mock_response.status_code = 503
+        mock_httpx_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = mock_httpx_client
+            with pytest.raises(HTTPException) as exc_info:
+                await get_priority(
+                    month="2025-01",
+                    auth_data=sample_session_info,
+                    token="test_token",
+                    dek=test_dek,
+                )
+
+            assert exc_info.value.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_get_priority_connection_error(
+        self, sample_session_info, test_dek
+    ):
+        """Should raise HTTPException when connection fails."""
+        import httpx
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_async_client = AsyncMock()
+            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_client.return_value.__aenter__.return_value = mock_async_client
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_priority(
+                    month="2025-01",
+                    auth_data=sample_session_info,
+                    token="test_token",
+                    dek=test_dek,
+                )
+
+            assert exc_info.value.status_code == 500
+            assert "Verbindungsfehler" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_get_priority_generic_exception_during_decryption(
+        self, sample_session_info, test_dek, mock_httpx_client
+    ):
+        """Should re-raise generic exception during decryption (after tracking error)."""
+        weeks_data = {"weeks": []}
+        encrypted_fields = EncryptionManager.encrypt_fields(weeks_data, test_dek)
+
+        mock_response = MagicMock(spec=Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "items": [
+                {
+                    "id": "priority_1",
+                    "userId": sample_session_info.id,
+                    "month": "2025-01",
+                    "encrypted_fields": encrypted_fields,
+                    "identifier": "",
+                    "manual": False,
+                    "collectionId": "priorities_collection",
+                    "collectionName": "priorities",
+                    "created": "2025-01-01T00:00:00Z",
+                    "updated": "2025-01-01T00:00:00Z",
+                }
+            ]
+        }
+        mock_httpx_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = mock_httpx_client
+            # Mock EncryptionManager.decrypt_fields to raise a generic exception
+            with patch(
+                "priotag.api.routes.priorities.EncryptionManager.decrypt_fields"
+            ) as mock_decrypt:
+                mock_decrypt.side_effect = Exception("Generic decryption error")
+
+                # Generic exceptions are re-raised, not wrapped in HTTPException
+                with pytest.raises(Exception) as exc_info:
+                    await get_priority(
+                        month="2025-01",
+                        auth_data=sample_session_info,
+                        token="test_token",
+                        dek=test_dek,
+                    )
+
+                assert "Generic decryption error" in str(exc_info.value)
 
 
 @pytest.mark.unit
@@ -548,6 +682,67 @@ class TestSavePriority:
 
                 assert exc_info.value.status_code == 500
 
+    @pytest.mark.asyncio
+    async def test_save_priority_pocketbase_error_response(
+        self, sample_session_info, test_dek, mock_httpx_client, fake_redis
+    ):
+        """Should raise HTTPException when PocketBase returns error during save."""
+        weeks = [WeekPriority(weekNumber=1, monday=1)]
+        current_month = datetime.now().strftime("%Y-%m")
+
+        check_response = MagicMock(spec=Response)
+        check_response.status_code = 200
+        check_response.json.return_value = {"totalItems": 0, "items": []}
+
+        create_response = MagicMock(spec=Response)
+        create_response.status_code = 400
+        create_response.json.return_value = {"message": "Invalid data"}
+
+        mock_httpx_client.get = AsyncMock(return_value=check_response)
+        mock_httpx_client.post = AsyncMock(return_value=create_response)
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = mock_httpx_client
+            with pytest.raises(HTTPException) as exc_info:
+                await save_priority(
+                    month=current_month,
+                    weeks=weeks,
+                    auth_data=sample_session_info,
+                    token="test_token",
+                    dek=test_dek,
+                    redis_client=fake_redis,
+                )
+
+            assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_save_priority_connection_error(
+        self, sample_session_info, test_dek, fake_redis
+    ):
+        """Should raise HTTPException when connection to PocketBase fails."""
+        import httpx
+
+        weeks = [WeekPriority(weekNumber=1, monday=1)]
+        current_month = datetime.now().strftime("%Y-%m")
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_async_client = AsyncMock()
+            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_client.return_value.__aenter__.return_value = mock_async_client
+
+            with pytest.raises(HTTPException) as exc_info:
+                await save_priority(
+                    month=current_month,
+                    weeks=weeks,
+                    auth_data=sample_session_info,
+                    token="test_token",
+                    dek=test_dek,
+                    redis_client=fake_redis,
+                )
+
+            assert exc_info.value.status_code == 500
+            assert "Verbindungsfehler" in exc_info.value.detail
+
 
 @pytest.mark.unit
 class TestDeletePriority:
@@ -673,3 +868,65 @@ class TestDeletePriority:
                 )
 
             assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_delete_priority_404_response(
+        self, sample_session_info, mock_httpx_client
+    ):
+        """Should raise 404 when PocketBase returns 404."""
+        mock_response = MagicMock(spec=Response)
+        mock_response.status_code = 404
+        mock_httpx_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = mock_httpx_client
+            with pytest.raises(HTTPException) as exc_info:
+                await delete_priority(
+                    month="2025-01",
+                    auth_data=sample_session_info,
+                    token="test_token",
+                )
+
+            assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_priority_non_200_response(
+        self, sample_session_info, mock_httpx_client
+    ):
+        """Should raise HTTPException for non-200 responses."""
+        mock_response = MagicMock(spec=Response)
+        mock_response.status_code = 503
+        mock_httpx_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value = mock_httpx_client
+            with pytest.raises(HTTPException) as exc_info:
+                await delete_priority(
+                    month="2025-01",
+                    auth_data=sample_session_info,
+                    token="test_token",
+                )
+
+            assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_delete_priority_connection_error(
+        self, sample_session_info
+    ):
+        """Should raise HTTPException when connection fails."""
+        import httpx
+
+        with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
+            mock_async_client = AsyncMock()
+            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_client.return_value.__aenter__.return_value = mock_async_client
+
+            with pytest.raises(HTTPException) as exc_info:
+                await delete_priority(
+                    month="2025-01",
+                    auth_data=sample_session_info,
+                    token="test_token",
+                )
+
+            assert exc_info.value.status_code == 500
+            assert "Verbindungsfehler" in exc_info.value.detail
