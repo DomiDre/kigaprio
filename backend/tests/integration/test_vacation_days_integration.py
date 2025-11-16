@@ -161,7 +161,8 @@ class TestVacationDaysIntegration:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["date"] == future_date
+        # PocketBase returns dates with timestamps (e.g., '2026-02-24 00:00:00.000Z')
+        assert data["date"].startswith(future_date)
         assert data["type"] == "public_holiday"
         assert data["description"] == "Test Holiday"
         assert data["created_by"] == admin_auth["user_data"]["username"]
@@ -409,7 +410,7 @@ class TestVacationDaysIntegration:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["date"] == future_date
+        assert data["date"].startswith(future_date)
         assert data["type"] == "vacation"
         assert data["description"] == "Specific Day"
 
@@ -684,10 +685,11 @@ class TestVacationDaysIntegration:
         data = response.json()
 
         assert len(data) == 2
-        dates = [day["date"] for day in data]
-        assert date1 in dates
-        assert date2 in dates
-        assert date3 not in dates
+        # PocketBase returns dates with timestamps, so check with startswith
+        dates_str = " ".join([day["date"] for day in data])
+        assert any(day["date"].startswith(date1) for day in data)
+        assert any(day["date"].startswith(date2) for day in data)
+        assert not any(day["date"].startswith(date3) for day in data)
 
     def test_user_get_vacation_days_in_range_invalid_dates(
         self, test_app: TestClient
@@ -733,7 +735,7 @@ class TestVacationDaysIntegration:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["date"] == future_date
+        assert data["date"].startswith(future_date)
         assert data["type"] == "vacation"
         assert data["description"] == "Specific Day"
         assert "created_by" not in data  # Simplified response

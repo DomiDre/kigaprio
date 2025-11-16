@@ -586,19 +586,9 @@ class TestAdminIntegration:
         assert create_response.status_code == 200
         created_identifier = create_response.json()["identifier"]
 
-        # Delete the entry
-        # Note: The identifier stored is a UUID, not the original identifier
-        # We need to get the actual identifier from manual entries
-        get_response = test_app.get(f"/api/v1/admin/manual-entries/{current_month}")
-        assert get_response.status_code == 200
-        entries = get_response.json()
-
-        # Find our entry by looking for the newest one
-        assert len(entries) >= 1
-        stored_identifier = entries[-1]["identifier"]
-
+        # Delete the entry using the identifier we created it with
         delete_response = test_app.delete(
-            f"/api/v1/admin/manual-entry/{current_month}/{stored_identifier}"
+            f"/api/v1/admin/manual-entry/{current_month}/{identifier}"
         )
 
         assert delete_response.status_code == 200

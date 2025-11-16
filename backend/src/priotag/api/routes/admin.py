@@ -240,6 +240,9 @@ async def get_user_for_admin(
                 raise HTTPException(status_code=204, detail="User nicht gefunden")
 
             user_record = UsersResponse(**response_data["items"][0])
+        except HTTPException:
+            # Re-raise HTTPExceptions (like the 204 from above)
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=500, detail="Unbekannter Fehler beim abrufen des Benutzer"
@@ -341,7 +344,7 @@ async def create_manual_priority(
         priority_data = {
             "userId": auth_data.id,
             "month": request.month,
-            "identifier": uuid.uuid4().hex,
+            "identifier": identifier,
             "encrypted_fields": encrypted_data,
             "manual": True,
         }

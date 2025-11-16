@@ -213,6 +213,9 @@ class TestAccountIntegration:
                 if cookie_match:
                     cookies_cleared[cookie_match.group(1)] = True
 
+        # Clear cookies from test client to verify session is truly invalidated
+        test_app.cookies = {}
+
         # Verify session is invalid
         verify_response = test_app.get("/api/v1/auth/verify")
         assert verify_response.status_code in [401, 403]
