@@ -315,8 +315,8 @@ async def save_priority(
             status_code=500,
             detail="Verbindungsfehler zum Datenbankserver",
         ) from e
-    finally:
-        redis_client.delete(rate_limit_key)
+    # Note: Do not delete rate_limit_key here - let the TTL expire naturally
+    # to ensure rate limiting works correctly
 
 
 @router.delete("/{month}")
