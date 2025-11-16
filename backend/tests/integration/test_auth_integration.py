@@ -252,6 +252,18 @@ class TestAuthenticationIntegration:
         assert data["success"] is True
         assert "erfolgreich" in data["message"].lower()
 
+        # Clear cookies after password change (server sends Set-Cookie to clear them)
+        # Extract the cleared cookies from the response
+        set_cookie_headers = change_password_response.headers.get_list("set-cookie")
+        cleared_cookies = {}
+        for cookie_header in set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]*)", cookie_header)
+            if cookie_match:
+                cleared_cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        # Update test_app cookies with cleared values
+        test_app.cookies = cleared_cookies
+
         # Verify old session is invalidated (cookies cleared)
         verify_response = test_app.get("/api/v1/auth/verify")
         # Should fail because session was invalidated
