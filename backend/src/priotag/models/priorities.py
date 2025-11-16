@@ -53,7 +53,7 @@ def get_week_start_date(year: int, month: int, week_number: int) -> datetime:
 
     Args:
         year: Year
-        month: Month (1-12)
+        month: Month (1-12, standard calendar month)
         week_number: Week number within the month (1-5)
 
     Returns:
@@ -70,6 +70,12 @@ def get_week_start_date(year: int, month: int, week_number: int) -> datetime:
 
     # Calculate the Monday of the specified week
     week_start = first_week_monday + timedelta(weeks=week_number - 1)
+
+    # Debug logging to help diagnose frontend/backend mismatches
+    print(f"[get_week_start_date] year={year}, month={month}, week_number={week_number}")
+    print(f"[get_week_start_date] first_day={first_day.strftime('%Y-%m-%d %A')}, day_of_week={day_of_week}")
+    print(f"[get_week_start_date] first_week_monday={first_week_monday.strftime('%Y-%m-%d %A')}")
+    print(f"[get_week_start_date] week_start (week {week_number})={week_start.strftime('%Y-%m-%d %A')}")
 
     return week_start
 

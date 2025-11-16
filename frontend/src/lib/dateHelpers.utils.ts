@@ -7,10 +7,14 @@ export function getWeeksForMonth(year: number, month: number): WeekData[] {
 	const weeks: WeekData[] = [];
 	const firstDay = new SvelteDate(year, month, 1);
 
+	console.log(`[getWeeksForMonth] year=${year}, month=${month} (0-indexed), firstDay=${firstDay.toISOString()}`);
+
 	const currentDate = new SvelteDate(firstDay);
 	const dayOfWeek = currentDate.getDay();
 	const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 	currentDate.setDate(currentDate.getDate() - daysToSubtract);
+
+	console.log(`[getWeeksForMonth] dayOfWeek=${dayOfWeek}, daysToSubtract=${daysToSubtract}, firstMonday=${currentDate.toISOString()}`);
 
 	let weekNumber = 1;
 
@@ -40,10 +44,15 @@ export function getWeeksForMonth(year: number, month: number): WeekData[] {
 				return `${day}.${monthStr}.${year}`;
 			};
 
+			const formattedStart = formatDate(startDate);
+			const formattedEnd = formatDate(endDate);
+
+			console.log(`[getWeeksForMonth] Adding week ${weekNumber}: ${formattedStart} - ${formattedEnd}`);
+
 			weeks.push({
 				weekNumber,
-				startDate: formatDate(startDate),
-				endDate: formatDate(endDate),
+				startDate: formattedStart,
+				endDate: formattedEnd,
 				monday: null,
 				tuesday: null,
 				wednesday: null,
