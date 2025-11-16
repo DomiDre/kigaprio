@@ -211,7 +211,8 @@ class TestPriorityIntegration:
         auth = self._register_and_login(test_app)
         test_app.cookies = auth["cookies"]
 
-        current_month = datetime.now().strftime("%Y-%m")
+        # Use next month to ensure weeks haven't started yet
+        next_month = (datetime.now() + timedelta(days=32)).strftime("%Y-%m")
 
         # Create initial priority
         initial_data = [
@@ -226,13 +227,10 @@ class TestPriorityIntegration:
         ]
 
         create_response = test_app.put(
-            f"/api/v1/priorities/{current_month}",
+            f"/api/v1/priorities/{next_month}",
             json=initial_data,
         )
         assert create_response.status_code == 200
-
-        # Wait for rate limit to expire
-        time.sleep(1.1)
 
         # Update with different data
         updated_data = [
@@ -247,19 +245,20 @@ class TestPriorityIntegration:
         ]
 
         update_response = test_app.put(
-            f"/api/v1/priorities/{current_month}",
+            f"/api/v1/priorities/{next_month}",
             json=updated_data,
         )
         assert update_response.status_code == 200
 
         # Verify updated data
-        get_response = test_app.get(f"/api/v1/priorities/{current_month}")
+        get_response = test_app.get(f"/api/v1/priorities/{next_month}")
         assert get_response.status_code == 200
         data = get_response.json()
 
-        # Note: If week has already started, old data is preserved
-        # Otherwise, new data should be used
+        # Since we're using next month, the week hasn't started yet
+        # so the new data should be used
         assert len(data["weeks"]) == 1
+        assert data["weeks"][0]["monday"] == 5  # Verify it's the updated data
 
     def test_delete_priority(self, test_app: TestClient):
         """Test deleting a priority."""
@@ -310,13 +309,13 @@ class TestPriorityIntegration:
         assert response.status_code == 400
 
     def test_rate_limiting(self, test_app: TestClient):
-        """Test rate limiting for priority creation."""
+        """Test rate limiting - successful saves clear lock, failures keep it."""
         auth = self._register_and_login(test_app)
         test_app.cookies = auth["cookies"]
 
-        current_month = datetime.now().strftime("%Y-%m")
-
-        priority_data = [
+        # Part 1: Test that successful saves clear the lock immediately
+        next_month = (datetime.now() + timedelta(days=32)).strftime("%Y-%m")
+        valid_data = [
             {
                 "weekNumber": 1,
                 "monday": 1,
@@ -327,27 +326,78 @@ class TestPriorityIntegration:
             }
         ]
 
-        # First request should succeed
+        # First successful request clears the lock immediately
         response1 = test_app.put(
-            f"/api/v1/priorities/{current_month}",
-            json=priority_data,
+            f"/api/v1/priorities/{next_month}",
+            json=valid_data,
         )
         assert response1.status_code == 200
 
-        # Immediate second request should be rate limited
+        # Second successful request should also succeed (lock was cleared)
         response2 = test_app.put(
-            f"/api/v1/priorities/{current_month}",
-            json=priority_data,
+            f"/api/v1/priorities/{next_month}",
+            json=valid_data,
         )
-        assert response2.status_code == 429
+        assert response2.status_code == 200
 
-        # After waiting, should work again
-        time.sleep(2.1)
-        response3 = test_app.put(
-            f"/api/v1/priorities/{current_month}",
-            json=priority_data,
+        # Part 2: Test that failures keep the lock for 3 seconds
+        # Use previous month (which is still within allowed range if it's early in current month)
+        # but use week 1 which will definitely have started
+        prev_month = (datetime.now() - timedelta(days=15)).strftime("%Y-%m")
+        past_week_data = [
+            {
+                "weekNumber": 1,
+                "monday": 1,
+                "tuesday": 2,
+                "wednesday": 3,
+                "thursday": 4,
+                "friday": 5,
+            }
+        ]
+
+        # First, create existing data for the previous month's week 1
+        test_app.put(
+            f"/api/v1/priorities/{prev_month}",
+            json=past_week_data,
         )
-        assert response3.status_code == 200
+        # This might succeed if previous month is still in range, or fail with 422 if out of range
+
+        # Wait for any lock to clear
+        time.sleep(3.1)
+
+        # Now try to modify it with different data
+        modified_week_data = [
+            {
+                "weekNumber": 1,
+                "monday": 5,  # Different value
+                "tuesday": 4,
+                "wednesday": 3,
+                "thursday": 2,
+                "friday": 1,
+            }
+        ]
+
+        # This should fail with 422 (either locked week or month out of range)
+        response3 = test_app.put(
+            f"/api/v1/priorities/{prev_month}",
+            json=modified_week_data,
+        )
+        assert response3.status_code == 422
+
+        # Immediate retry should be rate limited (lock persists for 3s on HTTPException)
+        response4 = test_app.put(
+            f"/api/v1/priorities/{prev_month}",
+            json=modified_week_data,
+        )
+        assert response4.status_code == 429
+
+        # After waiting, should get 422 again (not rate limited)
+        time.sleep(3.1)
+        response5 = test_app.put(
+            f"/api/v1/priorities/{prev_month}",
+            json=modified_week_data,
+        )
+        assert response5.status_code == 422
 
     def test_month_validation_invalid_format(self, test_app: TestClient):
         """Test that invalid month format is rejected."""

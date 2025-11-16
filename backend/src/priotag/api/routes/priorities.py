@@ -187,15 +187,16 @@ async def save_priority(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # Check for duplicate month
-    rate_limit_key = f"priority_check:{user_id}:{month}"
+    # Check for concurrent saves - prevent duplicate submissions
+    rate_limit_key = f"priority_save:{user_id}:{month}"
     if redis_client.exists(rate_limit_key):
         raise HTTPException(
             status_code=429,
-            detail="Bitte warten Sie einen Moment",
+            detail="Bitte warten Sie einen Moment. Ihre Prioritäten werden gespeichert.",
         )
 
-    redis_client.setex(rate_limit_key, 1, "saving")  # 1 sec lock
+    # Set lock for 3 seconds to prevent rapid duplicate submissions
+    redis_client.setex(rate_limit_key, 3, "saving")
 
     try:
         async with httpx.AsyncClient() as client:
@@ -234,27 +235,49 @@ async def save_priority(
             # Merge weeks: use old data for started weeks, new data for future weeks
             month_date = datetime.strptime(month, "%Y-%m")
             final_weeks = []
+            locked_weeks = []  # Track which weeks are locked
 
             for new_week in weeks:
                 week_start = get_week_start_date(
                     month_date.year, month_date.month, new_week.weekNumber
                 )
-                week_start_midnight = datetime(
+                # Allow changes until end of Sunday
+                week_lock_time = datetime(
                     week_start.year, week_start.month, week_start.day
                 )
-                now = datetime.now()
-                today = datetime(now.year, now.month, now.day)
 
-                # If week has started and we have existing data, use the old data
-                if (
-                    today >= week_start_midnight
-                    and new_week.weekNumber in existing_weeks_data
-                ):
+                now = datetime.now()
+
+                # If week's first day has passed and we have existing data, check if user is trying to change it
+                if now >= week_lock_time and new_week.weekNumber in existing_weeks_data:
+                    # Check if user is trying to make changes to a locked week
+                    old_week = existing_weeks_data[new_week.weekNumber]
+                    new_week_dict = new_week.model_dump()
+
+                    # Compare the data to see if changes are being attempted
+                    is_different = False
+                    for day in ["monday", "tuesday", "wednesday", "thursday", "friday"]:
+                        if old_week.get(day) != new_week_dict.get(day):
+                            is_different = True
+                            break
+
+                    if is_different:
+                        # User is trying to change a locked week - record it
+                        locked_weeks.append(new_week.weekNumber)
+
                     # Keep the existing week data unchanged
-                    final_weeks.append(existing_weeks_data[new_week.weekNumber])
+                    final_weeks.append(old_week)
                 else:
                     # Use the new data (week hasn't started or no existing data)
                     final_weeks.append(new_week.model_dump())
+
+            # If user tried to change locked weeks, return an error
+            if locked_weeks:
+                week_str = ", ".join([f"KW{w}" for w in locked_weeks])
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Die Woche kann nicht mehr geändert werden (Änderungen nur bis Sonntag 23:59 Uhr möglich): {week_str}",
+                )
 
             # Encrypt the weeks data (use final_weeks which has the merged data)
             try:
@@ -303,17 +326,24 @@ async def save_priority(
                     detail=error_data.get("message", "Fehler beim Speichern"),
                 )
 
+            # Successfully saved - clear the rate limit lock
+            redis_client.delete(rate_limit_key)
             return SuccessResponse(message=message)
 
     except HTTPException:
+        # Don't clear rate limit key on HTTP exceptions (keeps lock for 3s)
         raise
     except httpx.RequestError as e:
+        # Clear rate limit on connection errors to allow retry
+        redis_client.delete(rate_limit_key)
         raise HTTPException(
             status_code=500,
             detail="Verbindungsfehler zum Datenbankserver",
         ) from e
-    # Note: Do not delete rate_limit_key here - let the TTL expire naturally
-    # to ensure rate limiting works correctly
+    except Exception:
+        # Clear rate limit on unexpected errors to allow retry
+        redis_client.delete(rate_limit_key)
+        raise
 
 
 @router.delete("/{month}")

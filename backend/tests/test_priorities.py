@@ -570,13 +570,15 @@ class TestSavePriority:
         mock_httpx_client.get = AsyncMock(return_value=check_response)
         mock_httpx_client.patch = AsyncMock(return_value=update_response)
 
-        # Use current month to pass validation
-        current_month = datetime.now().strftime("%Y-%m")
+        # Use next month to ensure weeks are not locked (editable)
+        from dateutil.relativedelta import relativedelta
+
+        next_month = (datetime.now() + relativedelta(months=1)).strftime("%Y-%m")
 
         with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value = mock_httpx_client
             result = await save_priority(
-                month=current_month,
+                month=next_month,
                 weeks=weeks,
                 auth_data=sample_session_info,
                 token="test_token",
@@ -635,9 +637,9 @@ class TestSavePriority:
         weeks = [WeekPriority(weekNumber=1, monday=1)]
         current_month = datetime.now().strftime("%Y-%m")
 
-        # Set rate limit key
-        rate_limit_key = f"priority_check:{sample_session_info.id}:{current_month}"
-        fake_redis.setex(rate_limit_key, 2, "saving")
+        # Set rate limit key (matches the actual key used in the route)
+        rate_limit_key = f"priority_save:{sample_session_info.id}:{current_month}"
+        fake_redis.setex(rate_limit_key, 3, "saving")
 
         with pytest.raises(HTTPException) as exc_info:
             await save_priority(
