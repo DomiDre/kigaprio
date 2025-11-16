@@ -262,14 +262,31 @@ class TestAuthenticationIntegration:
         for cookie_header in set_cookie_headers:
             cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
             if cookie_match:
-                new_cookies_after_change[cookie_match.group(1)] = cookie_match.group(2)
+                cookie_name = cookie_match.group(1)
+                cookie_value = cookie_match.group(2)
+                # Only add cookies with non-empty values (skip cleared cookies)
+                if cookie_value:
+                    new_cookies_after_change[cookie_name] = cookie_value
+
+        # Verify we got the required cookies
+        assert "auth_token" in new_cookies_after_change, (
+            f"auth_token not found in change_password response. "
+            f"Got cookies: {new_cookies_after_change.keys()}"
+        )
+        assert "dek" in new_cookies_after_change, (
+            f"dek not found in change_password response. "
+            f"Got cookies: {new_cookies_after_change.keys()}"
+        )
 
         # Update test_app with new cookies from password change
         test_app.cookies = new_cookies_after_change
 
         # Verify new session works immediately after password change
         verify_new_response = test_app.get("/api/v1/auth/verify")
-        assert verify_new_response.status_code == 200
+        assert verify_new_response.status_code == 200, (
+            f"Verify failed with status {verify_new_response.status_code}: "
+            f"{verify_new_response.text}"
+        )
         verify_data = verify_new_response.json()
         assert verify_data["authenticated"] is True
         assert verify_data["username"] == registration_data["username"]
