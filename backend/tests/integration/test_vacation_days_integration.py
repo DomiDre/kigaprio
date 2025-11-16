@@ -662,8 +662,8 @@ class TestVacationDaysIntegration:
         test_app.cookies = admin_auth["cookies"]
 
         date1 = (datetime.now() + timedelta(days=190)).strftime("%Y-%m-%d")
-        date2 = (datetime.now() + timedelta(days=191)).strftime("%Y-%m-%d")
-        date3 = (datetime.now() + timedelta(days=200)).strftime("%Y-%m-%d")
+        date2 = (datetime.now() + timedelta(days=195)).strftime("%Y-%m-%d")
+        date3 = (datetime.now() + timedelta(days=210)).strftime("%Y-%m-%d")
 
         for date in [date1, date2, date3]:
             test_app.post(

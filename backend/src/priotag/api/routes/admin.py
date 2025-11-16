@@ -314,7 +314,7 @@ async def create_manual_priority(
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f'userId = null && month="{request.month}" && identifier="{identifier}"'
+                "filter": f'manual = true && month="{request.month}" && identifier="{identifier}"'
             },
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -487,7 +487,7 @@ async def delete_manual_entry(
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f'userId = null && month="{month}" && identifier="{identifier}"'
+                "filter": f'manual = true && month="{month}" && identifier="{identifier}"'
             },
             headers={"Authorization": f"Bearer {token}"},
         )
