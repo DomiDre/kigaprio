@@ -87,8 +87,6 @@ def get_week_start_date(year: int, month: int, week_number: int) -> datetime:
             weeks_found += 1
             if weeks_found == week_number:
                 # Found the requested week
-                print(f"[get_week_start_date] year={year}, month={month}, week_number={week_number}")
-                print(f"[get_week_start_date] Found week {week_number} starting on {current_monday.strftime('%Y-%m-%d %A')}")
                 return current_monday
 
         # Move to next week
