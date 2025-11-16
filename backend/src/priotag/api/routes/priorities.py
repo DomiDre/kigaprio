@@ -52,7 +52,7 @@ async def get_user_priorities(
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Fehler beim Abrufen der PrioritÃ¤ten",
+                    detail="Fehler beim Abrufen der Prioritäten",
                 )
 
             data = response.json()
@@ -115,13 +115,13 @@ async def get_priority(
             if response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
-                    detail="PrioritÃ¤t nicht gefunden",
+                    detail="Priorität nicht gefunden",
                 )
 
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Fehler beim Abrufen der PrioritÃ¤t",
+                    detail="Fehler beim Abrufen der Priorität",
                 )
 
             items = response.json()["items"]
@@ -135,7 +135,7 @@ async def get_priority(
             if encrypted_record.userId != user_id:
                 raise HTTPException(
                     status_code=403,
-                    detail="Keine Berechtigung fÃ¼r diese PrioritÃ¤t",
+                    detail="Keine Berechtigung für diese Priorität",
                 )
 
             track_data_operation("read", "priorities")
@@ -179,7 +179,6 @@ async def save_priority(
 ):
     """Create or update a priority record for the authenticated user."""
 
-    print(weeks)
     user_id = auth_data.id
 
     # Validate month
@@ -190,6 +189,9 @@ async def save_priority(
 
     # Check for duplicate month
     rate_limit_key = f"priority_check:{user_id}:{month}"
+    import time
+
+    print(time.time(), rate_limit_key)
     if redis_client.exists(rate_limit_key):
         raise HTTPException(
             status_code=429,
@@ -267,7 +269,7 @@ async def save_priority(
                 track_encryption_error("encrypt")
                 raise HTTPException(
                     status_code=500,
-                    detail="VerschlÃ¼sselung der Daten fehlgeschlagen",
+                    detail="Verschlüsselung der Daten fehlgeschlagen",
                 ) from e
 
             # Create encrypted record
@@ -287,7 +289,7 @@ async def save_priority(
                     headers={"Authorization": f"Bearer {token}"},
                     json=encrypted_priority,
                 )
-                message = "PrioritÃ¤t gespeichert"
+                message = "Priorität gespeichert"
             else:
                 track_data_operation("create", "priorities")
                 response = await client.post(
@@ -295,7 +297,7 @@ async def save_priority(
                     headers={"Authorization": f"Bearer {token}"},
                     json=encrypted_priority,
                 )
-                message = "PrioritÃ¤t erstellt"
+                message = "Priorität erstellt"
 
             if response.status_code not in [200, 201]:
                 error_data = response.json()
@@ -341,25 +343,25 @@ async def delete_priority(
             if check_response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
-                    detail="PrioritÃ¤t nicht gefunden",
+                    detail="Priorität nicht gefunden",
                 )
 
             if check_response.status_code != 200:
                 raise HTTPException(
                     status_code=400,
-                    detail="Fehler bei dem Versuch die PrioritÃ¤t zu lÃ¶schen.",
+                    detail="Fehler bei dem Versuch die Priorität zu löschen.",
                 )
 
             items = check_response.json()["items"]
             if len(items) == 0:
                 raise HTTPException(
-                    status_code=400, detail="PrioritÃ¤t gefunden aber leer"
+                    status_code=400, detail="Priorität gefunden aber leer"
                 )
             record = items[0]
             if record["userId"] != user_id:
                 raise HTTPException(
                     status_code=403,
-                    detail="Keine Berechtigung fÃ¼r diese PrioritÃ¤t",
+                    detail="Keine Berechtigung für diese Priorität",
                 )
 
             record_id = record["id"]
@@ -373,10 +375,10 @@ async def delete_priority(
             if response.status_code not in [200, 204]:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail="Fehler beim LÃ¶schen der PrioritÃ¤t",
+                    detail="Fehler beim Löschen der Priorität",
                 )
 
-            return {"message": "PrioritÃ¤t erfolgreich gelÃ¶scht"}
+            return {"message": "Priorität erfolgreich gelöscht"}
 
     except HTTPException:
         raise

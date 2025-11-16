@@ -586,7 +586,7 @@ class TestDeletePriority:
                 token="test_token",
             )
 
-        assert "gelöscht" in result["message"] or "gelÃ¶scht" in result["message"]
+        assert "gelöscht" in result["message"] or "gelöscht" in result["message"]
 
     @pytest.mark.asyncio
     async def test_delete_priority_not_found(

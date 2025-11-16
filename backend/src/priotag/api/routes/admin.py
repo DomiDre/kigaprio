@@ -141,7 +141,7 @@ async def get_user_submissions(
 
         if priorities_response.status_code != 200:
             raise HTTPException(
-                status_code=500, detail="Fehler beim Abrufen der PrioritÃ¤ten"
+                status_code=500, detail="Fehler beim Abrufen der Prioritäten"
             )
 
         priorities_data = priorities_response.json().get("items", [])
