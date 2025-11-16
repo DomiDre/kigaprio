@@ -9,7 +9,7 @@ Tests cover:
 - Static file serving setup
 """
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException, status
@@ -22,8 +22,9 @@ class TestLifespan:
     @pytest.mark.asyncio
     async def test_lifespan_startup_success(self):
         """Should successfully start up with Redis connection."""
-        from priotag.main import lifespan
         from fastapi import FastAPI
+
+        from priotag.main import lifespan
 
         app = FastAPI()
 
@@ -36,8 +37,9 @@ class TestLifespan:
     @pytest.mark.asyncio
     async def test_lifespan_startup_redis_failure(self):
         """Should raise error if Redis connection fails."""
-        from priotag.main import lifespan
         from fastapi import FastAPI
+
+        from priotag.main import lifespan
 
         app = FastAPI()
 
@@ -51,8 +53,9 @@ class TestLifespan:
     @pytest.mark.asyncio
     async def test_lifespan_shutdown_closes_redis(self):
         """Should close Redis connections on shutdown."""
-        from priotag.main import lifespan
         from fastapi import FastAPI
+
+        from priotag.main import lifespan
 
         app = FastAPI()
 
@@ -116,8 +119,9 @@ class TestMetricsEndpoint:
     async def test_metrics_endpoint_valid_token(self):
         """Should return metrics with valid token."""
         # Import the app which sets up the metrics endpoint
-        from priotag import main
         from fastapi.security import HTTPAuthorizationCredentials
+
+        from priotag import main
 
         # Mock the metrics token file to exist
         with patch.object(main, "metrics_token_file") as mock_file:
@@ -126,6 +130,7 @@ class TestMetricsEndpoint:
 
             # Reload to pick up the mocked token file
             import importlib
+
             importlib.reload(main)
 
             # Now test the endpoint
@@ -140,14 +145,16 @@ class TestMetricsEndpoint:
     @pytest.mark.asyncio
     async def test_metrics_endpoint_invalid_token(self):
         """Should reject requests with invalid token."""
-        from priotag import main
         from fastapi.security import HTTPAuthorizationCredentials
+
+        from priotag import main
 
         with patch.object(main, "metrics_token_file") as mock_file:
             mock_file.exists.return_value = True
             mock_file.read_text.return_value = "secret_token\n"
 
             import importlib
+
             importlib.reload(main)
 
             credentials = HTTPAuthorizationCredentials(

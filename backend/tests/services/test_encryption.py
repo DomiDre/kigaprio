@@ -17,7 +17,7 @@ Tests cover:
 import base64
 import json
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -589,7 +589,9 @@ class TestDEKPartEncryption:
         # Save original value
         original_key = EncryptionManager._SERVER_CACHE_KEY
         # Set a valid 32-byte key for testing
-        EncryptionManager._SERVER_CACHE_KEY = b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
+        EncryptionManager._SERVER_CACHE_KEY = (
+            b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
+        )
         yield
         # Restore original value (important for integration tests)
         EncryptionManager._SERVER_CACHE_KEY = original_key
@@ -621,10 +623,10 @@ class TestDEKPartEncryption:
 
     def test_encrypt_dek_part_uses_server_cache_key(self):
         """Should use server cache key for encryption."""
-        with patch.object(
-            EncryptionManager, "_get_server_cache_key"
-        ) as mock_get_key:
-            mock_get_key.return_value = b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
+        with patch.object(EncryptionManager, "_get_server_cache_key") as mock_get_key:
+            mock_get_key.return_value = (
+                b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
+            )
             dek_part = base64.b64encode(b"test_part").decode()
 
             EncryptionManager.encrypt_dek_part(dek_part)
@@ -643,7 +645,9 @@ class TestGetDekFromRequest:
         # Save original value
         original_key = EncryptionManager._SERVER_CACHE_KEY
         # Set a valid 32-byte key for testing
-        EncryptionManager._SERVER_CACHE_KEY = b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
+        EncryptionManager._SERVER_CACHE_KEY = (
+            b"test_server_cache_key_32bytes!!!"  # Exactly 32 bytes
+        )
         yield
         # Restore original value (important for integration tests)
         EncryptionManager._SERVER_CACHE_KEY = original_key

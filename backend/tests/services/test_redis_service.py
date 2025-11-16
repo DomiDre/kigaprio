@@ -9,7 +9,6 @@ Tests cover:
 - Redis INFO metrics
 """
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -133,6 +132,9 @@ class TestRedisService:
 
         with patch.dict("os.environ", {"REDIS_URL": "redis://redis:6379"}):
             client = service.get_client()
+
+            # Client should not be None
+            assert client is not None
 
             # Should have created Redis client with pool
             mock_redis_class.assert_called_once()

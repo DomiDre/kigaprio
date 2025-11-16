@@ -11,7 +11,6 @@ Tests cover:
 - Error cases (wrong password, network errors, etc.)
 """
 
-import base64
 import json
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -32,9 +31,7 @@ class TestChangePasswordEndpoint:
         from priotag.models.auth import ChangePasswordRequest
 
         # Setup
-        session_info = SessionInfo(
-            id="user123", username="testuser", is_admin=False
-        )
+        session_info = SessionInfo(id="user123", username="testuser", is_admin=False)
         token = "current_token_123"
         request_data = ChangePasswordRequest(
             current_password="OldPassword123!",
@@ -47,6 +44,7 @@ class TestChangePasswordEndpoint:
 
         # Create encryption data for the user
         from priotag.services.encryption import EncryptionManager
+
         encryption_data = EncryptionManager.create_user_encryption_data(
             request_data.current_password
         )
@@ -126,9 +124,7 @@ class TestChangePasswordEndpoint:
         from priotag.api.routes.auth import change_password
         from priotag.models.auth import ChangePasswordRequest
 
-        session_info = SessionInfo(
-            id="user123", username="testuser", is_admin=False
-        )
+        session_info = SessionInfo(id="user123", username="testuser", is_admin=False)
         token = "current_token_123"
         request_data = ChangePasswordRequest(
             current_password="WrongPassword!!!",
@@ -140,6 +136,7 @@ class TestChangePasswordEndpoint:
 
         # Create encryption data with a different password
         from priotag.services.encryption import EncryptionManager
+
         encryption_data = EncryptionManager.create_user_encryption_data(
             "ActualPassword123!"
         )
@@ -174,9 +171,7 @@ class TestChangePasswordEndpoint:
         from priotag.api.routes.auth import change_password
         from priotag.models.auth import ChangePasswordRequest
 
-        session_info = SessionInfo(
-            id="user123", username="testuser", is_admin=False
-        )
+        session_info = SessionInfo(id="user123", username="testuser", is_admin=False)
         token = "current_token_123"
         request_data = ChangePasswordRequest(
             current_password="OldPassword123!",
@@ -201,7 +196,9 @@ class TestChangePasswordEndpoint:
                 )
 
             assert exc_info.value.status_code == 500
-            assert "Benutzerdaten konnten nicht abgerufen werden" in exc_info.value.detail
+            assert (
+                "Benutzerdaten konnten nicht abgerufen werden" in exc_info.value.detail
+            )
 
     @pytest.mark.asyncio
     async def test_change_password_update_fails(self, fake_redis, sample_user_data):
@@ -209,9 +206,7 @@ class TestChangePasswordEndpoint:
         from priotag.api.routes.auth import change_password
         from priotag.models.auth import ChangePasswordRequest
 
-        session_info = SessionInfo(
-            id="user123", username="testuser", is_admin=False
-        )
+        session_info = SessionInfo(id="user123", username="testuser", is_admin=False)
         token = "current_token_123"
         request_data = ChangePasswordRequest(
             current_password="OldPassword123!",
@@ -222,6 +217,7 @@ class TestChangePasswordEndpoint:
         mock_response.headers = {}
 
         from priotag.services.encryption import EncryptionManager
+
         encryption_data = EncryptionManager.create_user_encryption_data(
             request_data.current_password
         )
@@ -261,9 +257,7 @@ class TestChangePasswordEndpoint:
         from priotag.api.routes.auth import change_password
         from priotag.models.auth import ChangePasswordRequest
 
-        session_info = SessionInfo(
-            id="user123", username="testuser", is_admin=False
-        )
+        session_info = SessionInfo(id="user123", username="testuser", is_admin=False)
         token = "current_token_123"
         request_data = ChangePasswordRequest(
             current_password="OldPassword123!",
@@ -274,6 +268,7 @@ class TestChangePasswordEndpoint:
         mock_response.headers = {}
 
         from priotag.services.encryption import EncryptionManager
+
         encryption_data = EncryptionManager.create_user_encryption_data(
             request_data.current_password
         )
@@ -308,7 +303,10 @@ class TestChangePasswordEndpoint:
                 )
 
             assert exc_info.value.status_code == 500
-            assert "Authentifizierung mit neuem Passwort fehlgeschlagen" in exc_info.value.detail
+            assert (
+                "Authentifizierung mit neuem Passwort fehlgeschlagen"
+                in exc_info.value.detail
+            )
 
     @pytest.mark.asyncio
     async def test_change_password_admin_shorter_ttl(
@@ -318,9 +316,7 @@ class TestChangePasswordEndpoint:
         from priotag.api.routes.auth import change_password
         from priotag.models.auth import ChangePasswordRequest
 
-        session_info = SessionInfo(
-            id="admin123", username="admin", is_admin=True
-        )
+        session_info = SessionInfo(id="admin123", username="admin", is_admin=True)
         token = "admin_token_123"
         request_data = ChangePasswordRequest(
             current_password="AdminPassword123!",
@@ -331,6 +327,7 @@ class TestChangePasswordEndpoint:
         mock_response.headers = {}
 
         from priotag.services.encryption import EncryptionManager
+
         encryption_data = EncryptionManager.create_user_encryption_data(
             request_data.current_password
         )
@@ -381,9 +378,7 @@ class TestChangePasswordEndpoint:
         from priotag.api.routes.auth import change_password
         from priotag.models.auth import ChangePasswordRequest
 
-        session_info = SessionInfo(
-            id="user123", username="testuser", is_admin=False
-        )
+        session_info = SessionInfo(id="user123", username="testuser", is_admin=False)
         token = "current_token_123"
         request_data = ChangePasswordRequest(
             current_password="OldPassword123!",

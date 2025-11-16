@@ -12,7 +12,6 @@ Tests cover:
 """
 
 import base64
-import json
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -251,7 +250,9 @@ class TestUpdateLastSeen:
             patch_call = mock_client.patch.call_args
             json_data = patch_call.kwargs["json"]
             last_seen_str = json_data["lastSeen"]
-            last_seen_time = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
+            last_seen_time = datetime.fromisoformat(
+                last_seen_str.replace("Z", "+00:00")
+            )
 
             # Should be recent
             assert last_seen_time >= before_time
@@ -341,9 +342,7 @@ class TestVerifyToken:
             mock_update.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_verify_token_cache_miss_success(
-        self, fake_redis, sample_user_data
-    ):
+    async def test_verify_token_cache_miss_success(self, fake_redis, sample_user_data):
         """Should fetch from PocketBase on cache miss."""
         mock_response = Response()
 
@@ -540,7 +539,6 @@ class TestVerifyToken:
 
                 assert result.id == "user123"
 
-
     @pytest.mark.asyncio
     async def test_verify_token_blacklist_check_error(self, fake_redis):
         """Should continue if blacklist check fails (don't block valid users)."""
@@ -609,6 +607,7 @@ class TestVerifyToken:
 
             # Make delete raise error for old session
             original_delete = fake_redis.delete
+
             def delete_error(key):
                 if "old_token" in str(key):
                     raise Exception("Redis delete failed")
@@ -659,6 +658,7 @@ class TestVerifyToken:
 
             # Make setex raise error for throttle key
             original_setex = fake_redis.setex
+
             def setex_error(key, ttl, value):
                 if key.startswith("lastseen:"):
                     raise Exception("Redis setex failed")

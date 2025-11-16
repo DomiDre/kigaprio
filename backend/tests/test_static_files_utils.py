@@ -12,14 +12,12 @@ Tests cover:
 
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
-from fastapi import FastAPI, HTTPException
-from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 from priotag.static_files_utils import (
-    ALLOWED_EXTENSIONS,
     find_file_to_serve,
     is_allowed_file,
     is_safe_symlink,
@@ -388,7 +386,9 @@ class TestFindFileToServe:
             large_file = base / "large.html"
             large_file.touch()
 
-            with patch("priotag.static_files_utils.validate_file_size", return_value=False):
+            with patch(
+                "priotag.static_files_utils.validate_file_size", return_value=False
+            ):
                 result = find_file_to_serve(base, large_file)
 
                 assert result is None

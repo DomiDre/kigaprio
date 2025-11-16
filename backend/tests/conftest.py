@@ -289,9 +289,8 @@ def mock_httpx_client():
 def reset_environment(request):
     """Reset environment variables after unit tests only (not integration tests)."""
     # Skip this fixture for integration tests to avoid interfering with their environment setup
-    is_integration_test = (
-        "integration" in request.keywords
-        or "integration" in str(request.fspath)
+    is_integration_test = "integration" in request.keywords or "integration" in str(
+        request.fspath
     )
 
     if is_integration_test:

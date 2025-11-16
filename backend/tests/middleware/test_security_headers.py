@@ -10,11 +10,10 @@ Tests cover:
 
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import FastAPI, Response
-from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from priotag.middleware.security_headers import (

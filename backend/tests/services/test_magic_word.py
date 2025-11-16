@@ -6,10 +6,8 @@ Tests cover:
 - create_or_update_magic_word (database operations)
 """
 
-import json
 from unittest.mock import AsyncMock, Mock, patch
 
-import httpx
 import pytest
 
 from priotag.services.magic_word import (
@@ -79,9 +77,7 @@ class TestGetMagicWordFromCacheOrDB:
             ):
                 mock_response = Mock()
                 mock_response.status_code = 200
-                mock_response.json.return_value = {
-                    "items": [{"value": "test_word"}]
-                }
+                mock_response.json.return_value = {"items": [{"value": "test_word"}]}
                 mock_client.get.return_value = mock_response
 
                 await get_magic_word_from_cache_or_db(fake_redis)
@@ -169,9 +165,7 @@ class TestCreateOrUpdateMagicWord:
             # Mock GET response (record exists)
             mock_get_response = Mock()
             mock_get_response.status_code = 200
-            mock_get_response.json.return_value = {
-                "items": [{"id": "record_123"}]
-            }
+            mock_get_response.json.return_value = {"items": [{"id": "record_123"}]}
 
             # Mock PATCH response (update successful)
             mock_patch_response = Mock()
@@ -200,9 +194,7 @@ class TestCreateOrUpdateMagicWord:
 
             mock_get_response = Mock()
             mock_get_response.status_code = 200
-            mock_get_response.json.return_value = {
-                "items": [{"id": "record_123"}]
-            }
+            mock_get_response.json.return_value = {"items": [{"id": "record_123"}]}
 
             mock_patch_response = Mock()
             mock_patch_response.status_code = 200
@@ -253,9 +245,7 @@ class TestCreateOrUpdateMagicWord:
 
             mock_get_response = Mock()
             mock_get_response.status_code = 200
-            mock_get_response.json.return_value = {
-                "items": [{"id": "record_123"}]
-            }
+            mock_get_response.json.return_value = {"items": [{"id": "record_123"}]}
 
             mock_patch_response = Mock()
             mock_patch_response.status_code = 200
@@ -281,9 +271,7 @@ class TestCreateOrUpdateMagicWord:
 
             mock_get_response = Mock()
             mock_get_response.status_code = 200
-            mock_get_response.json.return_value = {
-                "items": [{"id": "record_123"}]
-            }
+            mock_get_response.json.return_value = {"items": [{"id": "record_123"}]}
 
             # Mock PATCH failure
             mock_patch_response = Mock()

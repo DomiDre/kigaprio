@@ -69,7 +69,10 @@ class TestServiceAccountAuthentication:
 
             assert token is None
             mock_logger.error.assert_called_once()
-            assert "Error during service account authentication" in mock_logger.error.call_args[0][0]
+            assert (
+                "Error during service account authentication"
+                in mock_logger.error.call_args[0][0]
+            )
 
     @pytest.mark.asyncio
     async def test_authenticate_service_account_malformed_response(self):

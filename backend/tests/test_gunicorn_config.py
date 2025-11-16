@@ -6,7 +6,6 @@ Tests cover:
 - on_starting callback
 """
 
-import logging
 from unittest.mock import Mock, patch
 
 import pytest
