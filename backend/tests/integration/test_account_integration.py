@@ -208,7 +208,10 @@ class TestAccountIntegration:
         cookies_cleared = {}
         for cookie_header in set_cookie_headers:
             # Check if max-age=0 or expires in past (cookie deletion markers)
-            if "max-age=0" in cookie_header.lower() or "expires=" in cookie_header.lower():
+            if (
+                "max-age=0" in cookie_header.lower()
+                or "expires=" in cookie_header.lower()
+            ):
                 cookie_match = re.match(r"([^=]+)=", cookie_header)
                 if cookie_match:
                     cookies_cleared[cookie_match.group(1)] = True

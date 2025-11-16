@@ -87,10 +87,9 @@ class TestValidateWeeksNotStarted:
     def test_empty_weeks_pass_validation(self):
         """Should pass validation for empty weeks list."""
         current_month = datetime.now().strftime("%Y-%m")
-        weeks = []
 
         # Should not raise an exception
-        validate_weeks_not_started(current_month, weeks)
+        validate_weeks_not_started(current_month, [])
 
 
 @pytest.mark.unit

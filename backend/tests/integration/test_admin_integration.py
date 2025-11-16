@@ -358,7 +358,9 @@ class TestAdminIntegration:
         auth = self._register_and_login(test_app)
         test_app.cookies = auth["cookies"]
 
-        response = test_app.get(f"/api/v1/admin/users/info/{auth['user_data']['username']}")
+        response = test_app.get(
+            f"/api/v1/admin/users/info/{auth['user_data']['username']}"
+        )
         assert response.status_code == 403
 
     def test_create_manual_priority(
@@ -584,7 +586,6 @@ class TestAdminIntegration:
             },
         )
         assert create_response.status_code == 200
-        created_identifier = create_response.json()["identifier"]
 
         # Delete the entry using the identifier we created it with
         delete_response = test_app.delete(
@@ -631,7 +632,7 @@ class TestAdminIntegration:
         current_month = datetime.now().strftime("%Y-%m")
 
         # Test all admin endpoints
-        endpoints = [
+        endpoints: list[tuple[str, str, dict] | tuple[str, str]] = [
             ("GET", "/api/v1/admin/magic-word-info"),
             ("POST", "/api/v1/admin/update-magic-word", {"new_magic_word": "test"}),
             ("GET", "/api/v1/admin/total-users"),

@@ -1,5 +1,3 @@
-import uuid
-
 import httpx
 import redis
 from fastapi import APIRouter, Depends, HTTPException

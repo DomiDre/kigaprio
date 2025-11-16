@@ -229,7 +229,7 @@ class TestVacationDaysIntegration:
             {
                 "date": (base_date + timedelta(days=i)).strftime("%Y-%m-%d"),
                 "type": "vacation",
-                "description": f"Day {i+1}",
+                "description": f"Day {i + 1}",
             }
             for i in range(3)
         ]
@@ -689,14 +689,11 @@ class TestVacationDaysIntegration:
 
         assert len(data) == 2
         # PocketBase returns dates with timestamps, so check with startswith
-        dates_str = " ".join([day["date"] for day in data])
         assert any(day["date"].startswith(date1) for day in data)
         assert any(day["date"].startswith(date2) for day in data)
         assert not any(day["date"].startswith(date3) for day in data)
 
-    def test_user_get_vacation_days_in_range_invalid_dates(
-        self, test_app: TestClient
-    ):
+    def test_user_get_vacation_days_in_range_invalid_dates(self, test_app: TestClient):
         """Test date range validation."""
         # Setup: Create regular user
         user_auth = self._register_and_login(test_app)
@@ -761,7 +758,10 @@ class TestVacationDaysIntegration:
         # Test all user endpoints
         endpoints = [
             ("GET", "/api/v1/vacation-days"),
-            ("GET", "/api/v1/vacation-days/range?start_date=2025-01-01&end_date=2025-12-31"),
+            (
+                "GET",
+                "/api/v1/vacation-days/range?start_date=2025-01-01&end_date=2025-12-31",
+            ),
             ("GET", "/api/v1/vacation-days/2025-12-25"),
         ]
 

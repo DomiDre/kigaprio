@@ -175,7 +175,9 @@ class TestGetUserPriorities:
 
         with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
             mock_async_client = AsyncMock()
-            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_async_client.get = AsyncMock(
+                side_effect=httpx.RequestError("Connection failed")
+            )
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
             with pytest.raises(HTTPException) as exc_info:
@@ -390,15 +392,15 @@ class TestGetPriority:
             assert exc_info.value.status_code == 503
 
     @pytest.mark.asyncio
-    async def test_get_priority_connection_error(
-        self, sample_session_info, test_dek
-    ):
+    async def test_get_priority_connection_error(self, sample_session_info, test_dek):
         """Should raise HTTPException when connection fails."""
         import httpx
 
         with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
             mock_async_client = AsyncMock()
-            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_async_client.get = AsyncMock(
+                side_effect=httpx.RequestError("Connection failed")
+            )
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
             with pytest.raises(HTTPException) as exc_info:
@@ -417,7 +419,7 @@ class TestGetPriority:
         self, sample_session_info, test_dek, mock_httpx_client
     ):
         """Should re-raise generic exception during decryption (after tracking error)."""
-        weeks_data = {"weeks": []}
+        weeks_data: dict[str, list[WeekPriority]] = {"weeks": []}
         encrypted_fields = EncryptionManager.encrypt_fields(weeks_data, test_dek)
 
         mock_response = MagicMock(spec=Response)
@@ -727,7 +729,9 @@ class TestSavePriority:
 
         with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
             mock_async_client = AsyncMock()
-            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_async_client.get = AsyncMock(
+                side_effect=httpx.RequestError("Connection failed")
+            )
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
             with pytest.raises(HTTPException) as exc_info:
@@ -910,15 +914,15 @@ class TestDeletePriority:
             assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_delete_priority_connection_error(
-        self, sample_session_info
-    ):
+    async def test_delete_priority_connection_error(self, sample_session_info):
         """Should raise HTTPException when connection fails."""
         import httpx
 
         with patch("priotag.api.routes.priorities.httpx.AsyncClient") as mock_client:
             mock_async_client = AsyncMock()
-            mock_async_client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+            mock_async_client.get = AsyncMock(
+                side_effect=httpx.RequestError("Connection failed")
+            )
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
             with pytest.raises(HTTPException) as exc_info:
