@@ -23,7 +23,13 @@
 
 		try {
 			await apiService.login(username, password, keepLoggedIn);
-			if (await authStore.verifyAuth()) goto('/dashboard');
+			const isAdmin = await authStore.verifyAuth();
+			if (isAdmin) {
+				goto('/dashboard');
+			} else {
+				error = 'Zugriff verweigert. Nur Administratoren können sich hier anmelden.';
+				await apiService.logout(); // Logout the non-admin user
+			}
 		} catch (err) {
 			error = (err as Error).message;
 		} finally {

@@ -187,15 +187,16 @@ async def save_priority(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # Check for duplicate month
-    rate_limit_key = f"priority_check:{user_id}:{month}"
+    # Check for concurrent saves - prevent duplicate submissions
+    rate_limit_key = f"priority_save:{user_id}:{month}"
     if redis_client.exists(rate_limit_key):
         raise HTTPException(
             status_code=429,
-            detail="Bitte warten Sie einen Moment",
+            detail="Bitte warten Sie einen Moment. Ihre Prioritäten werden gespeichert.",
         )
 
-    redis_client.setex(rate_limit_key, 1, "saving")  # 1 sec lock
+    # Set lock for 3 seconds to prevent rapid duplicate submissions
+    redis_client.setex(rate_limit_key, 3, "saving")
 
     try:
         async with httpx.AsyncClient() as client:
@@ -303,17 +304,24 @@ async def save_priority(
                     detail=error_data.get("message", "Fehler beim Speichern"),
                 )
 
+            # Successfully saved - clear the rate limit lock
+            redis_client.delete(rate_limit_key)
             return SuccessResponse(message=message)
 
     except HTTPException:
+        # Don't clear rate limit key on HTTP exceptions (keeps lock for 3s)
         raise
     except httpx.RequestError as e:
+        # Clear rate limit on connection errors to allow retry
+        redis_client.delete(rate_limit_key)
         raise HTTPException(
             status_code=500,
             detail="Verbindungsfehler zum Datenbankserver",
         ) from e
-    # Note: Do not delete rate_limit_key here - let the TTL expire naturally
-    # to ensure rate limiting works correctly
+    except Exception:
+        # Clear rate limit on unexpected errors to allow retry
+        redis_client.delete(rate_limit_key)
+        raise
 
 
 @router.delete("/{month}")

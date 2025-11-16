@@ -174,8 +174,8 @@ export class ApiService {
 	}
 
 	async updatePriority(month: string, priorityData: WeekData[]) {
-		// Retry logic for rate limiting (429 responses)
-		const maxRetries = 3;
+		// Single retry for rate limiting with appropriate delay
+		const maxRetries = 1;
 		let lastError: Error | null = null;
 
 		for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -185,15 +185,14 @@ export class ApiService {
 					body: JSON.stringify(priorityData)
 				});
 			} catch (error) {
-				// Check if it's a rate limit error
+				// Check if it's a rate limit error (concurrent save in progress)
 				if (error instanceof Error && error.message.includes('Bitte warten Sie einen Moment')) {
 					lastError = error;
 
-					// If we have retries left, wait and try again
+					// Only retry once after waiting for the lock to clear
 					if (attempt < maxRetries) {
-						// Exponential backoff: 2s, 3s, 4s
-						const waitTime = 2000 + attempt * 1000;
-						await new Promise((resolve) => setTimeout(resolve, waitTime));
+						// Wait 3.5 seconds for backend lock to clear
+						await new Promise((resolve) => setTimeout(resolve, 3500));
 						continue;
 					}
 				}
@@ -203,7 +202,7 @@ export class ApiService {
 			}
 		}
 
-		// If we exhausted all retries, throw the last error
+		// If retry failed, throw informative error
 		throw lastError || new Error('Fehler beim Speichern der Prioritäten');
 	}
 
