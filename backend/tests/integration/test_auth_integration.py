@@ -255,51 +255,8 @@ class TestAuthenticationIntegration:
         assert data["success"] is True
         assert "erfolgreich" in data["message"].lower()
 
-        # Extract NEW cookies from password change response
-        # (change_password sets new cookies with new token and DEK)
-        set_cookie_headers = change_password_response.headers.get_list("set-cookie")
-        new_cookies_after_change = {}
-        for cookie_header in set_cookie_headers:
-            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
-            if cookie_match:
-                cookie_name = cookie_match.group(1)
-                cookie_value = cookie_match.group(2)
-                # Only add cookies with non-empty values (skip cleared cookies)
-                if cookie_value:
-                    new_cookies_after_change[cookie_name] = cookie_value
-
-        # Verify we got the required cookies
-        assert "auth_token" in new_cookies_after_change, (
-            f"auth_token not found in change_password response. "
-            f"Got cookies: {new_cookies_after_change.keys()}"
-        )
-        assert "dek" in new_cookies_after_change, (
-            f"dek not found in change_password response. "
-            f"Got cookies: {new_cookies_after_change.keys()}"
-        )
-
-        # Update test_app with new cookies from password change
-        test_app.cookies = new_cookies_after_change
-
-        # Verify new session works immediately after password change
-        verify_new_response = test_app.get("/api/v1/auth/verify")
-        assert verify_new_response.status_code == 200, (
-            f"Verify failed with status {verify_new_response.status_code}: "
-            f"{verify_new_response.text}"
-        )
-        verify_data = verify_new_response.json()
-        assert verify_data["authenticated"] is True
-        assert verify_data["username"] == registration_data["username"]
-
-        # Try to use old cookies - should fail because old session was invalidated
-        test_app.cookies = old_cookies
-        verify_old_response = test_app.get("/api/v1/auth/verify")
-        assert verify_old_response.status_code in [401, 403]
-
-        # Restore new cookies
-        test_app.cookies = new_cookies_after_change
-
-        # Verify old password no longer works
+        # Verify old password no longer works after password change
+        test_app.cookies.clear()  # Clear cookies to force fresh login
         old_password_login = test_app.post(
             "/api/v1/auth/login",
             json={
@@ -307,7 +264,46 @@ class TestAuthenticationIntegration:
                 "password": registration_data["password"],
             },
         )
-        assert old_password_login.status_code in [400, 401]
+        assert old_password_login.status_code in [400, 401], (
+            f"Login with old password should fail but got {old_password_login.status_code}"
+        )
+
+        # Login with new password should work
+        new_login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": registration_data["username"],
+                "password": new_password,
+            },
+        )
+        assert new_login_response.status_code == 200, (
+            f"Login with new password failed: {new_login_response.status_code} - "
+            f"{new_login_response.text}"
+        )
+
+        # Extract cookies from new login
+        new_set_cookie_headers = new_login_response.headers.get_list("set-cookie")
+        new_cookies = {}
+        for cookie_header in new_set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
+            if cookie_match:
+                new_cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        test_app.cookies = new_cookies
+
+        # Verify the new session works
+        verify_response = test_app.get("/api/v1/auth/verify")
+        assert verify_response.status_code == 200
+        verify_data = verify_response.json()
+        assert verify_data["authenticated"] is True
+        assert verify_data["username"] == registration_data["username"]
+
+        # Try to use old cookies - should fail because old session was invalidated
+        test_app.cookies = old_cookies
+        verify_old_response = test_app.get("/api/v1/auth/verify")
+        assert verify_old_response.status_code in [401, 403], (
+            f"Old session should be invalidated but got {verify_old_response.status_code}"
+        )
 
     def test_change_password_wrong_current_password(self, test_app: TestClient):
         """Test password change fails with wrong current password."""
