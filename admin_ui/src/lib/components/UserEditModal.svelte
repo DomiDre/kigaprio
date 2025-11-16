@@ -7,17 +7,16 @@
 	interface Props {
 		isOpen: boolean;
 		userId: string | null;
-		userName: string;
 		onClose: () => void;
 		onSuccess: () => void;
 	}
 
-	let { isOpen = $bindable(), userId, userName, onClose, onSuccess }: Props = $props();
+	let { isOpen = $bindable(), userId, onClose, onSuccess }: Props = $props();
 
 	// Form state
 	let formUsername = $state('');
 	let formEmail = $state('');
-	let formRole: 'user' | 'admin' | 'service' | 'generic' = $state('user');
+	let formRole: 'user' | 'admin' = $state('user');
 
 	let isLoading = $state(false);
 	let isFetching = $state(false);
@@ -109,7 +108,9 @@
 			tabindex="-1"
 		>
 			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
+			<div
+				class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700"
+			>
 				<h3 id="user-edit-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white">
 					Benutzer bearbeiten
 				</h3>
@@ -149,7 +150,10 @@
 					<div class="space-y-4">
 						<!-- Username -->
 						<div>
-							<label for="username" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+							<label
+								for="username"
+								class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+							>
 								Benutzername
 							</label>
 							<input
@@ -162,25 +166,12 @@
 								placeholder="Benutzername eingeben"
 							/>
 						</div>
-
-						<!-- Email -->
-						<div>
-							<label for="email" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-								E-Mail (optional)
-							</label>
-							<input
-								id="email"
-								type="email"
-								bind:value={formEmail}
-								disabled={isLoading}
-								class="block w-full rounded-lg border border-gray-300 p-2.5 text-sm text-gray-900 focus:border-purple-500 focus:ring-purple-500 disabled:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-purple-500 dark:focus:ring-purple-500"
-								placeholder="email@beispiel.de"
-							/>
-						</div>
-
 						<!-- Role -->
 						<div>
-							<label for="role" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+							<label
+								for="role"
+								class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+							>
 								Rolle
 							</label>
 							<select
@@ -191,14 +182,14 @@
 							>
 								<option value="user">Benutzer</option>
 								<option value="admin">Administrator</option>
-								<option value="service">Service</option>
-								<option value="generic">Generic</option>
 							</select>
 						</div>
 
 						<!-- Error Message -->
 						{#if error}
-							<div class="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400">
+							<div
+								class="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400"
+							>
 								{error}
 							</div>
 						{/if}
@@ -207,12 +198,14 @@
 			</form>
 
 			<!-- Footer -->
-			<div class="flex items-center justify-end gap-3 border-t border-gray-200 p-4 dark:border-gray-700">
+			<div
+				class="flex items-center justify-end gap-3 border-t border-gray-200 p-4 dark:border-gray-700"
+			>
 				<button
 					type="button"
 					onclick={handleClose}
 					disabled={isLoading || isFetching}
-					class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-200 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
+					class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 focus:outline-none disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
 				>
 					Abbrechen
 				</button>
@@ -220,7 +213,7 @@
 					type="submit"
 					onclick={handleSubmit}
 					disabled={isLoading || isFetching || !formUsername.trim()}
-					class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-300 disabled:opacity-50 dark:focus:ring-purple-800"
+					class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 focus:outline-none disabled:opacity-50 dark:focus:ring-purple-800"
 				>
 					{#if isLoading}
 						<span class="flex items-center gap-2">

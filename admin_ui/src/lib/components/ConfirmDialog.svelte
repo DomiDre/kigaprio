@@ -71,7 +71,9 @@
 			tabindex="-1"
 		>
 			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
+			<div
+				class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700"
+			>
 				<h3 id="confirm-dialog-title" class="text-lg font-semibold text-gray-900 dark:text-white">
 					{title}
 				</h3>
@@ -94,12 +96,14 @@
 			</div>
 
 			<!-- Footer -->
-			<div class="flex items-center justify-end gap-3 border-t border-gray-200 p-4 dark:border-gray-700">
+			<div
+				class="flex items-center justify-end gap-3 border-t border-gray-200 p-4 dark:border-gray-700"
+			>
 				<button
 					type="button"
 					onclick={handleCancel}
 					disabled={isLoading}
-					class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-200 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
+					class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-4 focus:ring-gray-200 focus:outline-none disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
 				>
 					{cancelText}
 				</button>
@@ -107,7 +111,7 @@
 					type="button"
 					onclick={handleConfirm}
 					disabled={isLoading}
-					class="rounded-lg px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-4 disabled:opacity-50 {variantClasses[
+					class="rounded-lg px-4 py-2 text-sm font-medium text-white focus:ring-4 focus:outline-none disabled:opacity-50 {variantClasses[
 						variant
 					]}"
 				>

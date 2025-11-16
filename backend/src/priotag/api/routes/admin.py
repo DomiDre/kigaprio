@@ -620,7 +620,9 @@ async def update_user(
             error_data = response.json()
             raise HTTPException(
                 status_code=response.status_code,
-                detail=error_data.get("message", "Fehler beim Aktualisieren des Benutzers"),
+                detail=error_data.get(
+                    "message", "Fehler beim Aktualisieren des Benutzers"
+                ),
             )
 
         return {
@@ -726,7 +728,9 @@ async def update_priority(
             error_data = response.json()
             raise HTTPException(
                 status_code=response.status_code,
-                detail=error_data.get("message", "Fehler beim Aktualisieren der Priorität"),
+                detail=error_data.get(
+                    "message", "Fehler beim Aktualisieren der Priorität"
+                ),
             )
 
         return {

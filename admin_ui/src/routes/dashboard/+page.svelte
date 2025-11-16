@@ -846,7 +846,6 @@
 <UserEditModal
 	bind:isOpen={showUserEditModal}
 	userId={editingUser?.userId || null}
-	userName={editingUser?.name || ''}
 	onClose={closeEditUser}
 	onSuccess={handleUserEditSuccess}
 />
