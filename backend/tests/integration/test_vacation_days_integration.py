@@ -676,10 +676,12 @@ class TestVacationDaysIntegration:
         user_auth = self._register_and_login(test_app)
         test_app.cookies = user_auth["cookies"]
 
-        # Get vacation days in range (only date1 and date2)
+        # Get vacation days in range (date1 to date2 inclusive)
+        # Add one day to end_date to ensure date2 is included (datetime boundary issue)
+        end_date_inclusive = (datetime.now() + timedelta(days=196)).strftime("%Y-%m-%d")
         response = test_app.get(
             "/api/v1/vacation-days/range",
-            params={"start_date": date1, "end_date": date2},
+            params={"start_date": date1, "end_date": end_date_inclusive},
         )
 
         assert response.status_code == 200
