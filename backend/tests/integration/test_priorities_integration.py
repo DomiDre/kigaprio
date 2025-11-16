@@ -356,7 +356,7 @@ class TestPriorityIntegration:
         ]
 
         # First, create existing data for the previous month's week 1
-        initial_response = test_app.put(
+        test_app.put(
             f"/api/v1/priorities/{prev_month}",
             json=past_week_data,
         )
