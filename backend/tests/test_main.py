@@ -118,22 +118,12 @@ class TestMetricsEndpoint:
     @pytest.mark.asyncio
     async def test_metrics_endpoint_valid_token(self):
         """Should return metrics with valid token."""
-        # Import the app which sets up the metrics endpoint
         from fastapi.security import HTTPAuthorizationCredentials
 
         from priotag import main
 
-        # Mock the metrics token file to exist
-        with patch.object(main, "metrics_token_file") as mock_file:
-            mock_file.exists.return_value = True
-            mock_file.read_text.return_value = "secret_token\n"
-
-            # Reload to pick up the mocked token file
-            import importlib
-
-            importlib.reload(main)
-
-            # Now test the endpoint
+        # Patch the METRICS_TOKEN constant directly
+        with patch.object(main, "METRICS_TOKEN", "secret_token"):
             credentials = HTTPAuthorizationCredentials(
                 scheme="Bearer", credentials="secret_token"
             )
@@ -149,14 +139,8 @@ class TestMetricsEndpoint:
 
         from priotag import main
 
-        with patch.object(main, "metrics_token_file") as mock_file:
-            mock_file.exists.return_value = True
-            mock_file.read_text.return_value = "secret_token\n"
-
-            import importlib
-
-            importlib.reload(main)
-
+        # Patch the METRICS_TOKEN constant directly
+        with patch.object(main, "METRICS_TOKEN", "secret_token"):
             credentials = HTTPAuthorizationCredentials(
                 scheme="Bearer", credentials="wrong_token"
             )
