@@ -476,7 +476,7 @@
 			);
 
 			// Collect all unique week numbers across all users
-			const allWeekNumbers = new Set<number>();
+			const allWeekNumbers = new SvelteSet<number>();
 			decryptedUsersArray.forEach((userData) => {
 				const weeks = userData.priorities?.weeks || [];
 				weeks.forEach((week: any) => {
@@ -500,7 +500,7 @@
 				const weeks = userData.priorities?.weeks || [];
 
 				// Create a map of week data for quick lookup
-				const weekMap = new Map();
+				const weekMap = new SvelteMap();
 				weeks.forEach((week: any) => {
 					weekMap.set(week.weekNumber, week);
 				});
