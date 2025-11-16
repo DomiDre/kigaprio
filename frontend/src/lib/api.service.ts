@@ -186,7 +186,7 @@ export class ApiService {
 				});
 			} catch (error) {
 				// Check if it's a rate limit error
-				if (error instanceof Error && error.message.includes('Zu viele Anfragen')) {
+				if (error instanceof Error && error.message.includes('Bitte warten Sie einen Moment')) {
 					lastError = error;
 
 					// If we have retries left, wait and try again

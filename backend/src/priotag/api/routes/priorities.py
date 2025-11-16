@@ -195,7 +195,7 @@ async def save_priority(
             detail="Bitte warten Sie einen Moment",
         )
 
-    redis_client.setex(rate_limit_key, 2, "saving")  # 2 sec lock
+    redis_client.setex(rate_limit_key, 1, "saving")  # 1 sec lock
 
     try:
         async with httpx.AsyncClient() as client:

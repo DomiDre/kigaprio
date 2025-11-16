@@ -231,6 +231,9 @@ class TestPriorityIntegration:
         )
         assert create_response.status_code == 200
 
+        # Wait for rate limit to expire
+        time.sleep(1.1)
+
         # Update with different data
         updated_data = [
             {
