@@ -184,3 +184,203 @@ class TestAuthenticationIntegration:
         # Verify session is invalid - try to use the old cookies
         verify_response = test_app.get("/api/v1/auth/verify")
         assert verify_response.status_code in [401, 403]
+
+    def test_change_password_success(self, test_app: TestClient):
+        """Test successful password change flow."""
+        # Register a new user with unique username
+        unique_suffix = secrets.token_hex(4)
+        registration_data = {
+            "username": f"changepass_{unique_suffix}",
+            "password": "OldPassword123!",
+            "name": "Password Change User",
+            "magic_word": "test",
+        }
+
+        # Verify magic word and register
+        verify_magic_word_response = test_app.post(
+            "/api/v1/auth/verify-magic-word",
+            json={"magic_word": registration_data["magic_word"]},
+        )
+        assert verify_magic_word_response.status_code == 200
+        magic_word_body = verify_magic_word_response.json()
+        registration_data["reg_token"] = magic_word_body["token"]
+
+        register_response = test_app.post(
+            "/api/v1/auth/register",
+            json={
+                "identity": registration_data["username"],
+                "password": registration_data["password"],
+                "passwordConfirm": registration_data["password"],
+                "name": registration_data["name"],
+                "registration_token": registration_data["reg_token"],
+            },
+        )
+        assert register_response.status_code == 200
+
+        # Login with old password
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": registration_data["username"],
+                "password": registration_data["password"],
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookies
+        set_cookie_headers = login_response.headers.get_list("set-cookie")
+        cookies = {}
+        for cookie_header in set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
+            if cookie_match:
+                cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        assert "auth_token" in cookies
+        test_app.cookies = cookies
+
+        # Change password
+        new_password = "NewPassword456!"
+        change_password_response = test_app.post(
+            "/api/v1/auth/change-password",
+            json={
+                "current_password": registration_data["password"],
+                "new_password": new_password,
+            },
+        )
+        assert change_password_response.status_code == 200
+        data = change_password_response.json()
+        assert data["success"] is True
+        assert "erfolgreich" in data["message"].lower()
+
+        # Verify old session is invalidated (cookies cleared)
+        verify_response = test_app.get("/api/v1/auth/verify")
+        # Should fail because session was invalidated
+        assert verify_response.status_code in [401, 403]
+
+        # Login with new password
+        new_login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": registration_data["username"],
+                "password": new_password,
+            },
+        )
+        assert new_login_response.status_code == 200
+
+        # Extract new cookies
+        new_set_cookie_headers = new_login_response.headers.get_list("set-cookie")
+        new_cookies = {}
+        for cookie_header in new_set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
+            if cookie_match:
+                new_cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        test_app.cookies = new_cookies
+
+        # Verify new session works
+        verify_new_response = test_app.get("/api/v1/auth/verify")
+        assert verify_new_response.status_code == 200
+        verify_data = verify_new_response.json()
+        assert verify_data["authenticated"] is True
+        assert verify_data["username"] == registration_data["username"]
+
+        # Verify old password no longer works
+        old_password_login = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": registration_data["username"],
+                "password": registration_data["password"],
+            },
+        )
+        assert old_password_login.status_code in [400, 401]
+
+    def test_change_password_wrong_current_password(self, test_app: TestClient):
+        """Test password change fails with wrong current password."""
+        # Register and login
+        unique_suffix = secrets.token_hex(4)
+        registration_data = {
+            "username": f"wrongpass_{unique_suffix}",
+            "password": "CorrectPassword123!",
+            "name": "Wrong Password User",
+            "magic_word": "test",
+        }
+
+        # Verify magic word and register
+        verify_magic_word_response = test_app.post(
+            "/api/v1/auth/verify-magic-word",
+            json={"magic_word": registration_data["magic_word"]},
+        )
+        assert verify_magic_word_response.status_code == 200
+        magic_word_body = verify_magic_word_response.json()
+
+        register_response = test_app.post(
+            "/api/v1/auth/register",
+            json={
+                "identity": registration_data["username"],
+                "password": registration_data["password"],
+                "passwordConfirm": registration_data["password"],
+                "name": registration_data["name"],
+                "registration_token": magic_word_body["token"],
+            },
+        )
+        assert register_response.status_code == 200
+
+        # Login
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": registration_data["username"],
+                "password": registration_data["password"],
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookies
+        set_cookie_headers = login_response.headers.get_list("set-cookie")
+        cookies = {}
+        for cookie_header in set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
+            if cookie_match:
+                cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        test_app.cookies = cookies
+
+        # Try to change password with wrong current password
+        change_password_response = test_app.post(
+            "/api/v1/auth/change-password",
+            json={
+                "current_password": "WrongPassword123!",
+                "new_password": "NewPassword456!",
+            },
+        )
+        assert change_password_response.status_code == 400
+        data = change_password_response.json()
+        assert "passwort ist falsch" in data["detail"].lower()
+
+        # Verify session is still valid (password not changed)
+        verify_response = test_app.get("/api/v1/auth/verify")
+        assert verify_response.status_code == 200
+
+        # Verify original password still works
+        relogin_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": registration_data["username"],
+                "password": registration_data["password"],
+            },
+        )
+        assert relogin_response.status_code == 200
+
+    def test_change_password_unauthenticated(self, test_app: TestClient):
+        """Test password change fails without authentication."""
+        # Clear any cookies
+        test_app.cookies.clear()
+
+        change_password_response = test_app.post(
+            "/api/v1/auth/change-password",
+            json={
+                "current_password": "OldPassword123!",
+                "new_password": "NewPassword456!",
+            },
+        )
+        assert change_password_response.status_code in [401, 403]
