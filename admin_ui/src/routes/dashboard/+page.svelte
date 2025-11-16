@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { scale } from 'svelte/transition';
 	import Refresh from 'virtual:icons/mdi/refresh';
+	import * as XLSX from 'xlsx';
 	import { apiService } from '$lib/api.service';
 	import { cryptoService } from '$lib/crypto.service';
 	import { webAuthnCryptoService } from '$lib/webauthn-crypto.service';
@@ -456,7 +457,107 @@
 	}
 
 	function exportToExcel() {
-		alert('Excel-Export wird noch implementiert');
+		if (!keyUploaded || decryptedUsers.size === 0) {
+			decryptionError =
+				'Bitte authentifizieren Sie sich und entschlüsseln Sie die Daten, bevor Sie exportieren.';
+			return;
+		}
+
+		try {
+			// Day labels for column headers
+			const dayLabels = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+
+			// Prepare data rows
+			const rows: any[] = [];
+
+			// Convert decrypted users map to sorted array
+			const decryptedUsersArray = Array.from(decryptedUsers.values()).sort((a, b) =>
+				a.userName.localeCompare(b.userName)
+			);
+
+			// Collect all unique week numbers across all users
+			const allWeekNumbers = new SvelteSet<number>();
+			decryptedUsersArray.forEach((userData) => {
+				const weeks = userData.priorities?.weeks || [];
+				weeks.forEach((week: any) => {
+					allWeekNumbers.add(week.weekNumber);
+				});
+			});
+			const sortedWeeks = Array.from(allWeekNumbers).sort((a, b) => a - b);
+
+			// Build header row
+			const headerRow: any = { Name: 'Name' };
+			sortedWeeks.forEach((weekNum) => {
+				dayLabels.forEach((dayLabel) => {
+					headerRow[`KW${weekNum} ${dayLabel}`] = `KW${weekNum} ${dayLabel}`;
+				});
+			});
+			rows.push(headerRow);
+
+			// Build data rows for each user
+			decryptedUsersArray.forEach((userData) => {
+				const row: any = { Name: userData.userName };
+				const weeks = userData.priorities?.weeks || [];
+
+				// Create a map of week data for quick lookup
+				const weekMap = new SvelteMap();
+				weeks.forEach((week: any) => {
+					weekMap.set(week.weekNumber, week);
+				});
+
+				// Fill in priority data for each week/day combination
+				sortedWeeks.forEach((weekNum) => {
+					const week = weekMap.get(weekNum);
+					dayKeys.forEach((dayKey, index) => {
+						const columnName = `KW${weekNum} ${dayLabels[index]}`;
+						const priority = week?.[dayKey];
+						row[columnName] = priority !== null && priority !== undefined ? priority : '';
+					});
+				});
+
+				rows.push(row);
+			});
+
+			// Create worksheet from data
+			const worksheet = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
+
+			// Auto-adjust column widths
+			const columnWidths: any[] = [];
+			const firstRow = rows[0];
+			Object.keys(firstRow).forEach((key) => {
+				let maxLength = key.length;
+				rows.forEach((row) => {
+					const cellValue = String(row[key] || '');
+					if (cellValue.length > maxLength) {
+						maxLength = cellValue.length;
+					}
+				});
+				columnWidths.push({ wch: Math.min(Math.max(maxLength + 2, 10), 50) });
+			});
+			worksheet['!cols'] = columnWidths;
+
+			// Create workbook and add worksheet
+			const workbook = XLSX.utils.book_new();
+			const sheetName = `Prioritäten ${selectedMonth}`;
+			XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+			// Generate Excel file and trigger download
+			const filename = `Prioritäten_${selectedMonth.replace(/\//g, '-')}.xlsx`;
+			XLSX.writeFile(workbook, filename);
+
+			// Show success message
+			successMessage = 'Excel-Datei erfolgreich heruntergeladen!';
+			showSuccessToast = true;
+			setTimeout(() => {
+				showSuccessToast = false;
+			}, 3000);
+		} catch (err) {
+			console.error('Excel-Export-Fehler:', err);
+			decryptionError =
+				err instanceof Error
+					? err.message
+					: 'Fehler beim Exportieren der Excel-Datei. Bitte versuchen Sie es erneut.';
+		}
 	}
 
 	function openManualEntry() {
