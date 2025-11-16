@@ -24,23 +24,6 @@ from priotag.services.redis_service import (
 )
 
 
-@pytest.fixture(autouse=True)
-def reset_redis_service():
-    """Reset RedisService singleton state after each test to prevent interference with integration tests."""
-    yield
-    # Import the singleton instance
-    from priotag.services import redis_service
-
-    # Reset singleton state
-    redis_service._redis_service._redis_url = None
-    if redis_service._redis_service._pool is not None:
-        try:
-            redis_service._redis_service._pool.disconnect()
-        except Exception:
-            pass
-    redis_service._redis_service._pool = None
-
-
 @pytest.mark.unit
 class TestRedisService:
     """Test RedisService class."""
