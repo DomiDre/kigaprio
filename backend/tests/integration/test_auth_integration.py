@@ -238,6 +238,9 @@ class TestAuthenticationIntegration:
         assert "auth_token" in cookies
         test_app.cookies = cookies
 
+        # Save old cookies before password change
+        old_cookies = dict(test_app.cookies)
+
         # Change password
         new_password = "NewPassword456!"
         change_password_response = test_app.post(
@@ -252,49 +255,32 @@ class TestAuthenticationIntegration:
         assert data["success"] is True
         assert "erfolgreich" in data["message"].lower()
 
-        # Clear cookies after password change (server sends Set-Cookie to clear them)
-        # Extract the cleared cookies from the response
+        # Extract NEW cookies from password change response
+        # (change_password sets new cookies with new token and DEK)
         set_cookie_headers = change_password_response.headers.get_list("set-cookie")
-        cleared_cookies = {}
+        new_cookies_after_change = {}
         for cookie_header in set_cookie_headers:
-            cookie_match = re.match(r"([^=]+)=([^;]*)", cookie_header)
-            if cookie_match:
-                cleared_cookies[cookie_match.group(1)] = cookie_match.group(2)
-
-        # Update test_app cookies with cleared values
-        test_app.cookies = cleared_cookies
-
-        # Verify old session is invalidated (cookies cleared)
-        verify_response = test_app.get("/api/v1/auth/verify")
-        # Should fail because session was invalidated
-        assert verify_response.status_code in [401, 403]
-
-        # Login with new password
-        new_login_response = test_app.post(
-            "/api/v1/auth/login",
-            json={
-                "identity": registration_data["username"],
-                "password": new_password,
-            },
-        )
-        assert new_login_response.status_code == 200
-
-        # Extract new cookies
-        new_set_cookie_headers = new_login_response.headers.get_list("set-cookie")
-        new_cookies = {}
-        for cookie_header in new_set_cookie_headers:
             cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
             if cookie_match:
-                new_cookies[cookie_match.group(1)] = cookie_match.group(2)
+                new_cookies_after_change[cookie_match.group(1)] = cookie_match.group(2)
 
-        test_app.cookies = new_cookies
+        # Update test_app with new cookies from password change
+        test_app.cookies = new_cookies_after_change
 
-        # Verify new session works
+        # Verify new session works immediately after password change
         verify_new_response = test_app.get("/api/v1/auth/verify")
         assert verify_new_response.status_code == 200
         verify_data = verify_new_response.json()
         assert verify_data["authenticated"] is True
         assert verify_data["username"] == registration_data["username"]
+
+        # Try to use old cookies - should fail because old session was invalidated
+        test_app.cookies = old_cookies
+        verify_old_response = test_app.get("/api/v1/auth/verify")
+        assert verify_old_response.status_code in [401, 403]
+
+        # Restore new cookies
+        test_app.cookies = new_cookies_after_change
 
         # Verify old password no longer works
         old_password_login = test_app.post(
