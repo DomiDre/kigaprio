@@ -201,7 +201,13 @@ class TestEnvironmentConfiguration:
         from priotag.main import app
 
         # Verify routers were added by checking routes
-        routes = [route.path for route in app.routes]
+        # Extract paths from routes, handling different route types
+        routes = []
+        for route in app.routes:
+            if hasattr(route, "path"):
+                routes.append(route.path)
+            elif hasattr(route, "path_format"):
+                routes.append(route.path_format)
 
         # Should have health, auth, and other endpoints
         assert any("/health" in path for path in routes)

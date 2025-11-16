@@ -238,9 +238,6 @@ class TestAuthenticationIntegration:
         assert "auth_token" in cookies
         test_app.cookies = cookies
 
-        # Save old cookies before password change
-        old_cookies = dict(test_app.cookies)
-
         # Change password
         new_password = "NewPassword456!"
         change_password_response = test_app.post(
@@ -264,7 +261,10 @@ class TestAuthenticationIntegration:
                 "password": registration_data["password"],
             },
         )
-        assert old_password_login.status_code in [400, 401], (
+        assert old_password_login.status_code in [
+            400,
+            401,
+        ], (
             f"Login with old password should fail but got {old_password_login.status_code}"
         )
 

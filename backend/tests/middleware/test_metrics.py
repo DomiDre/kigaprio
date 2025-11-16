@@ -165,6 +165,7 @@ class TestMetricsEndpoint:
         response = await metrics_endpoint()
 
         assert isinstance(response, Response)
+        assert response.media_type is not None
         assert "text/plain" in response.media_type
         assert "charset=utf-8" in response.media_type
         assert isinstance(response.body, bytes)

@@ -309,6 +309,8 @@ class TestRedisService:
             service.close()
 
             # Should disconnect and clear pool
+            assert mock_pool is not None
+            assert isinstance(mock_pool, Mock)
             mock_pool.disconnect.assert_called_once()
             assert service._pool is None
 

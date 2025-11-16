@@ -715,8 +715,7 @@ class TestSetupStaticFileServingEdgeCases:
         )
 
         # Should have added routes
-        routes = [route.path for route in app.routes]
-        assert any(path for path in routes)
+        assert len(app.routes) > 0
 
     def test_setup_development_without_serve_static(self, tmp_path):
         """Should not serve static files in development by default."""
