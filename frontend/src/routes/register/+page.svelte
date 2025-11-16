@@ -1,6 +1,7 @@
 <!-- src/routes/register/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { authStore, isAuthenticated } from '$lib/auth.store';
 	import { apiService } from '$lib/api.service';
 
@@ -14,10 +15,21 @@
 	let loading = $state(false);
 	let registrationToken = $state('');
 	let magicWordVerified = $state(false);
+	let isQRMode = $state(false); // Track if using QR code registration
 
 	$effect(() => {
 		if ($isAuthenticated) {
 			goto('/');
+		}
+	});
+
+	// Check for magic word in URL query parameters (QR code flow)
+	$effect(() => {
+		const magicFromUrl = $page.url.searchParams.get('magic');
+		if (magicFromUrl) {
+			magicWord = magicFromUrl;
+			magicWordVerified = true;
+			isQRMode = true;
 		}
 	});
 
@@ -70,22 +82,36 @@
 		}
 
 		try {
-			await apiService.register({
-				identity: username,
-				password,
-				passwordConfirm: password,
-				name: fullName,
-				registration_token: registrationToken,
-				keep_logged_in: keepLoggedIn
-			});
+			// Use QR endpoint if magic word came from URL, otherwise use traditional two-step flow
+			if (isQRMode) {
+				await apiService.registerWithQR({
+					identity: username,
+					password,
+					passwordConfirm: password,
+					name: fullName,
+					magic_word: magicWord,
+					keep_logged_in: keepLoggedIn
+				});
+			} else {
+				await apiService.register({
+					identity: username,
+					password,
+					passwordConfirm: password,
+					name: fullName,
+					registration_token: registrationToken,
+					keep_logged_in: keepLoggedIn
+				});
+			}
 			if (await authStore.verifyAuth()) goto('/priorities');
 		} catch (err) {
 			error = (err as Error).message;
-			// If token expired, reset to magic word step
-			if (error.includes('token')) {
+			// If token expired or magic word invalid, reset to magic word step
+			if (error.includes('token') || error.includes('Zauberwort')) {
 				magicWordVerified = false;
 				registrationToken = '';
-				magicWord = '';
+				if (!isQRMode) {
+					magicWord = '';
+				}
 			}
 		} finally {
 			loading = false;
@@ -99,7 +125,9 @@
 	function resetToMagicWord() {
 		magicWordVerified = false;
 		registrationToken = '';
-		magicWord = '';
+		if (!isQRMode) {
+			magicWord = '';
+		}
 		error = '';
 	}
 </script>
@@ -199,7 +227,10 @@
 						class="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20"
 					>
 						<p class="flex items-center text-sm text-green-700 dark:text-green-400">
-							<span class="mr-2">✓</span> Zauberwort verifiziert! Sie können sich jetzt registrieren.
+							<span class="mr-2">{isQRMode ? '📱' : '✓'}</span>
+							{isQRMode
+								? 'QR-Code erkannt! Sie können sich jetzt registrieren.'
+								: 'Zauberwort verifiziert! Sie können sich jetzt registrieren.'}
 						</p>
 					</div>
 
@@ -410,16 +441,18 @@
 						{loading ? 'Erstelle Account...' : 'Account erstellen'}
 					</button>
 
-					<button
-						type="button"
-						onclick={resetToMagicWord}
-						disabled={loading}
-						class="w-full text-center text-sm text-gray-600 hover:text-gray-800
-						       disabled:cursor-not-allowed disabled:opacity-50
-						       dark:text-gray-400 dark:hover:text-gray-200"
-					>
-						← Zurück zur Zauberwort-Eingabe
-					</button>
+					{#if !isQRMode}
+						<button
+							type="button"
+							onclick={resetToMagicWord}
+							disabled={loading}
+							class="w-full text-center text-sm text-gray-600 hover:text-gray-800
+							       disabled:cursor-not-allowed disabled:opacity-50
+							       dark:text-gray-400 dark:hover:text-gray-200"
+						>
+							← Zurück zur Zauberwort-Eingabe
+						</button>
+					{/if}
 				</form>
 			{/if}
 

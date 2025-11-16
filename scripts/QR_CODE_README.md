@@ -111,12 +111,20 @@ If using magic word only mode, users can:
 2. Copy the magic word
 3. Paste it into the registration form
 
-### Option 2: URL with Query Parameter (Recommended)
+### Option 2: URL with Query Parameter (Implemented ✓)
 
-The frontend can be updated to:
-1. Read the `magic` query parameter from the URL
-2. Auto-fill the magic word field
-3. Call the `/auth/register-qr` endpoint instead of the two-step process
+The frontend automatically detects the `magic` query parameter and provides a seamless registration experience:
+
+1. User scans QR code with URL like `https://priotag.example.com/register?magic=YourMagicWord123`
+2. Frontend automatically reads the magic word from the URL
+3. User is taken directly to the registration form (skipping manual magic word entry)
+4. Frontend calls the `/auth/register-qr` endpoint (all-in-one registration)
+5. User creates account and is auto-logged in
+
+**UI Enhancements:**
+- Shows "📱 QR-Code erkannt!" message when magic word is from URL
+- Hides the "Back to magic word entry" button in QR mode
+- Maintains backward compatibility with manual magic word entry
 
 Example URL structure:
 ```

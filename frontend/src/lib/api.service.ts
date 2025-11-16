@@ -130,6 +130,27 @@ export class ApiService {
 		return response;
 	}
 
+	async registerWithQR(data: {
+		identity: string;
+		password: string;
+		passwordConfirm: string;
+		name: string;
+		magic_word: string;
+		keep_logged_in: boolean;
+	}) {
+		const response = await this.requestJson('/auth/register-qr', {
+			method: 'POST',
+			body: JSON.stringify({
+				...data
+			})
+		});
+
+		// Update auth store
+		authStore.setAuth();
+
+		return response;
+	}
+
 	async changePassword(currentPassword: string, newPassword: string) {
 		const response = await this.requestJson('/auth/change-password', {
 			method: 'POST',
