@@ -11,12 +11,10 @@ Tests use mocked dependencies (no real PocketBase/Redis).
 """
 
 import base64
-import json
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
 from httpx import Response
 
@@ -252,7 +250,7 @@ class TestGetPriority:
         self, sample_session_info, test_dek, mock_httpx_client
     ):
         """Should raise 403 when user doesn't own the priority."""
-        weeks_data = {"weeks": []}
+        weeks_data: dict[str, list] = {"weeks": []}
         encrypted_fields = EncryptionManager.encrypt_fields(weeks_data, test_dek)
 
         mock_response = MagicMock(spec=Response)

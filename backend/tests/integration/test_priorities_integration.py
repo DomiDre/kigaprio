@@ -507,10 +507,7 @@ class TestPriorityIntegration:
         current_month = datetime.now().strftime("%Y-%m")
 
         # Create priority with 4 weeks
-        priority_data = [
-            {"weekNumber": i, "monday": i % 5 + 1}
-            for i in range(1, 5)
-        ]
+        priority_data = [{"weekNumber": i, "monday": i % 5 + 1} for i in range(1, 5)]
 
         response = test_app.put(
             f"/api/v1/priorities/{current_month}",
