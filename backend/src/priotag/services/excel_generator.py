@@ -52,7 +52,7 @@ class ExcelGenerator:
                 week_number = week.get("weekNumber", 0)
 
                 # Add each day's priority for this week
-                for day_key, day_label in zip(day_keys, day_labels):
+                for day_key, day_label in zip(day_keys, day_labels, strict=True):
                     priority = week.get(day_key)
                     column_name = f"KW{week_number} {day_label}"
 
