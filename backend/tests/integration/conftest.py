@@ -223,10 +223,12 @@ def pocketbase_url(monkeypatch, pocketbase_container):
         # This is necessary because Python imports create local copies of the constant
         try:
             from priotag.api.routes import account, priorities, vacation_days
+            from priotag.services import magic_word
 
             monkeypatch.setattr(priorities, "POCKETBASE_URL", pocketbase_url)
             monkeypatch.setattr(vacation_days, "POCKETBASE_URL", pocketbase_url)
             monkeypatch.setattr(account, "POCKETBASE_URL", pocketbase_url)
+            monkeypatch.setattr(magic_word, "POCKETBASE_URL", pocketbase_url)
         except (ImportError, AttributeError):
             # Modules may not be imported yet
             pass
