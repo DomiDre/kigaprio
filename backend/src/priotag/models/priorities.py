@@ -46,10 +46,12 @@ def get_week_start_date(year: int, month: int, week_number: int) -> datetime:
     """
     Calculate the Monday (start date) of a specific week in a month.
 
-    This matches the frontend logic in getWeeksForMonth():
-    - Find the Monday of the first week that contains days from this month
-    - This Monday may be in the previous month if the month doesn't start on Monday
-    - Add (week_number - 1) weeks to get subsequent weeks
+    IMPORTANT: This must match the frontend logic exactly!
+    The frontend only counts weeks that contain at least one day from the target month.
+
+    For example, if November 1st is a Saturday:
+    - Week starting Oct 27 (Mon-Fri: Oct 27-31) has NO November days -> SKIP
+    - Week starting Nov 3 (Mon-Fri: Nov 3-7) has November days -> This is Week 1
 
     Args:
         year: Year
@@ -66,18 +68,34 @@ def get_week_start_date(year: int, month: int, week_number: int) -> datetime:
     # weekday(): Monday=0, Sunday=6
     day_of_week = first_day.weekday()
     days_to_subtract = day_of_week  # If first_day is Monday, subtract 0
-    first_week_monday = first_day - timedelta(days=days_to_subtract)
+    current_monday = first_day - timedelta(days=days_to_subtract)
 
-    # Calculate the Monday of the specified week
-    week_start = first_week_monday + timedelta(weeks=week_number - 1)
+    # Iterate through weeks, only counting those that contain days from the target month
+    weeks_found = 0
+    max_iterations = 10  # Safety limit
 
-    # Debug logging to help diagnose frontend/backend mismatches
-    print(f"[get_week_start_date] year={year}, month={month}, week_number={week_number}")
-    print(f"[get_week_start_date] first_day={first_day.strftime('%Y-%m-%d %A')}, day_of_week={day_of_week}")
-    print(f"[get_week_start_date] first_week_monday={first_week_monday.strftime('%Y-%m-%d %A')}")
-    print(f"[get_week_start_date] week_start (week {week_number})={week_start.strftime('%Y-%m-%d %A')}")
+    for _ in range(max_iterations):
+        # Check if this week (Mon-Fri) contains any days from the target month
+        week_has_month_days = False
+        for day_offset in range(5):  # Monday to Friday
+            check_date = current_monday + timedelta(days=day_offset)
+            if check_date.year == year and check_date.month == month:
+                week_has_month_days = True
+                break
 
-    return week_start
+        if week_has_month_days:
+            weeks_found += 1
+            if weeks_found == week_number:
+                # Found the requested week
+                print(f"[get_week_start_date] year={year}, month={month}, week_number={week_number}")
+                print(f"[get_week_start_date] Found week {week_number} starting on {current_monday.strftime('%Y-%m-%d %A')}")
+                return current_monday
+
+        # Move to next week
+        current_monday += timedelta(weeks=1)
+
+    # If we get here, something went wrong
+    raise ValueError(f"Could not find week {week_number} for {year}-{month:02d}")
 
 
 def validate_weeks_not_started(month: str, weeks: list["WeekPriority"]) -> None:
