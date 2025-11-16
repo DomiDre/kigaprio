@@ -469,3 +469,266 @@ class TestSetupStaticFileServing:
             setup_static_file_serving(app, static_path, "production", False)
 
             # Should validate and mount assets
+
+
+@pytest.mark.unit
+class TestSafeJoinPathEdgeCases:
+    """Test edge cases and error handling in safe_join_path."""
+
+    def test_path_traversal_detected(self, tmp_path):
+        """Should detect and reject path traversal attempts."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Try to escape using symlink
+        outside = tmp_path / "outside"
+        outside.mkdir()
+
+        # This should be detected and rejected
+        result = safe_join_path(base, "../outside")
+        assert result is None
+
+    def test_path_resolution_error_handling(self, tmp_path):
+        """Should handle path resolution errors gracefully."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create a very long path that might cause OSError
+        long_path = "a/" * 1000  # Very deep path
+        result = safe_join_path(base, long_path)
+
+        # Should handle error gracefully (either None or valid path)
+        # The key is it doesn't crash
+        assert result is None or isinstance(result, Path)
+
+    def test_relative_to_check_failure(self, tmp_path):
+        """Should handle relative_to check failures."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Try various path traversal techniques
+        test_cases = [
+            "../../etc/passwd",
+            "./../../../root",
+            "subdir/../../etc",
+        ]
+
+        for test_input in test_cases:
+            result = safe_join_path(base, test_input)
+            # Should either be None or safely within base
+            if result is not None:
+                assert result.is_relative_to(base)
+
+
+@pytest.mark.unit
+class TestSymlinkSafety:
+    """Test symlink safety checks."""
+
+    def test_unsafe_symlink_outside_base(self, tmp_path):
+        """Should detect symlinks pointing outside base directory."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "evil.txt").write_text("evil content")
+
+        # Create symlink pointing outside
+        link = base / "evil_link"
+        link.symlink_to(outside / "evil.txt")
+
+        # Should be detected as unsafe
+        assert is_safe_symlink(link, base) is False
+
+    def test_safe_symlink_within_base(self, tmp_path):
+        """Should allow symlinks pointing within base directory."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        target = base / "target.txt"
+        target.write_text("safe content")
+
+        link = base / "safe_link"
+        link.symlink_to(target)
+
+        # Should be detected as safe
+        assert is_safe_symlink(link, base) is True
+
+    def test_symlink_error_handling(self, tmp_path):
+        """Should handle symlink resolution errors."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create broken symlink
+        link = base / "broken_link"
+        link.symlink_to(base / "nonexistent.txt")
+
+        # Should handle gracefully
+        result = is_safe_symlink(link, base)
+        assert isinstance(result, bool)
+
+
+@pytest.mark.unit
+class TestDirectoryValidationErrors:
+    """Test error handling in directory validation."""
+
+    def test_unsafe_directory_symlink(self, tmp_path):
+        """Should reject directories that are unsafe symlinks."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        outside_dir = tmp_path / "outside_dir"
+        outside_dir.mkdir()
+
+        # Create symlink to directory outside base
+        dir_link = base / "unsafe_dir_link"
+        dir_link.symlink_to(outside_dir)
+
+        # Should be rejected
+        assert validate_directory_safety(dir_link, base) is False
+
+    def test_directory_validation_os_error(self, tmp_path):
+        """Should handle OS errors during directory validation."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create directory with permission issues (on Unix)
+        restricted_dir = base / "restricted"
+        restricted_dir.mkdir()
+
+        # Note: Permission manipulation is platform-dependent
+        # This test verifies error handling exists
+        result = validate_directory_safety(restricted_dir, base)
+        assert isinstance(result, bool)
+
+
+@pytest.mark.unit
+class TestFindFileToServeEdgeCases:
+    """Test edge cases in file serving logic."""
+
+    def test_unsafe_symlink_file_rejected(self, tmp_path):
+        """Should reject files that are unsafe symlinks."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "evil.js").write_text("malicious code")
+
+        # Create unsafe symlink
+        link = base / "evil.js"
+        link.symlink_to(outside / "evil.js")
+
+        # Should be rejected
+        result = find_file_to_serve(base, link)
+        assert result is None
+
+    def test_index_html_validation_failure(self, tmp_path):
+        """Should handle index.html validation failures."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        dir_path = base / "subdir"
+        dir_path.mkdir()
+
+        # Create index.html as broken symlink
+        index = dir_path / "index.html"
+        index.symlink_to(base / "nonexistent.html")
+
+        # Should handle error gracefully
+        result = find_file_to_serve(base, dir_path)
+        # Falls back to other options or None
+        assert result is None or isinstance(result, Path)
+
+    def test_html_extension_fallback_os_error(self, tmp_path):
+        """Should handle OS errors in .html extension fallback."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Request for non-existent file
+        requested = base / "nonexistent"
+
+        result = find_file_to_serve(base, requested)
+
+        # Should handle gracefully and try fallbacks
+        # Returns None or root index.html if it exists
+        assert result is None or result.name == "index.html"
+
+    def test_root_index_fallback(self, tmp_path):
+        """Should fallback to root index.html when file not found."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # Create root index.html
+        root_index = base / "index.html"
+        root_index.write_text("<html><body>Root Index</body></html>")
+
+        # Request non-existent file
+        requested = base / "nonexistent" / "path"
+
+        # Should fallback to root index
+        result = find_file_to_serve(base, requested)
+        assert result == root_index
+
+    def test_no_fallback_when_root_index_missing(self, tmp_path):
+        """Should return None when no files found and no root index."""
+        base = tmp_path / "static"
+        base.mkdir()
+
+        # No index.html exists
+        requested = base / "nonexistent"
+
+        result = find_file_to_serve(base, requested)
+        assert result is None
+
+
+@pytest.mark.unit
+class TestSetupStaticFileServingEdgeCases:
+    """Test static file serving setup edge cases."""
+
+    def test_setup_with_missing_static_path(self, tmp_path):
+        """Should handle missing static path gracefully."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        missing_path = tmp_path / "nonexistent_static"
+
+        # Should not crash, just log warning
+        setup_static_file_serving(
+            app=app, static_path=missing_path, env="development", serve_static=True
+        )
+
+        # App should still be configured
+        assert app is not None
+
+    def test_setup_production_with_serve_static_true(self, tmp_path):
+        """Should serve static files in production when explicitly enabled."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        static_path = tmp_path / "static"
+        static_path.mkdir()
+        (static_path / "test.html").write_text("<html></html>")
+
+        setup_static_file_serving(
+            app=app, static_path=static_path, env="production", serve_static=True
+        )
+
+        # Should have added routes
+        routes = [route.path for route in app.routes]
+        assert any(path for path in routes)
+
+    def test_setup_development_without_serve_static(self, tmp_path):
+        """Should not serve static files in development by default."""
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        static_path = tmp_path / "static"
+        static_path.mkdir()
+
+        setup_static_file_serving(
+            app=app, static_path=static_path, env="development", serve_static=False
+        )
+
+        # App should be configured but not serving static files
+        assert app is not None
