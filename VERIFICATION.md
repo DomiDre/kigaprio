@@ -12,7 +12,18 @@ PrioTag implements a multi-layered verification system to ensure that what you s
 4. **Build Metadata Injection** - Running apps expose their exact Git commit
 5. **Public CI/CD** - All builds happen in auditable GitHub Actions workflows
 
-## Quick Verification
+## ⚠️ Important Security Note
+
+**The `/verify` page and `/api/v1/build-info` endpoint are convenience features, NOT security features.**
+
+A malicious actor could:
+- Build a backdoored Docker image
+- Include a fake `build_info.json` pointing to legitimate source code
+- Serve that fake metadata while running malicious code
+
+**For TRUE cryptographic verification, you MUST verify the Docker image digest externally.** See [True Verification](#true-verification) below.
+
+## Quick Verification (Informational Only)
 
 ### For End Users
 
@@ -21,11 +32,7 @@ Visit the verification page on any PrioTag deployment:
 https://your-priotag-instance.com/verify
 ```
 
-This page shows:
-- The exact Git commit SHA of the running code
-- Link to view that commit on GitHub
-- Build date and version
-- Instructions for advanced verification
+**⚠️ WARNING**: This page shows metadata embedded in the image, which can be forged. Use this for transparency, but NOT as proof of security.
 
 ### For Technical Users
 
@@ -40,9 +47,151 @@ Response:
   "version": "v1.2.3",
   "commit": "abc123def456...",
   "build_date": "2025-11-16T12:34:56Z",
-  "source_url": "https://github.com/DomiDre/priotag/tree/abc123def456..."
+  "source_url": "https://github.com/DomiDre/priotag/tree/abc123def456...",
+  "security_warning": "This metadata can be forged. For true verification, check the running container's image digest and verify its signature with cosign."
 }
 ```
+
+**⚠️ WARNING**: This data is embedded at build time and can be faked by a malicious image.
+
+## True Verification
+
+**This is the ONLY way to cryptographically verify what's actually running.**
+
+### Step 1: Get the Running Image Digest
+
+First, you need to determine what Docker image is actually running on the server. A malicious actor controls the server, so this step requires either:
+- Access to the server (SSH, console)
+- Access to the orchestration platform (Docker API, Kubernetes API)
+- Trust in the server operator to provide this information
+
+#### Option A: Direct Server Access
+
+If you can SSH into the server:
+
+```bash
+# Find the running container
+docker ps | grep priotag
+
+# Get the image digest of the running backend container
+docker inspect <container-id> --format='{{.Image}}'
+# Output example: sha256:abc123def456...
+
+# Get the full image name and digest
+docker inspect <container-id> --format='{{.Config.Image}}'
+# Output example: ghcr.io/domidre/priotag-backend@sha256:abc123...
+```
+
+#### Option B: Kubernetes/Container Orchestration
+
+If deployed on Kubernetes:
+
+```bash
+# Get pod details
+kubectl get pod <pod-name> -o jsonpath='{.status.containerStatuses[0].imageID}'
+# Output: docker-pullable://ghcr.io/domidre/priotag-backend@sha256:abc123...
+```
+
+#### Option C: Docker Compose
+
+If using Docker Compose:
+
+```bash
+# Get the image digest from running services
+docker-compose ps
+docker inspect $(docker-compose ps -q backend) --format='{{.Image}}'
+```
+
+### Step 2: Verify the Image Digest Signature
+
+Now that you have the actual image digest, verify it was built by our GitHub Actions:
+
+```bash
+# Verify the signature (replace with actual digest from Step 1)
+cosign verify \
+  --certificate-identity-regexp='https://github.com/DomiDre/priotag' \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  ghcr.io/domidre/priotag-backend@sha256:abc123def456...
+```
+
+**What this proves:**
+- ✅ This exact image (byte-for-byte) was built by GitHub Actions
+- ✅ The build was triggered from the DomiDre/priotag repository
+- ✅ The signature is logged in Sigstore's transparency log
+- ✅ The image has not been tampered with since signing
+
+**What this does NOT prove:**
+- ❌ Which commit was used (need to check provenance for that)
+- ❌ That GitHub Actions itself wasn't compromised
+- ❌ That the source code is safe (need to audit the code)
+
+### Step 3: Verify the Provenance Attestation
+
+Check which Git commit was used to build this image:
+
+```bash
+# Verify and view the provenance attestation
+cosign verify-attestation \
+  --type slsaprovenance \
+  --certificate-identity-regexp='https://github.com/DomiDre/priotag' \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  ghcr.io/domidre/priotag-backend@sha256:abc123... \
+  | jq -r '.payload' | base64 -d | jq
+```
+
+Look for the `recipe.definedInMaterial` field showing the commit SHA.
+
+### Step 4: Compare with Source Code
+
+Now you can compare the commit SHA from the provenance with:
+- The `/api/v1/build-info` endpoint (should match if not faked)
+- The actual source code on GitHub
+
+```bash
+# View the exact source code used
+git clone https://github.com/DomiDre/priotag.git
+cd priotag
+git checkout <commit-sha-from-provenance>
+
+# Audit the code at this specific commit
+```
+
+### Why This Works
+
+The security model relies on:
+
+1. **Docker Content Trust**: Image digests are cryptographic hashes of the image content
+   - Changing even 1 byte changes the digest
+   - If the digest matches, the content is identical
+
+2. **Cosign Signatures**: Keyless OIDC signing proves:
+   - The image was built by a specific GitHub Actions workflow
+   - The workflow ran in the DomiDre/priotag repository
+   - The signature is in a public transparency log (can't be backdated)
+
+3. **SLSA Provenance**: Cryptographically attests:
+   - Which Git commit was used
+   - What build parameters were used
+   - The complete build recipe
+
+4. **Public Audit Trail**: Everything is verifiable:
+   - GitHub Actions logs are public
+   - Sigstore transparency log is public
+   - Source code is public
+
+### Attack Scenarios and Defenses
+
+| Attack | Can It Fool build-info? | Can It Fool Digest Verification? |
+|--------|------------------------|----------------------------------|
+| Fake build_info.json | ✅ Yes | ❌ No - signature won't match |
+| Modified image | ✅ Yes | ❌ No - digest changes |
+| Different source code | ✅ Yes | ❌ No - provenance shows real commit |
+| Compromised server lying about digest | ✅ Yes | ✅ Yes - you must trust the server operator |
+| Compromised GitHub Actions | ❌ No* | ❌ No* |
+
+\* Would be visible in public audit logs and source code history
+
+**Bottom Line**: The digest verification proves the image is authentic, but you must get the digest from a trusted source (direct server access or trusted operator).
 
 ## Docker Image Verification
 
