@@ -280,8 +280,9 @@ class TestVerifyToken:
             with patch("priotag.utils.update_last_seen"):
                 await verify_token(mock_response, "old_token", fake_redis)
 
-                # Should have set new cookie
-                assert "auth_token" in mock_response.cookies or "Set-Cookie" in mock_response.headers
+                # Should have set new cookie (check in headers)
+                # Response.set_cookie adds to headers, not cookies attribute
+                assert "set-cookie" in mock_response.headers
 
     @pytest.mark.asyncio
     async def test_verify_token_admin_shorter_ttl(self, fake_redis, sample_admin_data):
@@ -362,11 +363,19 @@ class TestVerifyToken:
                 "record": {
                     "id": "user123",
                     "username": "testuser",
+                    "email": "test@example.com",
+                    "emailVisibility": False,
                     "role": "user",
+                    "salt": "dGVzdF9zYWx0",
+                    "user_wrapped_dek": "d3JhcHBlZF9kZWs=",
+                    "admin_wrapped_dek": "YWRtaW5fd3JhcHBlZA==",
+                    "encrypted_fields": "ZW5jcnlwdGVk",
+                    "lastSeen": "2024-01-01T00:00:00Z",
+                    "verified": True,
                     "collectionId": "coll",
                     "collectionName": "users",
-                    "created": "2024-01-01",
-                    "updated": "2024-01-01",
+                    "created": "2024-01-01T00:00:00Z",
+                    "updated": "2024-01-01T00:00:00Z",
                 },
             }
             mock_client.post.return_value = mock_pb_response
@@ -396,11 +405,19 @@ class TestVerifyToken:
                 "record": {
                     "id": "user123",
                     "username": "testuser",
+                    "email": "test@example.com",
+                    "emailVisibility": False,
                     "role": "user",
+                    "salt": "dGVzdF9zYWx0",
+                    "user_wrapped_dek": "d3JhcHBlZF9kZWs=",
+                    "admin_wrapped_dek": "YWRtaW5fd3JhcHBlZA==",
+                    "encrypted_fields": "ZW5jcnlwdGVk",
+                    "lastSeen": "2024-01-01T00:00:00Z",
+                    "verified": True,
                     "collectionId": "coll",
                     "collectionName": "users",
-                    "created": "2024-01-01",
-                    "updated": "2024-01-01",
+                    "created": "2024-01-01T00:00:00Z",
+                    "updated": "2024-01-01T00:00:00Z",
                 },
             }
             mock_client.post.return_value = mock_pb_response

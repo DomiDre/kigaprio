@@ -89,6 +89,15 @@ class TestDEKSplitting:
 class TestDEKPartEncryption:
     """Test encryption of DEK parts for caching."""
 
+    @pytest.fixture(autouse=True)
+    def setup_server_cache_key(self):
+        """Ensure server cache key is initialized for all tests."""
+        # Reset and set a valid 32-byte key
+        EncryptionManager._SERVER_CACHE_KEY = b"test_server_key_32_bytes_long!!"
+        yield
+        # Reset after test
+        EncryptionManager._SERVER_CACHE_KEY = None
+
     def test_encrypt_dek_part(self):
         """Should encrypt DEK part."""
         dek_part = base64.b64encode(b"test_dek_part_32bytes_long!!!").decode()
@@ -119,7 +128,7 @@ class TestDEKPartEncryption:
         with patch.object(
             EncryptionManager, "_get_server_cache_key"
         ) as mock_get_key:
-            mock_get_key.return_value = b"test_key_32_bytes_long_!!!!!!!"
+            mock_get_key.return_value = b"test_key_32_bytes_long_!!!!!!!!"  # 32 bytes
             dek_part = base64.b64encode(b"test_part").decode()
 
             EncryptionManager.encrypt_dek_part(dek_part)
@@ -131,6 +140,15 @@ class TestDEKPartEncryption:
 @pytest.mark.unit
 class TestGetDekFromRequest:
     """Test DEK reconstruction from request based on security tier."""
+
+    @pytest.fixture(autouse=True)
+    def setup_server_cache_key(self):
+        """Ensure server cache key is initialized for all tests."""
+        # Reset and set a valid 32-byte key
+        EncryptionManager._SERVER_CACHE_KEY = b"test_server_key_32_bytes_long!!"
+        yield
+        # Reset after test
+        EncryptionManager._SERVER_CACHE_KEY = None
 
     def test_get_dek_high_security_mode(self, test_dek, fake_redis):
         """High security mode should decode DEK directly from request."""
