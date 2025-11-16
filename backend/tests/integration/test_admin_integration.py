@@ -1,0 +1,675 @@
+"""
+Integration tests for admin endpoints.
+
+Tests the full admin flow with real Redis and PocketBase.
+
+Covers:
+- GET /api/v1/admin/magic-word-info - Get magic word information
+- POST /api/v1/admin/update-magic-word - Update magic word
+- GET /api/v1/admin/total-users - Get total user count
+- GET /api/v1/admin/users/{month} - Get user submissions for month
+- GET /api/v1/admin/users/info/{user_id} - Get user info
+- POST /api/v1/admin/manual-priority - Create/update manual priority
+- GET /api/v1/admin/manual-entries/{month} - Get manual entries
+- DELETE /api/v1/admin/manual-entry/{month}/{identifier} - Delete manual entry
+"""
+
+import re
+import secrets
+from datetime import datetime
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+
+@pytest.mark.integration
+class TestAdminIntegration:
+    """Integration tests for admin endpoints."""
+
+    def _register_and_login(self, test_app: TestClient) -> dict:
+        """Helper: Register a new user and return cookies + user data."""
+        unique_suffix = secrets.token_hex(4)
+        user_data = {
+            "username": f"testuser_{unique_suffix}",
+            "password": "SecurePassword123!",
+            "name": "Test User",
+            "magic_word": "test",
+        }
+
+        # Verify magic word
+        verify_response = test_app.post(
+            "/api/v1/auth/verify-magic-word",
+            json={"magic_word": user_data["magic_word"]},
+        )
+        assert verify_response.status_code == 200
+        magic_word_body = verify_response.json()
+        user_data["reg_token"] = magic_word_body["token"]
+
+        # Register user
+        register_response = test_app.post(
+            "/api/v1/auth/register",
+            json={
+                "identity": user_data["username"],
+                "password": user_data["password"],
+                "passwordConfirm": user_data["password"],
+                "name": user_data["name"],
+                "registration_token": user_data["reg_token"],
+            },
+        )
+        assert register_response.status_code == 200
+
+        # Login
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": user_data["username"],
+                "password": user_data["password"],
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookies
+        set_cookie_headers = login_response.headers.get_list("set-cookie")
+        cookies = {}
+        for cookie_header in set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
+            if cookie_match:
+                cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        assert "auth_token" in cookies
+        assert "dek" in cookies
+
+        return {"cookies": cookies, "user_data": user_data}
+
+    def _elevate_to_admin(
+        self, username: str, pocketbase_admin_client: httpx.Client
+    ) -> None:
+        """Helper: Elevate a user to admin role."""
+        # Find user by username
+        response = pocketbase_admin_client.get(
+            "/api/collections/users/records",
+            params={"filter": f'username="{username}"'},
+        )
+        assert response.status_code == 200
+        users = response.json()["items"]
+        assert len(users) == 1
+
+        user_id = users[0]["id"]
+
+        # Update role to admin
+        response = pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{user_id}",
+            json={"role": "admin"},
+        )
+        assert response.status_code == 200
+
+    def _register_and_login_admin(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ) -> dict:
+        """Helper: Register a user, elevate to admin, and login."""
+        auth = self._register_and_login(test_app)
+
+        # Elevate to admin
+        self._elevate_to_admin(auth["user_data"]["username"], pocketbase_admin_client)
+
+        # Login again to get admin session
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": auth["user_data"]["username"],
+                "password": auth["user_data"]["password"],
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookies
+        set_cookie_headers = login_response.headers.get_list("set-cookie")
+        cookies = {}
+        for cookie_header in set_cookie_headers:
+            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
+            if cookie_match:
+                cookies[cookie_match.group(1)] = cookie_match.group(2)
+
+        return {"cookies": cookies, "user_data": auth["user_data"]}
+
+    def test_get_magic_word_info(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving magic word information."""
+        # Setup: Create admin user and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Get magic word info
+        response = test_app.get("/api/v1/admin/magic-word-info")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "current_magic_word" in data
+        assert data["current_magic_word"] == "test"
+        assert "last_updated" in data
+        assert "last_updated_by" in data
+
+    def test_get_magic_word_info_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot access magic word info."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        response = test_app.get("/api/v1/admin/magic-word-info")
+        assert response.status_code == 403
+
+    def test_update_magic_word(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test updating the magic word."""
+        # Setup: Create admin user and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Update magic word
+        new_magic_word = f"newmagic_{secrets.token_hex(4)}"
+        response = test_app.post(
+            "/api/v1/admin/update-magic-word",
+            json={"new_magic_word": new_magic_word},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["success"] is True
+        assert "updated successfully" in data["message"].lower()
+        assert data["updated_by"] == admin_auth["user_data"]["username"]
+
+        # Verify the update by getting magic word info
+        get_response = test_app.get("/api/v1/admin/magic-word-info")
+        assert get_response.status_code == 200
+        assert get_response.json()["current_magic_word"] == new_magic_word
+
+        # Restore original magic word for other tests
+        restore_response = test_app.post(
+            "/api/v1/admin/update-magic-word",
+            json={"new_magic_word": "test"},
+        )
+        assert restore_response.status_code == 200
+
+    def test_update_magic_word_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot update magic word."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        response = test_app.post(
+            "/api/v1/admin/update-magic-word",
+            json={"new_magic_word": "hacked"},
+        )
+        assert response.status_code == 403
+
+    def test_get_total_users(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test getting total user count."""
+        # Setup: Create admin user and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Get total users
+        response = test_app.get("/api/v1/admin/total-users")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "totalUsers" in data
+        assert isinstance(data["totalUsers"], int)
+        assert data["totalUsers"] >= 1  # At least the admin user
+
+    def test_get_total_users_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot get total user count."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        response = test_app.get("/api/v1/admin/total-users")
+        assert response.status_code == 403
+
+    def test_get_user_submissions(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving user submissions for a month."""
+        # Setup: Create regular user with priorities
+        user_auth = self._register_and_login(test_app)
+        test_app.cookies = user_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        priority_data = [
+            {
+                "weekNumber": 1,
+                "monday": 1,
+                "tuesday": 2,
+                "wednesday": 3,
+                "thursday": 4,
+                "friday": 5,
+            }
+        ]
+
+        create_response = test_app.put(
+            f"/api/v1/priorities/{current_month}",
+            json=priority_data,
+        )
+        assert create_response.status_code == 200
+
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Get user submissions for current month
+        response = test_app.get(f"/api/v1/admin/users/{current_month}")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert isinstance(data, list)
+        assert len(data) >= 1
+
+        # Verify submission structure
+        submission = next(
+            (s for s in data if s["userName"] == user_auth["user_data"]["username"]),
+            None,
+        )
+        assert submission is not None
+        assert "adminWrappedDek" in submission
+        assert "userName" in submission
+        assert "month" in submission
+        assert submission["month"] == current_month
+        assert "userEncryptedFields" in submission
+        assert "prioritiesEncryptedFields" in submission
+
+    def test_get_user_submissions_empty_month(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving submissions for a month with no data."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Get submissions for future month (no data)
+        future_month = "2099-12"
+        response = test_app.get(f"/api/v1/admin/users/{future_month}")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert isinstance(data, list)
+        assert len(data) == 0
+
+    def test_get_user_submissions_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot get user submissions."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        response = test_app.get(f"/api/v1/admin/users/{current_month}")
+        assert response.status_code == 403
+
+    def test_get_user_info(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving user info by user ID."""
+        # Setup: Create a regular user
+        user_auth = self._register_and_login(test_app)
+
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Get user info
+        response = test_app.get(
+            f"/api/v1/admin/users/info/{user_auth['user_data']['username']}"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "username" in data
+        assert data["username"] == user_auth["user_data"]["username"]
+        assert "admin_wrapped_dek" in data
+        assert "encrypted_fields" in data
+        assert "created" in data
+
+    def test_get_user_info_not_found(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving info for non-existent user."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Try to get non-existent user
+        response = test_app.get("/api/v1/admin/users/info/nonexistent_user_12345")
+
+        assert response.status_code == 204
+
+    def test_get_user_info_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot get user info."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        response = test_app.get(f"/api/v1/admin/users/info/{auth['user_data']['username']}")
+        assert response.status_code == 403
+
+    def test_create_manual_priority(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test creating a manual priority entry."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        identifier = f"paper_{secrets.token_hex(4)}"
+
+        # Create manual priority
+        response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": identifier,
+                "month": current_month,
+                "weeks": [
+                    {
+                        "weekNumber": 1,
+                        "monday": 1,
+                        "tuesday": 2,
+                        "wednesday": 3,
+                        "thursday": 4,
+                        "friday": 5,
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["success"] is True
+        assert "erstellt" in data["message"].lower()
+        assert data["identifier"] == identifier
+        assert data["month"] == current_month
+
+    def test_update_manual_priority(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test updating an existing manual priority entry."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        identifier = f"paper_{secrets.token_hex(4)}"
+
+        # Create initial entry
+        create_response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": identifier,
+                "month": current_month,
+                "weeks": [{"weekNumber": 1, "monday": 1}],
+            },
+        )
+        assert create_response.status_code == 200
+
+        # Update the entry
+        update_response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": identifier,
+                "month": current_month,
+                "weeks": [
+                    {
+                        "weekNumber": 1,
+                        "monday": 5,
+                        "tuesday": 4,
+                        "wednesday": 3,
+                        "thursday": 2,
+                        "friday": 1,
+                    }
+                ],
+            },
+        )
+
+        assert update_response.status_code == 200
+        data = update_response.json()
+
+        assert data["success"] is True
+        assert "aktualisiert" in data["message"].lower()
+
+    def test_create_manual_priority_validation(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test manual priority validation."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+
+        # Test empty identifier
+        response1 = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": "   ",
+                "month": current_month,
+                "weeks": [{"weekNumber": 1, "monday": 1}],
+            },
+        )
+        assert response1.status_code == 422
+
+        # Test no priority data
+        response2 = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": "test",
+                "month": current_month,
+                "weeks": [{"weekNumber": 1}],  # No days set
+            },
+        )
+        assert response2.status_code == 422
+
+    def test_create_manual_priority_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot create manual priorities."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": "paper_1",
+                "month": current_month,
+                "weeks": [{"weekNumber": 1, "monday": 1}],
+            },
+        )
+        assert response.status_code == 403
+
+    def test_get_manual_entries(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving manual entries for a month."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        identifier = f"paper_{secrets.token_hex(4)}"
+
+        # Create a manual entry
+        create_response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": identifier,
+                "month": current_month,
+                "weeks": [{"weekNumber": 1, "monday": 1}],
+            },
+        )
+        assert create_response.status_code == 200
+
+        # Get manual entries
+        response = test_app.get(f"/api/v1/admin/manual-entries/{current_month}")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert isinstance(data, list)
+        # Should find our manual entry
+        assert len(data) >= 1
+
+        # Verify entry structure
+        entry = data[0]
+        assert "adminWrappedDek" in entry
+        assert "identifier" in entry
+        assert "month" in entry
+        assert entry["month"] == current_month
+        assert "prioritiesEncryptedFields" in entry
+
+    def test_get_manual_entries_empty(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test retrieving manual entries for month with no entries."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        # Get entries for future month (no data)
+        future_month = "2099-12"
+        response = test_app.get(f"/api/v1/admin/manual-entries/{future_month}")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert isinstance(data, list)
+        assert len(data) == 0
+
+    def test_get_manual_entries_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot get manual entries."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        response = test_app.get(f"/api/v1/admin/manual-entries/{current_month}")
+        assert response.status_code == 403
+
+    def test_delete_manual_entry(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test deleting a manual entry."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        identifier = f"paper_{secrets.token_hex(4)}"
+
+        # Create a manual entry
+        create_response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": identifier,
+                "month": current_month,
+                "weeks": [{"weekNumber": 1, "monday": 1}],
+            },
+        )
+        assert create_response.status_code == 200
+        created_identifier = create_response.json()["identifier"]
+
+        # Delete the entry
+        # Note: The identifier stored is a UUID, not the original identifier
+        # We need to get the actual identifier from manual entries
+        get_response = test_app.get(f"/api/v1/admin/manual-entries/{current_month}")
+        assert get_response.status_code == 200
+        entries = get_response.json()
+
+        # Find our entry by looking for the newest one
+        assert len(entries) >= 1
+        stored_identifier = entries[-1]["identifier"]
+
+        delete_response = test_app.delete(
+            f"/api/v1/admin/manual-entry/{current_month}/{stored_identifier}"
+        )
+
+        assert delete_response.status_code == 200
+        data = delete_response.json()
+
+        assert data["success"] is True
+        assert "gelöscht" in data["message"].lower()
+
+    def test_delete_manual_entry_not_found(
+        self, test_app: TestClient, pocketbase_admin_client: httpx.Client
+    ):
+        """Test deleting a non-existent manual entry."""
+        # Setup: Create admin and login
+        admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
+        test_app.cookies = admin_auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        response = test_app.delete(
+            f"/api/v1/admin/manual-entry/{current_month}/nonexistent_id"
+        )
+
+        assert response.status_code == 404
+
+    def test_delete_manual_entry_unauthorized(self, test_app: TestClient):
+        """Test that non-admin users cannot delete manual entries."""
+        # Setup: Regular user
+        auth = self._register_and_login(test_app)
+        test_app.cookies = auth["cookies"]
+
+        current_month = datetime.now().strftime("%Y-%m")
+        response = test_app.delete(
+            f"/api/v1/admin/manual-entry/{current_month}/some_id"
+        )
+        assert response.status_code == 403
+
+    def test_unauthenticated_access_to_admin_endpoints(self, test_app: TestClient):
+        """Test that unauthenticated requests to admin endpoints are rejected."""
+        test_app.cookies = {}
+
+        current_month = datetime.now().strftime("%Y-%m")
+
+        # Test all admin endpoints
+        endpoints = [
+            ("GET", "/api/v1/admin/magic-word-info"),
+            ("POST", "/api/v1/admin/update-magic-word", {"new_magic_word": "test"}),
+            ("GET", "/api/v1/admin/total-users"),
+            ("GET", f"/api/v1/admin/users/{current_month}"),
+            ("GET", "/api/v1/admin/users/info/test_user"),
+            (
+                "POST",
+                "/api/v1/admin/manual-priority",
+                {
+                    "identifier": "test",
+                    "month": current_month,
+                    "weeks": [{"weekNumber": 1, "monday": 1}],
+                },
+            ),
+            ("GET", f"/api/v1/admin/manual-entries/{current_month}"),
+            ("DELETE", f"/api/v1/admin/manual-entry/{current_month}/test_id"),
+        ]
+
+        for method, endpoint, *args in endpoints:
+            json_data = args[0] if args else None
+            if method == "GET":
+                response = test_app.get(endpoint)
+            elif method == "POST":
+                response = test_app.post(endpoint, json=json_data)
+            elif method == "DELETE":
+                response = test_app.delete(endpoint)
+
+            assert response.status_code in [401, 403], (
+                f"Expected 401/403 for unauthenticated {method} {endpoint}, "
+                f"got {response.status_code}"
+            )
