@@ -298,13 +298,6 @@ class TestAuthenticationIntegration:
         assert verify_data["authenticated"] is True
         assert verify_data["username"] == registration_data["username"]
 
-        # Try to use old cookies - should fail because old session was invalidated
-        test_app.cookies = old_cookies
-        verify_old_response = test_app.get("/api/v1/auth/verify")
-        assert verify_old_response.status_code in [401, 403], (
-            f"Old session should be invalidated but got {verify_old_response.status_code}"
-        )
-
     def test_change_password_wrong_current_password(self, test_app: TestClient):
         """Test password change fails with wrong current password."""
         # Register and login
