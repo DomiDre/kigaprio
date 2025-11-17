@@ -61,4 +61,9 @@ export interface DecryptedData {
 	userName: string;
 	userData: DecryptedUserData;
 	priorities: DecryptedPriorities;
+	// Store encrypted data for cache invalidation detection
+	cachedEncryptedFields?: {
+		userEncryptedFields?: string;
+		prioritiesEncryptedFields?: string;
+	};
 }

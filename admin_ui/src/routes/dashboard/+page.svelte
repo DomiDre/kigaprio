@@ -141,9 +141,11 @@
 	// Auf Monatsänderungen mit $effect reagieren
 	$effect(() => {
 		if (initialFetchDone && selectedMonth) {
+			// Clear cache when month changes since it's different data
 			decryptedUsers.clear();
 			showOverview = false;
-			fetchUserSubmissions();
+			// Fetch and decrypt all for new month
+			fetchUserSubmissions(true);
 		}
 	});
 
@@ -158,7 +160,7 @@
 		}
 	}
 
-	async function fetchUserSubmissions() {
+	async function fetchUserSubmissions(autoDecrypt = true) {
 		isLoading = true;
 		error = '';
 
@@ -203,8 +205,9 @@
 			// Beide Typen kombinieren
 			users = [...regularUsers, ...manualUsers];
 
-			if (keyUploaded) {
-				await decryptAllUsers();
+			// Only auto-decrypt if requested and key is uploaded
+			if (autoDecrypt && keyUploaded) {
+				await decryptNewUsers();
 			}
 		} catch (err) {
 			error = (err as Error).message;
@@ -245,7 +248,11 @@
 						decryptedUsers.set(user.name, {
 							userName: result.userData?.name || user.name,
 							userData: result.userData!,
-							priorities: result.priorities!
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								userEncryptedFields: user.userEncryptedFields,
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
 						});
 					} catch (err) {
 						console.error(`Fehler beim Entschlüsseln der Daten für ${user.name}:`, err);
@@ -265,7 +272,10 @@
 						decryptedUsers.set(user.name, {
 							userName: userName,
 							userData: { name: userName }, // Minimales userData-Objekt erstellen
-							priorities: result.priorities!
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
 						});
 					} catch (err) {
 						console.error(`Fehler beim Entschlüsseln des manuellen Eintrags ${user.name}:`, err);
@@ -276,6 +286,123 @@
 			showOverview = true;
 		} catch (err) {
 			console.error('Fehler während der Stapelentschlüsselung:', err);
+			decryptionError = 'Einige Daten konnten nicht entschlüsselt werden';
+		} finally {
+			isDecryptingAll = false;
+		}
+	}
+
+	// Nur neue Benutzer entschlüsseln (Smart Caching mit Change Detection)
+	async function decryptNewUsers() {
+		if (!keyUploaded || users.length === 0 || isDecryptingAll) return;
+
+		isDecryptingAll = true;
+		decryptionError = '';
+
+		try {
+			let newDecryptions = 0;
+			let reDecryptions = 0;
+
+			// Create a set of current user names for efficient lookup
+			const currentUserNames = new SvelteSet(users.map((u) => u.name));
+
+			// Remove cached users that no longer exist in the current user list
+			for (const cachedName of Array.from(decryptedUsers.keys())) {
+				if (!currentUserNames.has(cachedName)) {
+					decryptedUsers.delete(cachedName);
+				}
+			}
+
+			for (const user of users) {
+				// Check if user is already decrypted AND encrypted data hasn't changed
+				const cached = decryptedUsers.get(user.name);
+				if (cached) {
+					// Check if encrypted data has changed (inexpensive string comparison)
+					const encryptedDataChanged =
+						cached.cachedEncryptedFields?.userEncryptedFields !== user.userEncryptedFields ||
+						cached.cachedEncryptedFields?.prioritiesEncryptedFields !==
+							user.prioritiesEncryptedFields;
+
+					if (!encryptedDataChanged) {
+						// Data hasn't changed, use cached version
+						continue;
+					}
+					// If encrypted data changed, we'll re-decrypt below
+					reDecryptions++;
+				}
+
+				// Den entsprechenden Service basierend auf dem Authentifizierungsmodus verwenden
+				const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
+
+				// Reguläre Benutzerübermittlungen verarbeiten
+				if (
+					!user.isManual &&
+					user.adminWrappedDek &&
+					user.userEncryptedFields &&
+					user.prioritiesEncryptedFields
+				) {
+					try {
+						const result = await service.decryptUserData({
+							adminWrappedDek: user.adminWrappedDek,
+							userEncryptedFields: user.userEncryptedFields,
+							prioritiesEncryptedFields: user.prioritiesEncryptedFields
+						});
+
+						decryptedUsers.set(user.name, {
+							userName: result.userData?.name || user.name,
+							userData: result.userData!,
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								userEncryptedFields: user.userEncryptedFields,
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
+						});
+						if (!cached) newDecryptions++;
+					} catch (err) {
+						console.error(`Fehler beim Entschlüsseln der Daten für ${user.name}:`, err);
+					}
+				}
+				// Manuelle Einträge verarbeiten (keine userEncryptedFields, Benutzername in priorities.name)
+				else if (user.isManual && user.adminWrappedDek && user.prioritiesEncryptedFields) {
+					try {
+						const result = await service.decryptUserData({
+							adminWrappedDek: user.adminWrappedDek,
+							prioritiesEncryptedFields: user.prioritiesEncryptedFields
+						});
+
+						// Benutzernamen aus priorities.name extrahieren
+						const userName = (result.priorities as any)?.name || user.identifier || user.name;
+
+						decryptedUsers.set(user.name, {
+							userName: userName,
+							userData: { name: userName }, // Minimales userData-Objekt erstellen
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
+						});
+						if (!cached) newDecryptions++;
+					} catch (err) {
+						console.error(`Fehler beim Entschlüsseln des manuellen Eintrags ${user.name}:`, err);
+					}
+				}
+			}
+
+			if (decryptedUsers.size > 0) {
+				showOverview = true;
+			}
+
+			// Log for debugging
+			if (newDecryptions > 0 || reDecryptions > 0) {
+				const messages = [];
+				if (newDecryptions > 0) messages.push(`${newDecryptions} neu`);
+				if (reDecryptions > 0) messages.push(`${reDecryptions} aktualisiert`);
+				console.log(
+					`Entschlüsselt: ${messages.join(', ')} (${decryptedUsers.size} gesamt im Cache)`
+				);
+			}
+		} catch (err) {
+			console.error('Fehler während der inkrementellen Entschlüsselung:', err);
 			decryptionError = 'Einige Daten konnten nicht entschlüsselt werden';
 		} finally {
 			isDecryptingAll = false;
@@ -408,12 +535,28 @@
 
 		const cached = decryptedUsers.get(user.name);
 		if (cached) {
-			decryptedData = cached;
-			showDecryptedModal = true;
+			// Check if encrypted data has changed since caching
+			const encryptedDataChanged =
+				cached.cachedEncryptedFields?.userEncryptedFields !== user.userEncryptedFields ||
+				cached.cachedEncryptedFields?.prioritiesEncryptedFields !== user.prioritiesEncryptedFields;
+
+			if (!encryptedDataChanged) {
+				// Use cached version
+				decryptedData = cached;
+				showDecryptedModal = true;
+				return;
+			}
+			// If encrypted data changed, re-decrypt below
+		}
+
+		// Validate required fields based on entry type
+		if (!user.adminWrappedDek || !user.prioritiesEncryptedFields) {
+			decryptionError = 'Unvollständige Daten für diesen Benutzer';
 			return;
 		}
 
-		if (!user.adminWrappedDek || !user.userEncryptedFields || !user.prioritiesEncryptedFields) {
+		// For regular users (not manual entries), userEncryptedFields is also required
+		if (!user.isManual && !user.userEncryptedFields) {
 			decryptionError = 'Unvollständige Daten für diesen Benutzer';
 			return;
 		}
@@ -425,24 +568,51 @@
 			// Den entsprechenden Service basierend auf dem Authentifizierungsmodus verwenden
 			const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
 
-			const result = await service.decryptUserData({
-				adminWrappedDek: user.adminWrappedDek,
-				userEncryptedFields: user.userEncryptedFields,
-				prioritiesEncryptedFields: user.prioritiesEncryptedFields
-			});
+			// Regular users have both user and priority fields
+			if (!user.isManual && user.userEncryptedFields) {
+				const result = await service.decryptUserData({
+					adminWrappedDek: user.adminWrappedDek,
+					userEncryptedFields: user.userEncryptedFields,
+					prioritiesEncryptedFields: user.prioritiesEncryptedFields
+				});
 
-			decryptedUsers.set(user.name, {
-				userName: result.userData?.name || user.name,
-				userData: result.userData!,
-				priorities: result.priorities!
-			});
+				const decryptedDataObj = {
+					userName: result.userData?.name || user.name,
+					userData: result.userData!,
+					priorities: result.priorities!,
+					cachedEncryptedFields: {
+						userEncryptedFields: user.userEncryptedFields,
+						prioritiesEncryptedFields: user.prioritiesEncryptedFields
+					}
+				};
 
-			decryptedData = {
-				userName: result.userData?.name || user.name,
-				userData: result.userData!,
-				priorities: result.priorities!
-			};
-			showDecryptedModal = true;
+				decryptedUsers.set(user.name, decryptedDataObj);
+				decryptedData = decryptedDataObj;
+				showDecryptedModal = true;
+			}
+			// Manual entries only have priority fields
+			else if (user.isManual) {
+				const result = await service.decryptUserData({
+					adminWrappedDek: user.adminWrappedDek,
+					prioritiesEncryptedFields: user.prioritiesEncryptedFields
+				});
+
+				// Extract username from priorities.name for manual entries
+				const userName = (result.priorities as any)?.name || user.identifier || user.name;
+
+				const decryptedDataObj = {
+					userName: userName,
+					userData: { name: userName },
+					priorities: result.priorities!,
+					cachedEncryptedFields: {
+						prioritiesEncryptedFields: user.prioritiesEncryptedFields
+					}
+				};
+
+				decryptedUsers.set(user.name, decryptedDataObj);
+				decryptedData = decryptedDataObj;
+				showDecryptedModal = true;
+			}
 		} catch (err) {
 			console.error('Entschlüsselungsfehler:', err);
 			decryptionError = (err as Error).message;
@@ -620,7 +790,8 @@
 	}
 
 	async function handleUserEditSuccess() {
-		await fetchUserSubmissions();
+		// Preserve cache - only decrypt new/changed users
+		await fetchUserSubmissions(true);
 		successMessage = 'Benutzer erfolgreich aktualisiert!';
 		showSuccessToast = true;
 		setTimeout(() => {
@@ -643,7 +814,14 @@
 
 		try {
 			const result = await apiService.deleteUser(deletingUser.userId);
-			await fetchUserSubmissions();
+
+			// Remove from cache if present
+			if (deletingUser.name) {
+				decryptedUsers.delete(deletingUser.name);
+			}
+
+			// Fetch updated list - preserve cache for remaining users
+			await fetchUserSubmissions(false);
 			await fetchTotalUsers();
 			successMessage = result.message;
 			showSuccessToast = true;
@@ -673,12 +851,14 @@
 
 		try {
 			const result = await apiService.deletePriority(deletingPriority.priorityId);
-			await fetchUserSubmissions();
 
 			// Remove from decrypted users cache if present
 			if (deletingPriority.name) {
 				decryptedUsers.delete(deletingPriority.name);
 			}
+
+			// Fetch updated list - preserve cache for remaining users (no auto-decrypt needed)
+			await fetchUserSubmissions(false);
 
 			successMessage = result.message;
 			showSuccessToast = true;
@@ -700,7 +880,8 @@
 		decryptionError = '';
 
 		try {
-			await Promise.all([fetchTotalUsers(), fetchUserSubmissions()]);
+			// Preserve cache - only decrypt new users
+			await Promise.all([fetchTotalUsers(), fetchUserSubmissions(true)]);
 		} catch (err) {
 			error = 'Fehler beim Aktualisieren der Daten';
 			console.error('Aktualisierungsfehler:', err);
@@ -729,8 +910,8 @@
 			// Modal schließen
 			showManualEntry = false;
 
-			// Daten aktualisieren, um neuen Eintrag anzuzeigen
-			await fetchUserSubmissions();
+			// Daten aktualisieren und nur neue Einträge entschlüsseln (Cache bleibt erhalten)
+			await fetchUserSubmissions(true);
 		} catch (err) {
 			decryptionError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
 		}
@@ -754,8 +935,8 @@
 
 			// Modal NICHT schließen - Benutzer kann weiter eingeben
 
-			// Daten aktualisieren, um neuen Eintrag anzuzeigen
-			await fetchUserSubmissions();
+			// Daten aktualisieren und nur neue Einträge entschlüsseln (Cache bleibt erhalten)
+			await fetchUserSubmissions(true);
 		} catch (err) {
 			decryptionError = err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten';
 		}
@@ -821,13 +1002,19 @@
 		<!-- Fortschrittsindikatoren -->
 		{#if isDecryptingAll}
 			<LoadingIndicator
-				message="Entschlüssele Benutzerdaten... ({decryptedUsers.size}/{users.length})"
+				message={decryptedUsers.size > 0 && decryptedUsers.size < users.length
+					? `Entschlüssele neue Benutzerdaten... (${decryptedUsers.size}/${users.length} im Cache)`
+					: `Entschlüssele Benutzerdaten... (${decryptedUsers.size}/${users.length})`}
 			/>
 		{/if}
 
 		{#if isRefreshing}
 			<LoadingIndicator
-				message="Aktualisiere Daten{keyUploaded ? ' und entschlüssele...' : '...'}"
+				message={keyUploaded && decryptedUsers.size > 0
+					? 'Aktualisiere Daten (Cache bleibt erhalten)...'
+					: keyUploaded
+						? 'Aktualisiere Daten und entschlüssele...'
+						: 'Aktualisiere Daten...'}
 				color="blue"
 			/>
 		{/if}
