@@ -210,37 +210,39 @@
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
 		<div class="container mx-auto max-w-6xl px-4 py-10">
-			<!-- Navigation Bar -->
-			<div class="mb-6 flex items-center justify-between">
-				<h1 class="text-3xl font-bold text-gray-800 dark:text-white">{$LL.dashboard.title()}</h1>
-				<div class="flex gap-3">
+		<!-- Navigation Bar -->
+		<div class="mb-6">
+			<div class="mb-4 flex items-center justify-between">
+				<h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">{$LL.dashboard.title()}</h1>
 				<LanguageSwitcher />
-					<a
-						href="/priorities"
-						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-							/>
-						</svg>
-						{$LL.priorities.title()}
-					</a>
-					<button
-						class="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
-						on:click={handleLogout}>{$LL.auth.logout()}</button
-					>
-				</div>
 			</div>
+			<div class="flex flex-wrap gap-3">
+				<a
+					href="/priorities"
+					class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+						/>
+					</svg>
+					{$LL.priorities.title()}
+				</a>
+				<button
+					class="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
+					on:click={handleLogout}>{$LL.auth.logout()}</button
+				>
+			</div>
+		</div>
 
 			<!-- Welcome Section -->
 			<div class="mb-8 text-center">

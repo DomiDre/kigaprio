@@ -7,18 +7,19 @@
 </script>
 
 <div class="mb-8">
-	<!-- Language Switcher -->
-	<div class="mb-4 flex justify-end">
-		<LanguageSwitcher />
-	</div>
-
 	<!-- Header Content -->
 	<div class="text-center">
-		<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">{$LL.priorities.title()}</h1>
-		<p class="text-gray-600 dark:text-gray-300">
+		<div class="mb-4 flex items-center justify-between sm:justify-center sm:gap-4">
+			<div class="flex-1 sm:flex-initial"></div>
+			<h1 class="text-2xl sm:text-4xl font-bold text-gray-800 dark:text-white">{$LL.priorities.title()}</h1>
+			<div class="flex-1 sm:flex-initial flex justify-end">
+				<LanguageSwitcher />
+			</div>
+		</div>
+		<p class="mb-4 text-gray-600 dark:text-gray-300">
 			{$LL.app.subtitle()}
 		</p>
-		<div class="mt-4 inline-flex items-center rounded-lg bg-white px-4 py-2 shadow dark:bg-gray-800">
+		<div class="inline-flex items-center rounded-lg bg-white px-4 py-2 shadow dark:bg-gray-800">
 			<span class="text-sm text-gray-600 dark:text-gray-300">{$LL.priorities.selectMonth()}:</span>
 			<select
 				bind:value={selectedMonth}
