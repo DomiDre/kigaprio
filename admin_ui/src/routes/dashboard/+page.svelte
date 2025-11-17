@@ -546,7 +546,14 @@
 			// If encrypted data changed, re-decrypt below
 		}
 
-		if (!user.adminWrappedDek || !user.userEncryptedFields || !user.prioritiesEncryptedFields) {
+		// Validate required fields based on entry type
+		if (!user.adminWrappedDek || !user.prioritiesEncryptedFields) {
+			decryptionError = 'Unvollständige Daten für diesen Benutzer';
+			return;
+		}
+
+		// For regular users (not manual entries), userEncryptedFields is also required
+		if (!user.isManual && !user.userEncryptedFields) {
 			decryptionError = 'Unvollständige Daten für diesen Benutzer';
 			return;
 		}
@@ -558,25 +565,51 @@
 			// Den entsprechenden Service basierend auf dem Authentifizierungsmodus verwenden
 			const service = authMode === 'webauthn' ? webAuthnCryptoService : cryptoService;
 
-			const result = await service.decryptUserData({
-				adminWrappedDek: user.adminWrappedDek,
-				userEncryptedFields: user.userEncryptedFields,
-				prioritiesEncryptedFields: user.prioritiesEncryptedFields
-			});
-
-			const decryptedDataObj = {
-				userName: result.userData?.name || user.name,
-				userData: result.userData!,
-				priorities: result.priorities!,
-				cachedEncryptedFields: {
+			// Regular users have both user and priority fields
+			if (!user.isManual && user.userEncryptedFields) {
+				const result = await service.decryptUserData({
+					adminWrappedDek: user.adminWrappedDek,
 					userEncryptedFields: user.userEncryptedFields,
 					prioritiesEncryptedFields: user.prioritiesEncryptedFields
-				}
-			};
+				});
 
-			decryptedUsers.set(user.name, decryptedDataObj);
-			decryptedData = decryptedDataObj;
-			showDecryptedModal = true;
+				const decryptedDataObj = {
+					userName: result.userData?.name || user.name,
+					userData: result.userData!,
+					priorities: result.priorities!,
+					cachedEncryptedFields: {
+						userEncryptedFields: user.userEncryptedFields,
+						prioritiesEncryptedFields: user.prioritiesEncryptedFields
+					}
+				};
+
+				decryptedUsers.set(user.name, decryptedDataObj);
+				decryptedData = decryptedDataObj;
+				showDecryptedModal = true;
+			}
+			// Manual entries only have priority fields
+			else if (user.isManual) {
+				const result = await service.decryptUserData({
+					adminWrappedDek: user.adminWrappedDek,
+					prioritiesEncryptedFields: user.prioritiesEncryptedFields
+				});
+
+				// Extract username from priorities.name for manual entries
+				const userName = (result.priorities as any)?.name || user.identifier || user.name;
+
+				const decryptedDataObj = {
+					userName: userName,
+					userData: { name: userName },
+					priorities: result.priorities!,
+					cachedEncryptedFields: {
+						prioritiesEncryptedFields: user.prioritiesEncryptedFields
+					}
+				};
+
+				decryptedUsers.set(user.name, decryptedDataObj);
+				decryptedData = decryptedDataObj;
+				showDecryptedModal = true;
+			}
 		} catch (err) {
 			console.error('Entschlüsselungsfehler:', err);
 			decryptionError = (err as Error).message;
