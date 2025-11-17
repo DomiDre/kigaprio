@@ -248,7 +248,11 @@
 						decryptedUsers.set(user.name, {
 							userName: result.userData?.name || user.name,
 							userData: result.userData!,
-							priorities: result.priorities!
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								userEncryptedFields: user.userEncryptedFields,
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
 						});
 					} catch (err) {
 						console.error(`Fehler beim Entschlüsseln der Daten für ${user.name}:`, err);
@@ -268,7 +272,10 @@
 						decryptedUsers.set(user.name, {
 							userName: userName,
 							userData: { name: userName }, // Minimales userData-Objekt erstellen
-							priorities: result.priorities!
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
 						});
 					} catch (err) {
 						console.error(`Fehler beim Entschlüsseln des manuellen Eintrags ${user.name}:`, err);
@@ -285,7 +292,7 @@
 		}
 	}
 
-	// Nur neue Benutzer entschlüsseln (Smart Caching)
+	// Nur neue Benutzer entschlüsseln (Smart Caching mit Change Detection)
 	async function decryptNewUsers() {
 		if (!keyUploaded || users.length === 0 || isDecryptingAll) return;
 
@@ -294,6 +301,7 @@
 
 		try {
 			let newDecryptions = 0;
+			let reDecryptions = 0;
 
 			// Create a set of current user names for efficient lookup
 			const currentUserNames = new SvelteSet(users.map(u => u.name));
@@ -306,9 +314,20 @@
 			}
 
 			for (const user of users) {
-				// Skip if already decrypted (smart caching)
-				if (decryptedUsers.has(user.name)) {
-					continue;
+				// Check if user is already decrypted AND encrypted data hasn't changed
+				const cached = decryptedUsers.get(user.name);
+				if (cached) {
+					// Check if encrypted data has changed (inexpensive string comparison)
+					const encryptedDataChanged =
+						cached.cachedEncryptedFields?.userEncryptedFields !== user.userEncryptedFields ||
+						cached.cachedEncryptedFields?.prioritiesEncryptedFields !== user.prioritiesEncryptedFields;
+
+					if (!encryptedDataChanged) {
+						// Data hasn't changed, use cached version
+						continue;
+					}
+					// If encrypted data changed, we'll re-decrypt below
+					reDecryptions++;
 				}
 
 				// Den entsprechenden Service basierend auf dem Authentifizierungsmodus verwenden
@@ -331,9 +350,13 @@
 						decryptedUsers.set(user.name, {
 							userName: result.userData?.name || user.name,
 							userData: result.userData!,
-							priorities: result.priorities!
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								userEncryptedFields: user.userEncryptedFields,
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
 						});
-						newDecryptions++;
+						if (!cached) newDecryptions++;
 					} catch (err) {
 						console.error(`Fehler beim Entschlüsseln der Daten für ${user.name}:`, err);
 					}
@@ -352,9 +375,12 @@
 						decryptedUsers.set(user.name, {
 							userName: userName,
 							userData: { name: userName }, // Minimales userData-Objekt erstellen
-							priorities: result.priorities!
+							priorities: result.priorities!,
+							cachedEncryptedFields: {
+								prioritiesEncryptedFields: user.prioritiesEncryptedFields
+							}
 						});
-						newDecryptions++;
+						if (!cached) newDecryptions++;
 					} catch (err) {
 						console.error(`Fehler beim Entschlüsseln des manuellen Eintrags ${user.name}:`, err);
 					}
@@ -366,8 +392,11 @@
 			}
 
 			// Log for debugging
-			if (newDecryptions > 0) {
-				console.log(`Entschlüsselt: ${newDecryptions} neue Benutzer (${decryptedUsers.size} gesamt im Cache)`);
+			if (newDecryptions > 0 || reDecryptions > 0) {
+				const messages = [];
+				if (newDecryptions > 0) messages.push(`${newDecryptions} neu`);
+				if (reDecryptions > 0) messages.push(`${reDecryptions} aktualisiert`);
+				console.log(`Entschlüsselt: ${messages.join(', ')} (${decryptedUsers.size} gesamt im Cache)`);
 			}
 		} catch (err) {
 			console.error('Fehler während der inkrementellen Entschlüsselung:', err);
@@ -503,9 +532,18 @@
 
 		const cached = decryptedUsers.get(user.name);
 		if (cached) {
-			decryptedData = cached;
-			showDecryptedModal = true;
-			return;
+			// Check if encrypted data has changed since caching
+			const encryptedDataChanged =
+				cached.cachedEncryptedFields?.userEncryptedFields !== user.userEncryptedFields ||
+				cached.cachedEncryptedFields?.prioritiesEncryptedFields !== user.prioritiesEncryptedFields;
+
+			if (!encryptedDataChanged) {
+				// Use cached version
+				decryptedData = cached;
+				showDecryptedModal = true;
+				return;
+			}
+			// If encrypted data changed, re-decrypt below
 		}
 
 		if (!user.adminWrappedDek || !user.userEncryptedFields || !user.prioritiesEncryptedFields) {
@@ -526,17 +564,18 @@
 				prioritiesEncryptedFields: user.prioritiesEncryptedFields
 			});
 
-			decryptedUsers.set(user.name, {
+			const decryptedDataObj = {
 				userName: result.userData?.name || user.name,
 				userData: result.userData!,
-				priorities: result.priorities!
-			});
-
-			decryptedData = {
-				userName: result.userData?.name || user.name,
-				userData: result.userData!,
-				priorities: result.priorities!
+				priorities: result.priorities!,
+				cachedEncryptedFields: {
+					userEncryptedFields: user.userEncryptedFields,
+					prioritiesEncryptedFields: user.prioritiesEncryptedFields
+				}
 			};
+
+			decryptedUsers.set(user.name, decryptedDataObj);
+			decryptedData = decryptedDataObj;
 			showDecryptedModal = true;
 		} catch (err) {
 			console.error('Entschlüsselungsfehler:', err);
