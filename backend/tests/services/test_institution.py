@@ -3,7 +3,7 @@ Tests for institution service.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
 from priotag.services.institution import InstitutionService
@@ -12,13 +12,21 @@ from priotag.models.pocketbase_schemas import InstitutionRecord
 
 
 @pytest.mark.asyncio
-async def test_get_institution_success(mock_httpx_client, sample_institution_data):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_get_institution_success(mock_client_class, sample_institution_data):
     """Test successfully retrieving an institution by ID."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = sample_institution_data
-    mock_httpx_client.get.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     result = await InstitutionService.get_institution("institution_123", "test_token")
@@ -31,13 +39,21 @@ async def test_get_institution_success(mock_httpx_client, sample_institution_dat
 
 
 @pytest.mark.asyncio
-async def test_get_institution_not_found(mock_httpx_client):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_get_institution_not_found(mock_client_class):
     """Test getting non-existent institution raises 404."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 404
     mock_response.text = "Not found"
-    mock_httpx_client.get.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test and verify
     with pytest.raises(HTTPException) as exc_info:
@@ -47,13 +63,21 @@ async def test_get_institution_not_found(mock_httpx_client):
 
 
 @pytest.mark.asyncio
-async def test_get_by_short_code_success(mock_httpx_client, sample_institution_data):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_get_by_short_code_success(mock_client_class, sample_institution_data):
     """Test successfully retrieving an institution by short code."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"items": [sample_institution_data]}
-    mock_httpx_client.get.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     result = await InstitutionService.get_by_short_code("TEST_UNIV", "test_token")
@@ -65,13 +89,21 @@ async def test_get_by_short_code_success(mock_httpx_client, sample_institution_d
 
 
 @pytest.mark.asyncio
-async def test_get_by_short_code_not_found(mock_httpx_client):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_get_by_short_code_not_found(mock_client_class):
     """Test getting institution by non-existent short code raises 404."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"items": []}
-    mock_httpx_client.get.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test and verify
     with pytest.raises(HTTPException) as exc_info:
@@ -81,17 +113,25 @@ async def test_get_by_short_code_not_found(mock_httpx_client):
 
 
 @pytest.mark.asyncio
+@patch("priotag.services.institution.httpx.AsyncClient")
 async def test_list_institutions_active_only(
-    mock_httpx_client, sample_institution_data, sample_institution_data_2
+    mock_client_class, sample_institution_data, sample_institution_data_2
 ):
     """Test listing only active institutions."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "items": [sample_institution_data, sample_institution_data_2]
     }
-    mock_httpx_client.get.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     result = await InstitutionService.list_institutions("test_token", active_only=True)
@@ -103,24 +143,32 @@ async def test_list_institutions_active_only(
     assert result[1].short_code == "SECOND_UNIV"
 
     # Verify filter was applied
-    call_params = mock_httpx_client.get.call_args[1]["params"]
+    call_params = mock_client.get.call_args[1]["params"]
     assert call_params["filter"] == "active=true"
 
 
 @pytest.mark.asyncio
-async def test_list_institutions_all(mock_httpx_client, sample_institution_data):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_list_institutions_all(mock_client_class, sample_institution_data):
     """Test listing all institutions including inactive."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
     inactive_institution = sample_institution_data.copy()
     inactive_institution["active"] = False
     inactive_institution["id"] = "institution_inactive"
 
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "items": [sample_institution_data, inactive_institution]
     }
-    mock_httpx_client.get.return_value = mock_response
+    mock_client.get.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     result = await InstitutionService.list_institutions("test_token", active_only=False)
@@ -128,18 +176,26 @@ async def test_list_institutions_all(mock_httpx_client, sample_institution_data)
     # Verify
     assert len(result) == 2
     # Verify no filter was applied
-    call_params = mock_httpx_client.get.call_args[1].get("params", {})
+    call_params = mock_client.get.call_args[1].get("params", {})
     assert "filter" not in call_params or not call_params.get("filter")
 
 
 @pytest.mark.asyncio
-async def test_create_institution_success(mock_httpx_client, sample_institution_data):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_create_institution_success(mock_client_class, sample_institution_data):
     """Test successfully creating an institution."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = sample_institution_data
-    mock_httpx_client.post.return_value = mock_response
+    mock_client.post.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     create_data = CreateInstitutionRequest(
@@ -156,13 +212,21 @@ async def test_create_institution_success(mock_httpx_client, sample_institution_
 
 
 @pytest.mark.asyncio
-async def test_create_institution_duplicate_short_code(mock_httpx_client):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_create_institution_duplicate_short_code(mock_client_class):
     """Test creating institution with duplicate short code fails."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response for duplicate
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 400
     mock_response.text = "Duplicate short_code"
-    mock_httpx_client.post.return_value = mock_response
+    mock_client.post.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test and verify
     create_data = CreateInstitutionRequest(
@@ -178,16 +242,24 @@ async def test_create_institution_duplicate_short_code(mock_httpx_client):
 
 
 @pytest.mark.asyncio
-async def test_update_institution_success(mock_httpx_client, sample_institution_data):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_update_institution_success(mock_client_class, sample_institution_data):
     """Test successfully updating an institution."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
     updated_data = sample_institution_data.copy()
     updated_data["name"] = "Updated University Name"
 
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = updated_data
-    mock_httpx_client.patch.return_value = mock_response
+    mock_client.patch.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     update_data = UpdateInstitutionRequest(name="Updated University Name")
@@ -202,16 +274,24 @@ async def test_update_institution_success(mock_httpx_client, sample_institution_
 
 
 @pytest.mark.asyncio
-async def test_update_magic_word_success(mock_httpx_client, sample_institution_data):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_update_magic_word_success(mock_client_class, sample_institution_data):
     """Test successfully updating institution magic word."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
     updated_data = sample_institution_data.copy()
     updated_data["registration_magic_word"] = "NewMagic456"
 
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = updated_data
-    mock_httpx_client.patch.return_value = mock_response
+    mock_client.patch.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test
     result = await InstitutionService.update_magic_word(
@@ -224,13 +304,21 @@ async def test_update_magic_word_success(mock_httpx_client, sample_institution_d
 
 
 @pytest.mark.asyncio
-async def test_update_magic_word_not_found(mock_httpx_client):
+@patch("priotag.services.institution.httpx.AsyncClient")
+async def test_update_magic_word_not_found(mock_client_class):
     """Test updating magic word for non-existent institution fails."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 404
     mock_response.text = "Not found"
-    mock_httpx_client.patch.return_value = mock_response
+    mock_client.patch.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test and verify
     with pytest.raises(HTTPException) as exc_info:
@@ -242,23 +330,27 @@ async def test_update_magic_word_not_found(mock_httpx_client):
 
 
 @pytest.mark.asyncio
+@patch("priotag.services.institution.authenticate_service_account")
+@patch("priotag.services.institution.httpx.AsyncClient")
 async def test_get_institution_without_auth_token(
-    mock_httpx_client, sample_institution_data
+    mock_client_class, mock_auth_service, sample_institution_data
 ):
     """Test getting institution without auth token uses service account."""
-    # Setup mock responses
-    # First call: authenticate_service_account
-    auth_response = AsyncMock()
-    auth_response.status_code = 200
-    auth_response.json.return_value = {"token": "service_token"}
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
 
-    # Second call: get institution
-    inst_response = AsyncMock()
+    # Mock service account authentication
+    mock_auth_service.return_value = "service_token"
+
+    # Setup mock response for institution
+    inst_response = MagicMock()
     inst_response.status_code = 200
     inst_response.json.return_value = sample_institution_data
+    mock_client.get.return_value = inst_response
 
-    mock_httpx_client.post.return_value = auth_response
-    mock_httpx_client.get.return_value = inst_response
+    mock_client_class.return_value = mock_client
 
     # Test
     result = await InstitutionService.get_institution("institution_123", auth_token=None)
@@ -266,22 +358,30 @@ async def test_get_institution_without_auth_token(
     # Verify
     assert isinstance(result, InstitutionRecord)
     # Verify service account was used
-    assert mock_httpx_client.post.called
+    assert mock_auth_service.called
 
 
 @pytest.mark.asyncio
+@patch("priotag.services.institution.httpx.AsyncClient")
 async def test_update_institution_partial_update(
-    mock_httpx_client, sample_institution_data
+    mock_client_class, sample_institution_data
 ):
     """Test partial update only sends provided fields."""
+    # Setup mock client
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
     # Setup mock response
     updated_data = sample_institution_data.copy()
     updated_data["active"] = False
 
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = updated_data
-    mock_httpx_client.patch.return_value = mock_response
+    mock_client.patch.return_value = mock_response
+
+    mock_client_class.return_value = mock_client
 
     # Test - only update active status
     update_data = UpdateInstitutionRequest(active=False)
@@ -290,7 +390,7 @@ async def test_update_institution_partial_update(
     )
 
     # Verify only active field was sent
-    call_json = mock_httpx_client.patch.call_args[1]["json"]
+    call_json = mock_client.patch.call_args[1]["json"]
     assert "active" in call_json
     assert call_json["active"] is False
     # Verify other fields were not sent (exclude_none=True)

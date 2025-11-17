@@ -364,6 +364,15 @@ def mock_httpx_client():
     return mock
 
 
+@pytest.fixture
+def client():
+    """Provide TestClient for API testing."""
+    from fastapi.testclient import TestClient
+    from priotag.main import app
+
+    return TestClient(app)
+
+
 @pytest.fixture(autouse=True)
 def reset_environment(request):
     """Reset environment variables after unit tests only (not integration tests)."""

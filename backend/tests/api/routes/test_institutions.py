@@ -3,13 +3,7 @@ Tests for institution API routes.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
-
-from priotag.main import app
-
-
-client = TestClient(app)
 
 
 class TestPublicInstitutionEndpoints:
@@ -17,7 +11,7 @@ class TestPublicInstitutionEndpoints:
 
     @patch("priotag.api.routes.institutions.InstitutionService.list_institutions")
     def test_list_institutions_success(
-        self, mock_list, sample_institution_data, sample_institution_data_2
+        self, mock_list, sample_institution_data, sample_institution_data_2, client
     ):
         """Test listing active institutions."""
         # Mock the service
