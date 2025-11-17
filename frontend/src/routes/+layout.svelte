@@ -5,6 +5,9 @@
 	import ReAuthModal from '$lib/components/ReAuthModal.svelte';
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { initI18n } from '$i18n/i18n-setup';
+	import { setLocale } from '$i18n/i18n-svelte';
+	import { LL } from '$i18n/i18n-svelte';
 
 	let { children } = $props();
 
@@ -16,6 +19,10 @@
 	const publicRoutes = ['/login', '/register', '/imprint', '/privacy'];
 
 	onMount(async () => {
+		// Initialize i18n first
+		const detectedLocale = await initI18n();
+		setLocale(detectedLocale);
+
 		// Prevent concurrent auth checks
 		if (isVerifying) return;
 		isVerifying = true;
@@ -67,7 +74,7 @@
 			<div
 				class="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"
 			></div>
-			<p class="text-gray-600 dark:text-gray-400">Lade...</p>
+			<p class="text-gray-600 dark:text-gray-400">{$LL.common.loading()}</p>
 		</div>
 	</div>
 {:else}

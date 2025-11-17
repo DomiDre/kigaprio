@@ -4,6 +4,8 @@
 	import { apiService } from '$lib/api.service';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import { LL } from '$i18n/i18n-svelte';
 
 	let username = '';
 	let password = '';
@@ -37,16 +39,21 @@
 </script>
 
 {#if $isAuthenticated}
-	<Loading message="Lade..." />
+	<Loading message={$LL.common.loading()} />
 {:else}
 	<div
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
 		<div class="container mx-auto max-w-5xl px-4 py-8">
+			<!-- Language Switcher -->
+			<div class="mb-4 flex justify-end">
+				<LanguageSwitcher />
+			</div>
+
 			<!-- Header -->
 			<div class="mb-8 text-center">
-				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Prio Tag</h1>
-				<p class="text-gray-600 dark:text-gray-300">Prio Tage für den Monat festlegen</p>
+				<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">{$LL.app.title()}</h1>
+				<p class="text-gray-600 dark:text-gray-300">{$LL.app.subtitle()}</p>
 			</div>
 
 			<!-- Main Card -->
@@ -54,7 +61,7 @@
 				<form class="space-y-6" on:submit|preventDefault={handleLogin}>
 					<!-- Username -->
 					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-						Username
+						{$LL.common.username()}
 						<input
 							type="text"
 							bind:value={username}
@@ -69,7 +76,7 @@
 
 					<!-- Password -->
 					<label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-						Passwort
+						{$LL.common.password()}
 						<input
 							type="password"
 							bind:value={password}
@@ -98,14 +105,13 @@
 							/>
 							<div class="ml-3 flex-1">
 								<span class="block font-medium text-gray-900 dark:text-white">
-									Angemeldet bleiben
+									{$LL.auth.login.keepLoggedIn()}
 								</span>
 								<span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">
 									{#if keepLoggedIn}
-										Sie bleiben 30 Tage angemeldet. Empfohlen für persönliche Geräte.
+										{$LL.auth.login.keepLoggedInDesc30Days()}
 									{:else}
-										Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen
-										für gemeinsam genutzte Computer.
+										{$LL.auth.login.keepLoggedInDesc8Hours()}
 									{/if}
 								</span>
 							</div>
@@ -120,7 +126,7 @@
 							   text-white shadow-lg transition hover:scale-105
 							   disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
 					>
-						{isLoading ? 'Wird angemeldet...' : 'Anmelden'}
+						{isLoading ? $LL.auth.login.loggingIn() : $LL.auth.login.loginButton()}
 					</button>
 
 					<!-- Register Button -->
@@ -132,7 +138,7 @@
 						       disabled:cursor-not-allowed disabled:opacity-50"
 						on:click={goToRegister}
 					>
-						Registrieren
+						{$LL.auth.login.registerButton()}
 					</button>
 
 					<!-- Error Message -->
@@ -173,8 +179,7 @@
 							/>
 						</svg>
 						<p class="leading-relaxed">
-							Gespeicherte Daten werden Serverseitig verschlüsselt. Wir können Ihre persönlichen
-							Informationen nicht lesen.
+							{$LL.auth.login.securityNote()}
 						</p>
 					</div>
 				</div>
@@ -189,15 +194,15 @@
 						rel="noopener noreferrer"
 						class="transition-colors hover:text-blue-600 dark:hover:text-blue-400"
 					>
-						GitHub
+						{$LL.common.github()}
 					</a>
 					<span class="text-gray-400">•</span>
 					<a href="/imprint" class="transition-colors hover:text-blue-600 dark:hover:text-blue-400">
-						Impressum
+						{$LL.common.imprint()}
 					</a>
 					<span class="text-gray-400">•</span>
 					<a href="/privacy" class="transition-colors hover:text-blue-600 dark:hover:text-blue-400">
-						Datenschutz
+						{$LL.common.privacy()}
 					</a>
 				</div>
 			</div>

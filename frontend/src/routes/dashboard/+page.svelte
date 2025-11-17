@@ -8,6 +8,8 @@
 	import type { WeekData } from '$lib/priorities.types';
 	import { SvelteDate } from 'svelte/reactivity';
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
+	import { LL } from '$i18n/i18n-svelte';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 
 	let loading = true;
 	let priorities: WeekData[] = [];
@@ -33,7 +35,7 @@
 
 	async function loadPriorities() {
 		if (!$isAuthenticated) {
-			error = 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.';
+			error = $LL.errors.sessionExpired();
 			setTimeout(() => {
 				authStore.clearAuth();
 				goto('/login');
@@ -57,13 +59,13 @@
 		} catch (err: any) {
 			console.error('Error loading priorities:', err);
 			if (err.message?.includes('Verschlüsselungsschlüssel')) {
-				error = 'Sitzung abgelaufen. Sie werden zur Anmeldung weitergeleitet...';
+				error = $LL.errors.sessionExpired();
 				setTimeout(() => {
 					authStore.clearAuth();
 					goto('/login');
 				}, 2000);
 			} else {
-				error = 'Fehler beim Laden der Prioritäten';
+				error = $LL.priorities.errorSaving();
 			}
 			priorities = [];
 		} finally {
@@ -153,14 +155,6 @@
 				: 0;
 
 		// Find which day most often gets high priority (4-5)
-		const dayNames = {
-			monday: 'Montag',
-			tuesday: 'Dienstag',
-			wednesday: 'Mittwoch',
-			thursday: 'Donnerstag',
-			friday: 'Freitag'
-		};
-
 		let maxHighDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' = 'monday' as const;
 		let maxHighCount = dayPriorityCount.monday.high;
 		let maxLowDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' = 'monday' as const;
@@ -177,8 +171,9 @@
 			}
 		});
 
-		mostCommonHighPriorityDay = maxLowCount > 0 ? dayNames[maxLowDay] : '';
-		mostCommonLowPriorityDay = maxHighCount > 0 ? dayNames[maxHighDay] : '';
+		// Use i18n for day names (and fix the swapped bug - high should be maxHighDay, low should be maxLowDay)
+		mostCommonHighPriorityDay = maxHighCount > 0 ? $LL.priorities.days[maxHighDay]() : '';
+		mostCommonLowPriorityDay = maxLowCount > 0 ? $LL.priorities.days[maxLowDay]() : '';
 	}
 
 	async function handleLogout() {
@@ -216,9 +211,14 @@
 	>
 		<div class="container mx-auto max-w-6xl px-4 py-10">
 			<!-- Navigation Bar -->
-			<div class="mb-6 flex items-center justify-between">
-				<h1 class="text-3xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
-				<div class="flex gap-3">
+			<div class="mb-6">
+				<div class="mb-4 flex items-center justify-between">
+					<h1 class="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
+						{$LL.dashboard.title()}
+					</h1>
+					<LanguageSwitcher />
+				</div>
+				<div class="flex flex-wrap gap-3">
 					<a
 						href="/priorities"
 						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
@@ -237,11 +237,11 @@
 								d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
 							/>
 						</svg>
-						Prioritäten
+						{$LL.priorities.title()}
 					</a>
 					<button
 						class="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
-						on:click={handleLogout}>Logout</button
+						on:click={handleLogout}>{$LL.auth.logout()}</button
 					>
 				</div>
 			</div>
@@ -249,20 +249,20 @@
 			<!-- Welcome Section -->
 			<div class="mb-8 text-center">
 				<h2 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white">
-					Willkommen zurück!
+					{$LL.dashboard.welcome()}
 				</h2>
 				<p class="text-gray-600 dark:text-gray-300">
 					{#if allWeeksCompleted}
-						🎉 Super! Alle Wochen für {selectedMonth} sind priorisiert!
+						🎉 {$LL.dashboard.allWeeksComplete({ month: selectedMonth })}
 					{:else}
-						Hier ist Ihre Übersicht für {selectedMonth}
+						{$LL.dashboard.overviewForMonth({ month: selectedMonth })}
 					{/if}
 				</p>
 
 				<!-- Month Selector -->
 				<div class="mt-4 flex items-center justify-center gap-3">
 					<label for="month-select" class="text-sm font-medium text-gray-700 dark:text-gray-300">
-						Monat auswählen:
+						{$LL.dashboard.selectMonth()}
 					</label>
 					<select
 						id="month-select"
@@ -277,7 +277,7 @@
 			</div>
 
 			{#if loading}
-				<Loading message="Lade Dashboard..." />
+				<Loading message={$LL.dashboard.loading()} />
 			{:else if error}
 				<div class="mb-6 rounded-lg bg-red-100 p-4 text-red-700 dark:bg-red-900 dark:text-red-300">
 					{error}
@@ -288,7 +288,9 @@
 					<!-- Completion Rate (Days Filled) -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
-							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Fortschritt</span>
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+								>{$LL.dashboard.progress()}</span
+							>
 							<span class="text-2xl">📊</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
@@ -301,21 +303,25 @@
 							></div>
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{totalPrioritiesSet} von {totalWeeks * 5} Tagen priorisiert
+							{$LL.dashboard.daysPrioritized({ count: totalPrioritiesSet, total: totalWeeks * 5 })}
 						</div>
 					</div>
 
 					<!-- Most Important Day -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
-							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">Fokus-Tag</span>
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+								>{$LL.dashboard.focusDay()}</span
+							>
 							<span class="text-2xl">🔥</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
 							{mostCommonHighPriorityDay || '-'}
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{mostCommonHighPriorityDay ? 'Oft mit hoher Priorität (1-2)' : 'Keine Daten'}
+							{mostCommonHighPriorityDay
+								? $LL.dashboard.oftenHighPriority()
+								: $LL.dashboard.noData()}
 						</div>
 					</div>
 
@@ -323,7 +329,7 @@
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
 							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
-								>Entspannter Tag</span
+								>{$LL.dashboard.relaxedDay()}</span
 							>
 							<span class="text-2xl">☕</span>
 						</div>
@@ -331,7 +337,7 @@
 							{mostCommonLowPriorityDay || '-'}
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{mostCommonLowPriorityDay ? 'Oft mit niedriger Priorität (4-5)' : 'Keine Daten'}
+							{mostCommonLowPriorityDay ? $LL.dashboard.oftenLowPriority() : $LL.dashboard.noData()}
 						</div>
 					</div>
 				</div>
@@ -340,7 +346,7 @@
 				{#if priorities.length > 0}
 					<div class="mb-8 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<h3 class="mb-4 text-lg font-semibold text-purple-600 dark:text-purple-300">
-							Wochenübersicht - {selectedMonth}
+							{$LL.dashboard.weekOverview({ month: selectedMonth })}
 						</h3>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
 							{#each priorities as week (week.weekNumber)}
@@ -349,7 +355,8 @@
 								>
 									<div>
 										<span class="font-medium text-gray-800 dark:text-gray-200">
-											Woche {week.weekNumber}
+											{$LL.dashboard.week()}
+											{week.weekNumber}
 										</span>
 									</div>
 									<div>
@@ -357,13 +364,13 @@
 											<span
 												class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
 											>
-												✓ Vollständig
+												✓ {$LL.dashboard.complete()}
 											</span>
 										{:else}
 											<span
 												class="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200"
 											>
-												In Bearbeitung
+												{$LL.dashboard.inProgress()}
 											</span>
 										{/if}
 									</div>
@@ -373,13 +380,15 @@
 						{#if !allWeeksCompleted && getNextIncompleteWeek()}
 							<div class="mt-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
 								<p class="text-sm text-blue-700 dark:text-blue-300">
-									💡 Nächste zu bearbeitende Woche: <strong>Woche {getNextIncompleteWeek()}</strong>
+									💡 {$LL.dashboard.nextWeekToWorkOn({
+										weekNumber: getNextIncompleteWeek() || 0
+									})}
 								</p>
 								<a
 									href="/priorities"
 									class="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400"
 								>
-									Jetzt bearbeiten →
+									{$LL.dashboard.editNow()}
 								</a>
 							</div>
 						{/if}
@@ -391,16 +400,18 @@
 					class="flex items-center justify-between rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800"
 				>
 					<div>
-						<h3 class="font-semibold text-gray-800 dark:text-white">Account-Verwaltung</h3>
+						<h3 class="font-semibold text-gray-800 dark:text-white">
+							{$LL.dashboard.accountManagement()}
+						</h3>
 						<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-							Passwort ändern, Gespeicherte Daten einsehen, Account löschen
+							{$LL.dashboard.accountManagementDesc()}
 						</p>
 					</div>
 					<a
 						href="/account"
 						class="rounded-lg bg-purple-100 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300"
 					>
-						Account verwalten →
+						{$LL.dashboard.manageAccount()}
 					</a>
 				</div>
 			{/if}

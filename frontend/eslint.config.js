@@ -12,6 +12,16 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	{
+		ignores: [
+			// Auto-generated i18n files (typesafe-i18n)
+			'src/i18n/i18n-types.ts',
+			'src/i18n/i18n-util.ts',
+			'src/i18n/i18n-util.async.ts',
+			'src/i18n/i18n-util.sync.ts',
+			'src/i18n/i18n-svelte.ts'
+		]
+	},
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs.recommended,

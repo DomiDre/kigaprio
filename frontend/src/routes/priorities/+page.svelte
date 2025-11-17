@@ -29,6 +29,7 @@
 	import { dayKeys } from '$lib/priorities.config';
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { LL } from '$i18n/i18n-svelte';
 
 	// Component state
 	const monthOptions = getMonthOptions();
@@ -206,10 +207,10 @@
 				status: getWeekStatusUtil(week, vacationDaysMap)
 			}));
 
-			saveSuccess = 'Prioritäten erfolgreich gespeichert';
+			saveSuccess = $LL.priorities.savedSuccess();
 			setTimeout(() => (saveSuccess = ''), 3000);
 		} catch (error: any) {
-			saveError = error.message || 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
+			saveError = error.message || $LL.priorities.errorSavingRetry();
 			setTimeout(() => (saveError = ''), 3000);
 			console.error('Save error:', error);
 			throw error;
@@ -226,9 +227,9 @@
 		if (validPriorities.length === 5) {
 			const uniquePriorities = new Set(validPriorities);
 			if (uniquePriorities.size !== 5) {
-				saveError = 'Jeder Wochentag muss eine eindeutige Priorität haben';
+				saveError = $LL.priorities.errorUniquePriorities();
 				setTimeout(() => (saveError = ''), 3000);
-				throw new Error('Jeder Wochentag muss eine eindeutige Priorität haben');
+				throw new Error($LL.priorities.errorUniquePriorities());
 			}
 		}
 
@@ -275,7 +276,7 @@
 </script>
 
 {#if isLoading}
-	<Loading message="Lade..." />
+	<Loading message={$LL.common.loading()} />
 {:else}
 	<ProtectedRoute>
 		<div
