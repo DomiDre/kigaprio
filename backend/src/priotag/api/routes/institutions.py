@@ -263,14 +263,18 @@ async def update_institution_magic_word(
     """
     Update the magic word for the current user's institution.
 
-    This endpoint allows institution admins to update their institution's magic word.
-    Super admins can update any institution's magic word.
+    This endpoint is for institution admins to update their own institution's magic word.
+    Institution admins can only update their own institution.
+    Super admins should use the super admin endpoint instead.
     """
-    # Only institution_admin or super_admin can update magic word
-    if session.role not in ["institution_admin", "super_admin"]:
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    # Only institution_admin can use this endpoint
+    if session.role not in ["institution_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="This endpoint is for institution admins only. Super admins should use /admin/super/institutions/{institution_id}",
+        )
 
-    if not session.institution_id and session.role != "super_admin":
+    if not session.institution_id:
         raise HTTPException(
             status_code=400, detail="User is not associated with an institution"
         )

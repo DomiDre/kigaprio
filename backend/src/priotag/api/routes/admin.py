@@ -25,6 +25,93 @@ from priotag.utils import get_current_dek, get_current_token, require_admin
 router = APIRouter()
 
 
+def build_institution_filter(session: SessionInfo, base_filter: str = "") -> str:
+    """
+    Build filter string with institution isolation for institution admins.
+
+    Super admins can see all data (no institution filter).
+    Institution admins can only see data from their institution.
+
+    Args:
+        session: Current session info with role and institution_id
+        base_filter: Existing filter string (e.g., "month='2025-01'")
+
+    Returns:
+        Filter string with institution_id added if needed
+
+    Raises:
+        HTTPException: If user is institution_admin but has no institution_id
+    """
+    if session.role == "super_admin":
+        # Super admin sees everything
+        return base_filter
+
+    # Institution admin or regular admin - must filter by institution
+    if not session.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail="User not associated with an institution",
+        )
+
+    # Add institution_id filter
+    institution_filter = f"institution_id='{session.institution_id}'"
+
+    if base_filter:
+        return f"{base_filter} && {institution_filter}"
+    else:
+        return institution_filter
+
+
+async def verify_user_belongs_to_institution(
+    user_id: str,
+    session: SessionInfo,
+    token: str,
+) -> UsersResponse:
+    """
+    Verify that a user belongs to the admin's institution (or allow if super_admin).
+
+    Args:
+        user_id: User ID to check
+        session: Current session info
+        token: Auth token
+
+    Returns:
+        UsersResponse if user belongs to institution
+
+    Raises:
+        HTTPException: If user not found or doesn't belong to institution
+    """
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if user_response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+
+        if user_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail="Fehler beim Abrufen des Benutzers"
+            )
+
+        user_data = user_response.json()
+        user = UsersResponse(**user_data)
+
+        # Super admin can access any user
+        if session.role == "super_admin":
+            return user
+
+        # Institution admin can only access users from their institution
+        if user.institution_id != session.institution_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Sie haben keine Berechtigung auf diesen Benutzer zuzugreifen",
+            )
+
+        return user
+
+
 @router.get("/magic-word-info")
 async def get_magic_word_info(
     token: str = Depends(get_current_token),
@@ -95,13 +182,25 @@ async def update_magic_word(
 @router.get("/total-users")
 async def get_total_users(
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
-    """Get total count of registered users in the system"""
+    """
+    Get total count of registered users.
+
+    Institution admins see only users from their institution.
+    Super admins see all users.
+    """
     async with httpx.AsyncClient() as client:
+        # Build filter with institution isolation
+        filter_str = build_institution_filter(session, "")
+
+        params = {"perPage": 1}
+        if filter_str:
+            params["filter"] = filter_str
+
         response = await client.get(
             f"{POCKETBASE_URL}/api/collections/users/records",
-            params={"perPage": 1},
+            params=params,
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -118,7 +217,7 @@ async def get_total_users(
 async def get_user_submissions(
     month: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ) -> list[UserPriorityRecordForAdmin]:
     """Get all user submissions for a specific month, data is still
     encrypted and needs to be decrypted locally using admin private key
@@ -126,14 +225,21 @@ async def get_user_submissions(
 
     Note: This only returns regular user submissions (identifier = null).
     Manual entries (with identifier set) are excluded.
+
+    Institution admins only see submissions from their institution.
+    Super admins see all submissions.
     """
 
     async with httpx.AsyncClient() as client:
+        # Build filter with institution isolation
+        base_filter = f"manual = false && month='{month}' && identifier = null"
+        filter_str = build_institution_filter(session, base_filter)
+
         # Fetch priorities for the month - only regular user submissions (identifier is null)
         priorities_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f"manual = false && month='{month}' && identifier = null",
+                "filter": filter_str,
                 "perPage": 500,
             },
             headers={"Authorization": f"Bearer {token}"},
@@ -164,7 +270,14 @@ async def get_user_submissions(
 
         # Fetch only the users who have submissions
         # Build filter for multiple user IDs: id="id1" || id="id2" || ...
-        user_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+        user_id_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+
+        # Add institution filtering to user query
+        # Wrap user_id_filter in parentheses if adding institution filter
+        if session.role != "super_admin" and session.institution_id:
+            user_filter = f"({user_id_filter}) && institution_id='{session.institution_id}'"
+        else:
+            user_filter = user_id_filter
 
         users_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/users/records",
@@ -215,18 +328,25 @@ async def get_user_submissions(
 async def get_user_for_admin(
     user_id: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Return encrypted user data.
     Server CANNOT decrypt this - admin must decrypt client-side!
+
+    Institution admins can only access users from their institution.
+    Super admins can access any user.
     """
     async with httpx.AsyncClient() as client:
         try:
+            # Build filter with institution isolation
+            base_filter = f"username='{user_id}'"
+            filter_str = build_institution_filter(session, base_filter)
+
             # Fetch user details
             user_response = await client.get(
                 f"{POCKETBASE_URL}/api/collections/users/records",
-                params={"filter": f"username='{user_id}'"},
+                params={"filter": filter_str},
                 headers={"Authorization": f"Bearer {token}"},
             )
             if user_response.status_code != 200:
@@ -239,11 +359,14 @@ async def get_user_for_admin(
                     status_code=500, detail="In Antwort fehlen erwartete Felder"
                 )
             if response_data["totalItems"] != 1:
-                raise HTTPException(status_code=204, detail="User nicht gefunden")
+                raise HTTPException(
+                    status_code=404,
+                    detail="Benutzer nicht gefunden oder keine Berechtigung",
+                )
 
             user_record = UsersResponse(**response_data["items"][0])
         except HTTPException:
-            # Re-raise HTTPExceptions (like the 204 from above)
+            # Re-raise HTTPExceptions (like the 404 from above)
             raise
         except Exception as e:
             raise HTTPException(
@@ -311,13 +434,21 @@ async def create_manual_priority(
             detail="Bitte geben Sie mindestens eine Priorität ein",
         )
 
+    # Verify admin has institution_id
+    if not auth_data.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin ist keiner Institution zugeordnet",
+        )
+
     async with httpx.AsyncClient() as client:
-        # Check if entry already exists for this identifier + month
+        # Check if entry already exists for this identifier + month + institution
+        base_check_filter = f'manual = true && month="{request.month}" && identifier="{identifier}"'
+        check_filter = build_institution_filter(auth_data, base_check_filter)
+
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={
-                "filter": f'manual = true && month="{request.month}" && identifier="{identifier}"'
-            },
+            params={"filter": check_filter},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -342,13 +473,14 @@ async def create_manual_priority(
                 detail=f"Verschlüsselung fehlgeschlagen: {str(e)}",
             ) from e
 
-        # Create priority record
+        # Create priority record with institution_id
         priority_data = {
             "userId": auth_data.id,
             "month": request.month,
             "identifier": identifier,
             "encrypted_fields": encrypted_data,
             "manual": True,
+            "institution_id": auth_data.institution_id,
         }
 
         if existing_id:
@@ -388,19 +520,26 @@ async def create_manual_priority(
 async def get_manual_entries(
     month: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Get all manual entries for a specific month.
 
     Returns encrypted data that must be decrypted client-side by admin.
+
+    Institution admins only see manual entries from their institution.
+    Super admins see all manual entries.
     """
     async with httpx.AsyncClient() as client:
+        # Build filter with institution isolation
+        base_filter = f'manual = true && month="{month}" && identifier!=null'
+        filter_str = build_institution_filter(session, base_filter)
+
         # Fetch manual entries (where identifier is NOT null)
         response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
             params={
-                "filter": f'manual = true && month="{month}" && identifier!=null',
+                "filter": filter_str,
                 "perPage": 500,
             },
             headers={"Authorization": f"Bearer {token}"},
@@ -432,7 +571,15 @@ async def get_manual_entries(
 
         # Fetch only the users who have submissions
         # Build filter for multiple user IDs: id="id1" || id="id2" || ...
-        user_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+        user_id_filter = " || ".join([f'id="{uid}"' for uid in user_ids])
+
+        # Add institution filtering to user query
+        # Wrap user_id_filter in parentheses if adding institution filter
+        if session.role != "super_admin" and session.institution_id:
+            user_filter = f"({user_id_filter}) && institution_id='{session.institution_id}'"
+        else:
+            user_filter = user_id_filter
+
         users_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/users/records",
             params={"filter": user_filter, "perPage": 500},
@@ -480,18 +627,22 @@ async def delete_manual_entry(
     month: str,
     identifier: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Delete a specific manual entry by month and identifier.
+
+    Institution admins can only delete manual entries from their institution.
+    Super admins can delete any manual entry.
     """
     async with httpx.AsyncClient() as client:
-        # Find the entry
+        # Find the entry with institution filtering
+        base_filter = f'manual = true && month="{month}" && identifier="{identifier}"'
+        filter_str = build_institution_filter(session, base_filter)
+
         check_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={
-                "filter": f'manual = true && month="{month}" && identifier="{identifier}"'
-            },
+            params={"filter": filter_str},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -505,7 +656,7 @@ async def delete_manual_entry(
         if len(items) == 0:
             raise HTTPException(
                 status_code=404,
-                detail=f"Manueller Eintrag nicht gefunden (Monat: {month}, Kennung: {identifier})",
+                detail=f"Manueller Eintrag nicht gefunden oder keine Berechtigung (Monat: {month}, Kennung: {identifier})",
             )
 
         record_id = items[0]["id"]
@@ -532,44 +683,29 @@ async def delete_manual_entry(
 async def get_user_detail(
     user_id: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Get detailed user information by user ID.
     Returns encrypted user data that must be decrypted client-side.
+
+    Institution admins can only access users from their institution.
+    Super admins can access any user.
     """
-    async with httpx.AsyncClient() as client:
-        user_response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+    # Verify user belongs to institution (or allow if super_admin)
+    user = await verify_user_belongs_to_institution(user_id, session, token)
 
-        if user_response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail="Benutzer nicht gefunden",
-            )
-
-        if user_response.status_code != 200:
-            raise HTTPException(
-                status_code=500,
-                detail="Fehler beim Abrufen des Benutzers",
-            )
-
-        user_data = user_response.json()
-        user = UsersResponse(**user_data)
-
-        return {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "admin_wrapped_dek": user.admin_wrapped_dek,
-            "encrypted_fields": user.encrypted_fields,
-            "created": user.created,
-            "updated": user.updated,
-            "lastSeen": user.lastSeen,
-        }
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "admin_wrapped_dek": user.admin_wrapped_dek,
+        "encrypted_fields": user.encrypted_fields,
+        "created": user.created,
+        "updated": user.updated,
+        "lastSeen": user.lastSeen,
+    }
 
 
 @router.put("/users/{user_id}")
@@ -577,12 +713,18 @@ async def update_user(
     user_id: str,
     request: UpdateUserRequest,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Update user details (username, email, role).
     Note: This only updates basic fields. Encrypted data cannot be modified here.
+
+    Institution admins can only update users from their institution.
+    Super admins can update any user.
     """
+    # Verify user belongs to institution (or allow if super_admin)
+    await verify_user_belongs_to_institution(user_id, session, token)
+
     async with httpx.AsyncClient() as client:
         # Build update payload with only provided fields
         update_data = {}
@@ -635,38 +777,28 @@ async def update_user(
 async def delete_user(
     user_id: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Delete a user and all their associated priority records.
     This is a cascading delete operation.
+
+    Institution admins can only delete users from their institution.
+    Super admins can delete any user.
     """
+    # Verify user belongs to institution (or allow if super_admin)
+    user = await verify_user_belongs_to_institution(user_id, session, token)
+    username = user.username
+
     async with httpx.AsyncClient() as client:
-        # First, get the user to verify they exist and get username for response
-        user_response = await client.get(
-            f"{POCKETBASE_URL}/api/collections/users/records/{user_id}",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if user_response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail="Benutzer nicht gefunden",
-            )
-
-        if user_response.status_code != 200:
-            raise HTTPException(
-                status_code=500,
-                detail="Fehler beim Abrufen des Benutzers",
-            )
-
-        user_data = user_response.json()
-        username = user_data.get("username", user_id)
-
         # Delete all priorities associated with this user
+        # Add institution filter to priorities query for extra safety
+        base_priority_filter = f'userId="{user_id}"'
+        priority_filter = build_institution_filter(session, base_priority_filter)
+
         priorities_response = await client.get(
             f"{POCKETBASE_URL}/api/collections/priorities/records",
-            params={"filter": f'userId="{user_id}"', "perPage": 500},
+            params={"filter": priority_filter, "perPage": 500},
             headers={"Authorization": f"Bearer {token}"},
         )
 
