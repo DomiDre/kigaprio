@@ -204,7 +204,7 @@ const de = {
 		week: 'Woche',
 		complete: 'Vollständig',
 		inProgress: 'In Bearbeitung',
-		nextWeekToWorkOn: 'Nächste zu bearbeitende Woche: <strong>Woche {weekNumber:number}</strong>',
+		nextWeekToWorkOn: 'Nächste zu bearbeitende Woche: Woche {weekNumber:number}',
 		editNow: 'Jetzt bearbeiten →',
 		accountManagement: 'Account-Verwaltung',
 		accountManagementDesc: 'Passwort ändern, Gespeicherte Daten einsehen, Account löschen',
@@ -274,7 +274,7 @@ const de = {
 		deleteItemPriorities: 'Alle gespeicherten Prioritäten',
 		deletionReport:
 			'Nach der Löschung erhalten Sie einen Löschbericht als Nachweis gemäß DSGVO Art. 17.',
-		deleteConfirmPrompt: 'Geben Sie <strong>LÖSCHEN</strong> zur Bestätigung ein:',
+		deleteConfirmPrompt: 'Geben Sie LÖSCHEN zur Bestätigung ein:',
 		deleteConfirmText: 'LÖSCHEN',
 		deleting: 'Lösche Account...',
 		deleteAccountFinal: 'Account endgültig löschen',

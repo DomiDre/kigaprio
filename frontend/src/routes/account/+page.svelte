@@ -663,7 +663,7 @@
 								for="delete-confirm"
 								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 							>
-								{@html $LL.account.deleteConfirmPrompt()}
+								{$LL.account.deleteConfirmPrompt()}
 							</label>
 							<input
 								id="delete-confirm"

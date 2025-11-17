@@ -203,7 +203,7 @@ const en = {
 		week: 'Week',
 		complete: 'Complete',
 		inProgress: 'In Progress',
-		nextWeekToWorkOn: 'Next week to work on: <strong>Week {weekNumber}</strong>',
+		nextWeekToWorkOn: 'Next week to work on: Week {weekNumber}',
 		editNow: 'Edit now →',
 		accountManagement: 'Account Management',
 		accountManagementDesc: 'Change password, View saved data, Delete account',
@@ -273,7 +273,7 @@ const en = {
 		deleteItemPriorities: 'All saved priorities',
 		deletionReport:
 			'After deletion, you will receive a deletion report as proof according to GDPR Art. 17.',
-		deleteConfirmPrompt: 'Enter <strong>DELETE</strong> to confirm:',
+		deleteConfirmPrompt: 'Enter DELETE to confirm:',
 		deleteConfirmText: 'DELETE',
 		deleting: 'Deleting account...',
 		deleteAccountFinal: 'Permanently delete account',
