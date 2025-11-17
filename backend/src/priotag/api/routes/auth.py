@@ -35,6 +35,7 @@ from priotag.models.cookie import (
     COOKIE_SECURE,
 )
 from priotag.services.encryption import EncryptionManager
+from priotag.services.institution import InstitutionService
 from priotag.services.magic_word import get_magic_word_from_cache_or_db
 from priotag.services.pocketbase_service import POCKETBASE_URL
 from priotag.services.redis_service import get_redis
@@ -125,7 +126,7 @@ async def verify_magic_word(
     req: Request,
     redis_client: redis.Redis = Depends(get_redis),
 ) -> MagicWordResponse:
-    """Verify the magic word and return a temporary registration token."""
+    """Verify the institution-specific magic word and return a temporary registration token."""
     client_ip = get_client_ip(req)
     rate_limit_key = f"rate_limit:magic_word:{client_ip}"
     attempts = redis_client.get(rate_limit_key)
@@ -136,10 +137,28 @@ async def verify_magic_word(
             detail="Zu viele Versuche. Bitte versuchen Sie es später erneut.",
         )
 
-    # Get magic word from cache/database
-    magic_word = await get_magic_word_from_cache_or_db(redis_client)
+    # Get institution by short_code
+    try:
+        institution = await InstitutionService.get_by_short_code(
+            request.institution_short_code
+        )
+    except HTTPException as e:
+        if e.status_code == 404:
+            raise HTTPException(status_code=404, detail="Institution nicht gefunden")
+        raise
+
+    # Check if institution is active
+    if not institution.active:
+        raise HTTPException(
+            status_code=403, detail="Diese Institution ist nicht aktiv"
+        )
+
+    # Get institution's magic word
+    magic_word = institution.registration_magic_word
     if not magic_word:
-        raise HTTPException(status_code=500, detail="No magic word is initialized")
+        raise HTTPException(
+            status_code=500, detail="Kein Zauberwort für diese Institution konfiguriert"
+        )
 
     # Check magic word (case-insensitive comparison)
     is_valid = request.magic_word.strip().lower() == magic_word.lower()
@@ -157,9 +176,13 @@ async def verify_magic_word(
     # Generate temporary token
     token = secrets.token_urlsafe(32)
 
-    # Store token in Redis with 10 minute expiration
+    # Store token in Redis with 10 minute expiration, including institution_id
     token_key = f"reg_token:{token}"
-    token_data = {"created_at": datetime.now().isoformat(), "ip": client_ip}
+    token_data = {
+        "created_at": datetime.now().isoformat(),
+        "ip": client_ip,
+        "institution_id": institution.id,
+    }
     redis_client.setex(token_key, 600, json.dumps(token_data))
 
     return MagicWordResponse(
@@ -182,6 +205,19 @@ async def register_user(
         raise HTTPException(
             status_code=403, detail="Ungültiger oder abgelaufener Registrierungstoken"
         )
+
+    # Parse token data to get institution_id
+    try:
+        token_info = json.loads(token_data)
+        institution_id = token_info.get("institution_id")
+        if not institution_id:
+            raise HTTPException(
+                status_code=500, detail="Token enthält keine Institution-ID"
+            )
+    except (json.JSONDecodeError, KeyError) as e:
+        raise HTTPException(
+            status_code=500, detail="Ungültige Token-Daten"
+        ) from e
 
     # Delete token (one-time use)
     redis_client.delete(token_key)
@@ -229,6 +265,7 @@ async def register_user(
                     "password": request.password,
                     "passwordConfirm": request.passwordConfirm,
                     "role": "user",
+                    "institution_id": institution_id,
                     "salt": encryption_data["salt"],
                     "user_wrapped_dek": encryption_data["user_wrapped_dek"],
                     "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
@@ -282,10 +319,11 @@ async def register_user(
             # Store session in Redis
             session_key = f"session:{token}"
             session_info = {
-                "user_id": auth_data["record"]["id"],
+                "id": auth_data["record"]["id"],
                 "username": auth_data["record"]["username"],
                 "role": auth_data["record"]["role"],
-                "is_admin": auth_data["record"]["role"] == "admin",
+                "is_admin": auth_data["record"]["role"] in ["admin", "institution_admin", "super_admin"],
+                "institution_id": auth_data["record"].get("institution_id"),
             }
 
             # Determine session duration
@@ -334,10 +372,28 @@ async def register_user_qr(
             detail="Zu viele Versuche. Bitte versuchen Sie es später erneut.",
         )
 
-    # Get magic word from cache/database
-    magic_word = await get_magic_word_from_cache_or_db(redis_client)
+    # Get institution by short_code
+    try:
+        institution = await InstitutionService.get_by_short_code(
+            request.institution_short_code
+        )
+    except HTTPException as e:
+        if e.status_code == 404:
+            raise HTTPException(status_code=404, detail="Institution nicht gefunden")
+        raise
+
+    # Check if institution is active
+    if not institution.active:
+        raise HTTPException(
+            status_code=403, detail="Diese Institution ist nicht aktiv"
+        )
+
+    # Get institution's magic word
+    magic_word = institution.registration_magic_word
     if not magic_word:
-        raise HTTPException(status_code=500, detail="No magic word is initialized")
+        raise HTTPException(
+            status_code=500, detail="Kein Zauberwort für diese Institution konfiguriert"
+        )
 
     # Verify magic word (case-insensitive comparison)
     is_valid = request.magic_word.strip().lower() == magic_word.lower()
@@ -351,6 +407,9 @@ async def register_user_qr(
 
     # Reset rate limit on success
     redis_client.delete(rate_limit_key)
+
+    # Store institution_id for user creation
+    institution_id = institution.id
 
     # Check for duplicate registration attempts
     identity_key = f"reg_identity:{request.identity}"
@@ -395,6 +454,7 @@ async def register_user_qr(
                     "password": request.password,
                     "passwordConfirm": request.passwordConfirm,
                     "role": "user",
+                    "institution_id": institution_id,
                     "salt": encryption_data["salt"],
                     "user_wrapped_dek": encryption_data["user_wrapped_dek"],
                     "admin_wrapped_dek": encryption_data["admin_wrapped_dek"],
@@ -448,10 +508,11 @@ async def register_user_qr(
             # Store session in Redis
             session_key = f"session:{token}"
             session_info = {
-                "user_id": auth_data["record"]["id"],
+                "id": auth_data["record"]["id"],
                 "username": auth_data["record"]["username"],
                 "role": auth_data["record"]["role"],
-                "is_admin": auth_data["record"]["role"] == "admin",
+                "is_admin": auth_data["record"]["role"] in ["admin", "institution_admin", "super_admin"],
+                "institution_id": auth_data["record"].get("institution_id"),
             }
 
             # Determine session duration
