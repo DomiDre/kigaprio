@@ -125,8 +125,13 @@ const en = {
 	// Dashboard
 	dashboard: {
 		title: 'Dashboard',
-		welcome: 'Welcome back',
+		welcome: 'Welcome back!',
+		welcomeBack: 'Welcome back',
 		overview: 'Overview',
+		allWeeksComplete: 'Awesome! All weeks for {month} are prioritized!',
+		overviewForMonth: 'Here is your overview for {month}',
+		selectMonth: 'Select month:',
+		loading: 'Loading Dashboard...',
 		statistics: 'Statistics',
 		recentActivity: 'Recent activity',
 		noPrioritiesSet: 'No priorities set',
@@ -135,7 +140,23 @@ const en = {
 		thisWeek: 'This week',
 		today: 'Today',
 		upcomingVacation: 'Upcoming vacation',
-		noUpcomingVacation: 'No upcoming vacation'
+		noUpcomingVacation: 'No upcoming vacation',
+		progress: 'Progress',
+		focusDay: 'Focus Day',
+		relaxedDay: 'Relaxed Day',
+		oftenHighPriority: 'Often with high priority (4-5)',
+		oftenLowPriority: 'Often with low priority (1-2)',
+		noData: 'No data',
+		daysPrioritized: '{count} of {total} days prioritized',
+		weekOverview: 'Week Overview - {month}',
+		week: 'Week',
+		complete: 'Complete',
+		inProgress: 'In Progress',
+		nextWeekToWorkOn: 'Next week to work on: <strong>Week {weekNumber}</strong>',
+		editNow: 'Edit now →',
+		accountManagement: 'Account Management',
+		accountManagementDesc: 'Change password, View saved data, Delete account',
+		manageAccount: 'Manage account →'
 	},
 
 	// Account/Settings
