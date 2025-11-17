@@ -274,6 +274,82 @@ type RootTranslation = {
 			 * N​o​r​m​a​l​e​ ​R​e​g​i​s​t​r​i​e​r​u​n​g
 			 */
 			traditionalRegistration: string
+			/**
+			 * D​a​t​e​n​s​c​h​u​t​z​h​i​n​w​e​i​s​:
+			 */
+			privacyNotice: string
+			/**
+			 * �​�​ ​I​h​r​ ​P​s​e​u​d​o​n​y​m​ ​(​L​o​g​i​n​n​a​m​e​)​ ​w​i​r​d​ ​i​m​ ​K​l​a​r​t​e​x​t​ ​g​e​s​p​e​i​c​h​e​r​t
+			 */
+			privacyPseudonymPlaintext: string
+			/**
+			 * �​�​ ​D​e​r​ ​N​a​m​e​ ​I​h​r​e​s​ ​K​i​n​d​e​s​ ​w​i​r​d​ ​v​e​r​s​c​h​l​ü​s​s​e​l​t​ ​i​n​ ​d​e​r​ ​D​a​t​e​n​b​a​n​k​ ​g​e​s​p​e​i​c​h​e​r​t
+			 */
+			privacyNameEncrypted: string
+			/**
+			 * N​a​m​e​ ​I​h​r​e​s​ ​K​i​n​d​e​s
+			 */
+			childName: string
+			/**
+			 * V​e​r​s​c​h​l​ü​s​s​e​l​t
+			 */
+			encrypted: string
+			/**
+			 * z​.​B​.​ ​M​a​x​ ​M​u​s​t​e​r​m​a​n​n
+			 */
+			childNamePlaceholder: string
+			/**
+			 * W​i​r​d​ ​v​e​r​s​c​h​l​ü​s​s​e​l​t​ ​i​n​ ​d​e​r​ ​D​a​t​e​n​b​a​n​k​ ​g​e​s​p​e​i​c​h​e​r​t
+			 */
+			childNameHint: string
+			/**
+			 * P​s​e​u​d​o​n​y​m​ ​(​L​o​g​i​n​n​a​m​e​)
+			 */
+			pseudonym: string
+			/**
+			 * K​l​a​r​t​e​x​t
+			 */
+			plaintext: string
+			/**
+			 * z​.​B​.​ ​e​l​t​e​r​n​t​e​i​l​1​2​3
+			 */
+			pseudonymPlaceholder: string
+			/**
+			 * W​i​r​d​ ​i​m​ ​K​l​a​r​t​e​x​t​ ​g​e​s​p​e​i​c​h​e​r​t​.​ ​V​e​r​w​e​n​d​e​n​ ​S​i​e​ ​k​e​i​n​e​ ​e​c​h​t​e​n​ ​N​a​m​e​n​.
+			 */
+			pseudonymHint: string
+			/**
+			 * P​a​s​s​w​o​r​t​ ​b​e​s​t​ä​t​i​g​e​n
+			 */
+			confirmPasswordLabel: string
+			/**
+			 * N​o​c​h​m​a​l​ ​P​a​s​s​w​o​r​t​ ​e​i​n​g​e​b​e​n
+			 */
+			confirmPasswordPlaceholder2: string
+			/**
+			 * S​i​e​ ​b​l​e​i​b​e​n​ ​3​0​ ​T​a​g​e​ ​a​n​g​e​m​e​l​d​e​t​.​ ​E​m​p​f​o​h​l​e​n​ ​f​ü​r​ ​p​e​r​s​ö​n​l​i​c​h​e​ ​G​e​r​ä​t​e​.
+			 */
+			keepLoggedIn30Days: string
+			/**
+			 * S​i​e​ ​w​e​r​d​e​n​ ​n​a​c​h​ ​8​ ​S​t​u​n​d​e​n​ ​o​d​e​r​ ​b​e​i​m​ ​S​c​h​l​i​e​ß​e​n​ ​d​e​s​ ​B​r​o​w​s​e​r​s​ ​a​b​g​e​m​e​l​d​e​t​.​ ​E​m​p​f​o​h​l​e​n​ ​f​ü​r​ ​g​e​m​e​i​n​s​a​m​ ​g​e​n​u​t​z​t​e​ ​C​o​m​p​u​t​e​r​.
+			 */
+			keepLoggedIn8Hours: string
+			/**
+			 * E​r​s​t​e​l​l​e​ ​A​c​c​o​u​n​t​.​.​.
+			 */
+			creating: string
+			/**
+			 * A​c​c​o​u​n​t​ ​e​r​s​t​e​l​l​e​n
+			 */
+			createAccount: string
+			/**
+			 * H​a​b​e​n​ ​S​i​e​ ​b​e​r​e​i​t​s​ ​e​i​n​e​n​ ​A​c​c​o​u​n​t​?
+			 */
+			alreadyHaveAccount: string
+			/**
+			 * H​i​e​r​ ​k​l​i​c​k​e​n​ ​z​u​m​ ​e​i​n​l​o​g​g​e​n​.
+			 */
+			clickToLogin: string
 		}
 		/**
 		 * A​b​m​e​l​d​e​n
@@ -609,6 +685,233 @@ type RootTranslation = {
 		 * M​ö​c​h​t​e​n​ ​S​i​e​ ​I​h​r​ ​K​o​n​t​o​ ​w​i​r​k​l​i​c​h​ ​l​ö​s​c​h​e​n​?​ ​D​i​e​s​e​ ​A​k​t​i​o​n​ ​k​a​n​n​ ​n​i​c​h​t​ ​r​ü​c​k​g​ä​n​g​i​g​ ​g​e​m​a​c​h​t​ ​w​e​r​d​e​n​.
 		 */
 		deleteAccountConfirm: string
+		/**
+		 * A​c​c​o​u​n​t​-​V​e​r​w​a​l​t​u​n​g
+		 */
+		accountManagement: string
+		/**
+		 * A​c​c​o​u​n​t​-​I​n​f​o​r​m​a​t​i​o​n​e​n
+		 */
+		accountInfo: string
+		/**
+		 * U​s​e​r​n​a​m​e
+		 */
+		username: string
+		/**
+		 * N​i​c​h​t​ ​v​e​r​f​ü​g​b​a​r
+		 */
+		notAvailable: string
+		/**
+		 * A​c​c​o​u​n​t​ ​e​r​s​t​e​l​l​t
+		 */
+		accountCreated: string
+		/**
+		 * L​e​t​z​t​e​ ​A​n​m​e​l​d​u​n​g
+		 */
+		lastLogin: string
+		/**
+		 * A​c​c​o​u​n​t​-​S​t​a​t​u​s
+		 */
+		accountStatus: string
+		/**
+		 * A​k​t​i​v
+		 */
+		active: string
+		/**
+		 * �​�​ ​P​a​s​s​w​o​r​t​ ​ä​n​d​e​r​n
+		 */
+		changePasswordSection: string
+		/**
+		 * A​k​t​u​e​l​l​e​s​ ​P​a​s​s​w​o​r​t​ ​e​i​n​g​e​b​e​n
+		 */
+		currentPasswordPlaceholder: string
+		/**
+		 * N​e​u​e​s​ ​P​a​s​s​w​o​r​t​ ​e​i​n​g​e​b​e​n
+		 */
+		newPasswordPlaceholder: string
+		/**
+		 * N​e​u​e​s​ ​P​a​s​s​w​o​r​t​ ​w​i​e​d​e​r​h​o​l​e​n
+		 */
+		confirmPasswordPlaceholder: string
+		/**
+		 * P​a​s​s​w​ö​r​t​e​r​ ​a​n​z​e​i​g​e​n
+		 */
+		showPasswords: string
+		/**
+		 * W​i​r​d​ ​g​e​ä​n​d​e​r​t​.​.​.
+		 */
+		changing: string
+		/**
+		 * S​c​h​w​a​c​h
+		 */
+		passwordWeak: string
+		/**
+		 * M​i​t​t​e​l
+		 */
+		passwordMedium: string
+		/**
+		 * G​u​t
+		 */
+		passwordGood: string
+		/**
+		 * S​t​a​r​k
+		 */
+		passwordStrong: string
+		/**
+		 * B​i​t​t​e​ ​f​ü​l​l​e​n​ ​S​i​e​ ​a​l​l​e​ ​F​e​l​d​e​r​ ​a​u​s
+		 */
+		errorAllFieldsRequired: string
+		/**
+		 * D​i​e​ ​n​e​u​e​n​ ​P​a​s​s​w​ö​r​t​e​r​ ​s​t​i​m​m​e​n​ ​n​i​c​h​t​ ​ü​b​e​r​e​i​n
+		 */
+		errorPasswordMismatch: string
+		/**
+		 * D​a​s​ ​n​e​u​e​ ​P​a​s​s​w​o​r​t​ ​m​u​s​s​ ​s​i​c​h​ ​v​o​m​ ​a​k​t​u​e​l​l​e​n​ ​u​n​t​e​r​s​c​h​e​i​d​e​n
+		 */
+		errorPasswordMustDiffer: string
+		/**
+		 * P​a​s​s​w​o​r​t​ ​e​r​f​o​l​g​r​e​i​c​h​ ​g​e​ä​n​d​e​r​t
+		 */
+		successPasswordChanged: string
+		/**
+		 * F​e​h​l​e​r​ ​b​e​i​m​ ​Ä​n​d​e​r​n​ ​d​e​s​ ​P​a​s​s​w​o​r​t​s
+		 */
+		errorChangingPassword: string
+		/**
+		 * �​�​ ​D​a​t​e​n​v​e​r​w​a​l​t​u​n​g​ ​(​D​S​G​V​O​)
+		 */
+		dataManagement: string
+		/**
+		 * G​e​m​ä​ß​ ​d​e​r​ ​D​a​t​e​n​s​c​h​u​t​z​-​G​r​u​n​d​v​e​r​o​r​d​n​u​n​g​ ​h​a​b​e​n​ ​S​i​e​ ​d​a​s​ ​R​e​c​h​t​ ​a​u​f​ ​A​u​s​k​u​n​f​t​,​ ​B​e​r​i​c​h​t​i​g​u​n​g​ ​u​n​d​ ​L​ö​s​c​h​u​n​g​ ​I​h​r​e​r​ ​p​e​r​s​o​n​e​n​b​e​z​o​g​e​n​e​n​ ​D​a​t​e​n​.
+		 */
+		gdprNotice: string
+		/**
+		 * G​e​s​p​e​i​c​h​e​r​t​e​ ​D​a​t​e​n​ ​e​i​n​s​e​h​e​n
+		 */
+		viewStoredData: string
+		/**
+		 * D​a​t​e​n​ ​e​x​p​o​r​t​i​e​r​e​n
+		 */
+		exportData: string
+		/**
+		 * F​e​h​l​e​r​ ​b​e​i​m​ ​A​b​r​u​f​e​n​ ​d​e​r​ ​D​a​t​e​n​:​ ​{​e​r​r​o​r​}
+		 * @param {string} error
+		 */
+		errorFetchingData: RequiredParams<'error'>
+		/**
+		 * D​a​t​e​n​ ​e​r​f​o​l​g​r​e​i​c​h​ ​e​x​p​o​r​t​i​e​r​t
+		 */
+		successDataExported: string
+		/**
+		 * F​e​h​l​e​r​ ​b​e​i​m​ ​E​x​p​o​r​t​i​e​r​e​n​:​ ​{​e​r​r​o​r​}
+		 * @param {string} error
+		 */
+		errorExportingData: RequiredParams<'error'>
+		/**
+		 * ⚠​️​ ​G​e​f​a​h​r​e​n​z​o​n​e
+		 */
+		dangerZone: string
+		/**
+		 * D​a​s​ ​L​ö​s​c​h​e​n​ ​I​h​r​e​s​ ​A​c​c​o​u​n​t​s​ ​i​s​t​ ​u​n​w​i​d​e​r​r​u​f​l​i​c​h​.​ ​A​l​l​e​ ​I​h​r​e​ ​D​a​t​e​n​ ​w​e​r​d​e​n​ ​p​e​r​m​a​n​e​n​t​ ​g​e​l​ö​s​c​h​t​.
+		 */
+		deleteWarning: string
+		/**
+		 * A​c​c​o​u​n​t​ ​l​ö​s​c​h​e​n
+		 */
+		deleteAccountButton: string
+		/**
+		 * ⚠​️​ ​A​c​c​o​u​n​t​ ​d​a​u​e​r​h​a​f​t​ ​l​ö​s​c​h​e​n
+		 */
+		deleteConfirmTitle: string
+		/**
+		 * D​i​e​s​e​ ​A​k​t​i​o​n​ ​i​s​t​ ​u​n​w​i​d​e​r​r​u​f​l​i​c​h​!​ ​F​o​l​g​e​n​d​e​ ​D​a​t​e​n​ ​w​e​r​d​e​n​ ​g​e​l​ö​s​c​h​t​:
+		 */
+		deleteIrreversible: string
+		/**
+		 * I​h​r​ ​B​e​n​u​t​z​e​r​k​o​n​t​o​ ​u​n​d​ ​a​l​l​e​ ​A​n​m​e​l​d​e​d​a​t​e​n
+		 */
+		deleteItemAccount: string
+		/**
+		 * A​l​l​e​ ​g​e​s​p​e​i​c​h​e​r​t​e​n​ ​P​r​i​o​r​i​t​ä​t​e​n
+		 */
+		deleteItemPriorities: string
+		/**
+		 * N​a​c​h​ ​d​e​r​ ​L​ö​s​c​h​u​n​g​ ​e​r​h​a​l​t​e​n​ ​S​i​e​ ​e​i​n​e​n​ ​L​ö​s​c​h​b​e​r​i​c​h​t​ ​a​l​s​ ​N​a​c​h​w​e​i​s​ ​g​e​m​ä​ß​ ​D​S​G​V​O​ ​A​r​t​.​ ​1​7​.
+		 */
+		deletionReport: string
+		/**
+		 * G​e​b​e​n​ ​S​i​e​ ​<​s​t​r​o​n​g​>​L​Ö​S​C​H​E​N​<​/​s​t​r​o​n​g​>​ ​z​u​r​ ​B​e​s​t​ä​t​i​g​u​n​g​ ​e​i​n​:
+		 */
+		deleteConfirmPrompt: string
+		/**
+		 * L​Ö​S​C​H​E​N
+		 */
+		deleteConfirmText: string
+		/**
+		 * L​ö​s​c​h​e​ ​A​c​c​o​u​n​t​.​.​.
+		 */
+		deleting: string
+		/**
+		 * A​c​c​o​u​n​t​ ​e​n​d​g​ü​l​t​i​g​ ​l​ö​s​c​h​e​n
+		 */
+		deleteAccountFinal: string
+		/**
+		 * A​b​b​r​e​c​h​e​n
+		 */
+		cancel: string
+		/**
+		 * B​i​t​t​e​ ​g​e​b​e​n​ ​S​i​e​ ​"​L​Ö​S​C​H​E​N​"​ ​z​u​r​ ​B​e​s​t​ä​t​i​g​u​n​g​ ​e​i​n
+		 */
+		errorDeleteConfirm: string
+		/**
+		 * F​e​h​l​e​r​ ​b​e​i​m​ ​L​ö​s​c​h​e​n​:​ ​{​e​r​r​o​r​}
+		 * @param {string} error
+		 */
+		errorDeleting: RequiredParams<'error'>
+		/**
+		 * A​c​c​o​u​n​t​ ​w​u​r​d​e​ ​g​e​l​ö​s​c​h​t​.​ ​L​ö​s​c​h​b​e​r​i​c​h​t​ ​w​u​r​d​e​ ​h​e​r​u​n​t​e​r​g​e​l​a​d​e​n​.
+		 */
+		successDeleted: string
+		/**
+		 * I​h​r​ ​A​c​c​o​u​n​t​ ​w​u​r​d​e​ ​v​o​l​l​s​t​ä​n​d​i​g​ ​g​e​l​ö​s​c​h​t​ ​g​e​m​ä​ß​ ​D​S​G​V​O​ ​A​r​t​.​ ​1​7
+		 */
+		deletionCompleteMessage: string
+		/**
+		 * I​h​r​e​ ​g​e​s​p​e​i​c​h​e​r​t​e​n​ ​D​a​t​e​n
+		 */
+		yourStoredData: string
+		/**
+		 * S​c​h​l​i​e​ß​e​n
+		 */
+		close: string
+		/**
+		 * ℹ​️​ ​D​i​e​s​ ​i​s​t​ ​e​i​n​e​ ​v​o​l​l​s​t​ä​n​d​i​g​e​ ​K​o​p​i​e​ ​a​l​l​e​r​ ​D​a​t​e​n​,​ ​d​i​e​ ​w​i​r​ ​ü​b​e​r​ ​S​i​e​ ​s​p​e​i​c​h​e​r​n​ ​(​D​S​G​V​O​ ​A​r​t​.​ ​1​5​)
+		 */
+		gdprDataInfo: string
+		/**
+		 * A​l​s​ ​J​S​O​N​ ​e​x​p​o​r​t​i​e​r​e​n
+		 */
+		exportAsJson: string
+		/**
+		 * S​i​t​z​u​n​g​ ​a​b​g​e​l​a​u​f​e​n
+		 */
+		sessionExpiredTitle: string
+		/**
+		 * I​h​r​e​ ​S​i​t​z​u​n​g​ ​i​s​t​ ​a​b​g​e​l​a​u​f​e​n​.​ ​S​i​e​ ​w​e​r​d​e​n​ ​z​u​r​ ​A​n​m​e​l​d​u​n​g​ ​w​e​i​t​e​r​g​e​l​e​i​t​e​t​.​.​.
+		 */
+		sessionExpiredMessage: string
+		/**
+		 * S​i​t​z​u​n​g​ ​a​b​g​e​l​a​u​f​e​n​.​ ​B​i​t​t​e​ ​m​e​l​d​e​n​ ​S​i​e​ ​s​i​c​h​ ​e​r​n​e​u​t​ ​a​n​.
+		 */
+		errorSessionExpired: string
+		/**
+		 * F​e​h​l​e​r​ ​b​e​i​m​ ​L​a​d​e​n​ ​d​e​r​ ​K​o​n​t​o​i​n​f​o​r​m​a​t​i​o​n​e​n
+		 */
+		errorLoadingAccountInfo: string
+		/**
+		 * L​a​d​e​ ​A​c​c​o​u​n​t​.​.​.
+		 */
+		loadingAccount: string
 	}
 	vacation: {
 		/**
@@ -1059,6 +1362,82 @@ export type TranslationFunctions = {
 			 * Normale Registrierung
 			 */
 			traditionalRegistration: () => LocalizedString
+			/**
+			 * Datenschutzhinweis:
+			 */
+			privacyNotice: () => LocalizedString
+			/**
+			 * 🔓 Ihr Pseudonym (Loginname) wird im Klartext gespeichert
+			 */
+			privacyPseudonymPlaintext: () => LocalizedString
+			/**
+			 * 🔒 Der Name Ihres Kindes wird verschlüsselt in der Datenbank gespeichert
+			 */
+			privacyNameEncrypted: () => LocalizedString
+			/**
+			 * Name Ihres Kindes
+			 */
+			childName: () => LocalizedString
+			/**
+			 * Verschlüsselt
+			 */
+			encrypted: () => LocalizedString
+			/**
+			 * z.B. Max Mustermann
+			 */
+			childNamePlaceholder: () => LocalizedString
+			/**
+			 * Wird verschlüsselt in der Datenbank gespeichert
+			 */
+			childNameHint: () => LocalizedString
+			/**
+			 * Pseudonym (Loginname)
+			 */
+			pseudonym: () => LocalizedString
+			/**
+			 * Klartext
+			 */
+			plaintext: () => LocalizedString
+			/**
+			 * z.B. elternteil123
+			 */
+			pseudonymPlaceholder: () => LocalizedString
+			/**
+			 * Wird im Klartext gespeichert. Verwenden Sie keine echten Namen.
+			 */
+			pseudonymHint: () => LocalizedString
+			/**
+			 * Passwort bestätigen
+			 */
+			confirmPasswordLabel: () => LocalizedString
+			/**
+			 * Nochmal Passwort eingeben
+			 */
+			confirmPasswordPlaceholder2: () => LocalizedString
+			/**
+			 * Sie bleiben 30 Tage angemeldet. Empfohlen für persönliche Geräte.
+			 */
+			keepLoggedIn30Days: () => LocalizedString
+			/**
+			 * Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen für gemeinsam genutzte Computer.
+			 */
+			keepLoggedIn8Hours: () => LocalizedString
+			/**
+			 * Erstelle Account...
+			 */
+			creating: () => LocalizedString
+			/**
+			 * Account erstellen
+			 */
+			createAccount: () => LocalizedString
+			/**
+			 * Haben Sie bereits einen Account?
+			 */
+			alreadyHaveAccount: () => LocalizedString
+			/**
+			 * Hier klicken zum einloggen.
+			 */
+			clickToLogin: () => LocalizedString
 		}
 		/**
 		 * Abmelden
@@ -1388,6 +1767,230 @@ export type TranslationFunctions = {
 		 * Möchten Sie Ihr Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
 		 */
 		deleteAccountConfirm: () => LocalizedString
+		/**
+		 * Account-Verwaltung
+		 */
+		accountManagement: () => LocalizedString
+		/**
+		 * Account-Informationen
+		 */
+		accountInfo: () => LocalizedString
+		/**
+		 * Username
+		 */
+		username: () => LocalizedString
+		/**
+		 * Nicht verfügbar
+		 */
+		notAvailable: () => LocalizedString
+		/**
+		 * Account erstellt
+		 */
+		accountCreated: () => LocalizedString
+		/**
+		 * Letzte Anmeldung
+		 */
+		lastLogin: () => LocalizedString
+		/**
+		 * Account-Status
+		 */
+		accountStatus: () => LocalizedString
+		/**
+		 * Aktiv
+		 */
+		active: () => LocalizedString
+		/**
+		 * 🔐 Passwort ändern
+		 */
+		changePasswordSection: () => LocalizedString
+		/**
+		 * Aktuelles Passwort eingeben
+		 */
+		currentPasswordPlaceholder: () => LocalizedString
+		/**
+		 * Neues Passwort eingeben
+		 */
+		newPasswordPlaceholder: () => LocalizedString
+		/**
+		 * Neues Passwort wiederholen
+		 */
+		confirmPasswordPlaceholder: () => LocalizedString
+		/**
+		 * Passwörter anzeigen
+		 */
+		showPasswords: () => LocalizedString
+		/**
+		 * Wird geändert...
+		 */
+		changing: () => LocalizedString
+		/**
+		 * Schwach
+		 */
+		passwordWeak: () => LocalizedString
+		/**
+		 * Mittel
+		 */
+		passwordMedium: () => LocalizedString
+		/**
+		 * Gut
+		 */
+		passwordGood: () => LocalizedString
+		/**
+		 * Stark
+		 */
+		passwordStrong: () => LocalizedString
+		/**
+		 * Bitte füllen Sie alle Felder aus
+		 */
+		errorAllFieldsRequired: () => LocalizedString
+		/**
+		 * Die neuen Passwörter stimmen nicht überein
+		 */
+		errorPasswordMismatch: () => LocalizedString
+		/**
+		 * Das neue Passwort muss sich vom aktuellen unterscheiden
+		 */
+		errorPasswordMustDiffer: () => LocalizedString
+		/**
+		 * Passwort erfolgreich geändert
+		 */
+		successPasswordChanged: () => LocalizedString
+		/**
+		 * Fehler beim Ändern des Passworts
+		 */
+		errorChangingPassword: () => LocalizedString
+		/**
+		 * 📊 Datenverwaltung (DSGVO)
+		 */
+		dataManagement: () => LocalizedString
+		/**
+		 * Gemäß der Datenschutz-Grundverordnung haben Sie das Recht auf Auskunft, Berichtigung und Löschung Ihrer personenbezogenen Daten.
+		 */
+		gdprNotice: () => LocalizedString
+		/**
+		 * Gespeicherte Daten einsehen
+		 */
+		viewStoredData: () => LocalizedString
+		/**
+		 * Daten exportieren
+		 */
+		exportData: () => LocalizedString
+		/**
+		 * Fehler beim Abrufen der Daten: {error}
+		 */
+		errorFetchingData: (arg: { error: string }) => LocalizedString
+		/**
+		 * Daten erfolgreich exportiert
+		 */
+		successDataExported: () => LocalizedString
+		/**
+		 * Fehler beim Exportieren: {error}
+		 */
+		errorExportingData: (arg: { error: string }) => LocalizedString
+		/**
+		 * ⚠️ Gefahrenzone
+		 */
+		dangerZone: () => LocalizedString
+		/**
+		 * Das Löschen Ihres Accounts ist unwiderruflich. Alle Ihre Daten werden permanent gelöscht.
+		 */
+		deleteWarning: () => LocalizedString
+		/**
+		 * Account löschen
+		 */
+		deleteAccountButton: () => LocalizedString
+		/**
+		 * ⚠️ Account dauerhaft löschen
+		 */
+		deleteConfirmTitle: () => LocalizedString
+		/**
+		 * Diese Aktion ist unwiderruflich! Folgende Daten werden gelöscht:
+		 */
+		deleteIrreversible: () => LocalizedString
+		/**
+		 * Ihr Benutzerkonto und alle Anmeldedaten
+		 */
+		deleteItemAccount: () => LocalizedString
+		/**
+		 * Alle gespeicherten Prioritäten
+		 */
+		deleteItemPriorities: () => LocalizedString
+		/**
+		 * Nach der Löschung erhalten Sie einen Löschbericht als Nachweis gemäß DSGVO Art. 17.
+		 */
+		deletionReport: () => LocalizedString
+		/**
+		 * Geben Sie <strong>LÖSCHEN</strong> zur Bestätigung ein:
+		 */
+		deleteConfirmPrompt: () => LocalizedString
+		/**
+		 * LÖSCHEN
+		 */
+		deleteConfirmText: () => LocalizedString
+		/**
+		 * Lösche Account...
+		 */
+		deleting: () => LocalizedString
+		/**
+		 * Account endgültig löschen
+		 */
+		deleteAccountFinal: () => LocalizedString
+		/**
+		 * Abbrechen
+		 */
+		cancel: () => LocalizedString
+		/**
+		 * Bitte geben Sie "LÖSCHEN" zur Bestätigung ein
+		 */
+		errorDeleteConfirm: () => LocalizedString
+		/**
+		 * Fehler beim Löschen: {error}
+		 */
+		errorDeleting: (arg: { error: string }) => LocalizedString
+		/**
+		 * Account wurde gelöscht. Löschbericht wurde heruntergeladen.
+		 */
+		successDeleted: () => LocalizedString
+		/**
+		 * Ihr Account wurde vollständig gelöscht gemäß DSGVO Art. 17
+		 */
+		deletionCompleteMessage: () => LocalizedString
+		/**
+		 * Ihre gespeicherten Daten
+		 */
+		yourStoredData: () => LocalizedString
+		/**
+		 * Schließen
+		 */
+		close: () => LocalizedString
+		/**
+		 * ℹ️ Dies ist eine vollständige Kopie aller Daten, die wir über Sie speichern (DSGVO Art. 15)
+		 */
+		gdprDataInfo: () => LocalizedString
+		/**
+		 * Als JSON exportieren
+		 */
+		exportAsJson: () => LocalizedString
+		/**
+		 * Sitzung abgelaufen
+		 */
+		sessionExpiredTitle: () => LocalizedString
+		/**
+		 * Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...
+		 */
+		sessionExpiredMessage: () => LocalizedString
+		/**
+		 * Sitzung abgelaufen. Bitte melden Sie sich erneut an.
+		 */
+		errorSessionExpired: () => LocalizedString
+		/**
+		 * Fehler beim Laden der Kontoinformationen
+		 */
+		errorLoadingAccountInfo: () => LocalizedString
+		/**
+		 * Lade Account...
+		 */
+		loadingAccount: () => LocalizedString
 	}
 	vacation: {
 		/**

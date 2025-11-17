@@ -167,10 +167,10 @@
 							<span class="text-3xl">🔐</span>
 						</div>
 						<h2 class="text-xl font-semibold text-gray-800 dark:text-white">
-							Zugangsverifizierung
+							{$LL.auth.register.accessVerification()}
 						</h2>
 						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-							Das Zauberwort finden Sie im Eingangsbereich des Gebäudes
+							{$LL.auth.register.magicWordInfo()}
 						</p>
 					</div>
 
@@ -260,10 +260,10 @@
 								/>
 							</svg>
 							<div class="text-sm text-blue-800 dark:text-blue-300">
-								<p class="mb-1 font-semibold">Datenschutzhinweis:</p>
+								<p class="mb-1 font-semibold">{$LL.auth.register.privacyNotice()}</p>
 								<ul class="space-y-1 text-xs">
-									<li>🔓 Ihr Pseudonym (Loginname) wird im Klartext gespeichert</li>
-									<li>🔒 Der Name Ihres Kindes wird verschlüsselt in der Datenbank gespeichert</li>
+									<li>{$LL.auth.register.privacyPseudonymPlaintext()}</li>
+									<li>{$LL.auth.register.privacyNameEncrypted()}</li>
 								</ul>
 							</div>
 						</div>
@@ -275,7 +275,7 @@
 								for="fullName"
 								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 							>
-								Name Ihres Kindes
+								{$LL.auth.register.childName()}
 							</label>
 							<span
 								class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
@@ -287,7 +287,7 @@
 										clip-rule="evenodd"
 									/>
 								</svg>
-								Verschlüsselt
+								{$LL.auth.register.encrypted()}
 							</span>
 						</div>
 						<input
@@ -295,14 +295,14 @@
 							type="text"
 							bind:value={fullName}
 							disabled={loading}
-							placeholder="z.B. Max Mustermann"
+							placeholder="{$LL.auth.register.childNamePlaceholder()}"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
 								   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 						/>
 						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-							Wird verschlüsselt in der Datenbank gespeichert
+							{$LL.auth.register.childNameHint()}
 						</p>
 					</div>
 
@@ -312,7 +312,7 @@
 								for="username"
 								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 							>
-								Pseudonym (Loginname)
+								{$LL.auth.register.pseudonym()}
 							</label>
 							<span
 								class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
@@ -324,7 +324,7 @@
 										clip-rule="evenodd"
 									/>
 								</svg>
-								Klartext
+								{$LL.auth.register.plaintext()}
 							</span>
 						</div>
 						<input
@@ -333,14 +333,14 @@
 							bind:value={username}
 							required
 							disabled={loading}
-							placeholder="z.B. elternteil123"
+							placeholder="{$LL.auth.register.pseudonymPlaceholder()}"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
 								   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 						/>
 						<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-							Wird im Klartext gespeichert. Verwenden Sie keine echten Namen.
+							{$LL.auth.register.pseudonymHint()}
 						</p>
 					</div>
 
@@ -349,7 +349,7 @@
 							for="password"
 							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 						>
-							Passwort
+							{$LL.common.password()}
 						</label>
 						<input
 							id="password"
@@ -357,7 +357,7 @@
 							bind:value={password}
 							required
 							disabled={loading}
-							placeholder="Passwort eingeben"
+							placeholder="{$LL.auth.register.passwordPlaceholder()}"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
@@ -370,7 +370,7 @@
 							for="passwordConfirm"
 							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 						>
-							Passwort bestätigen
+							{$LL.auth.register.confirmPasswordLabel()}
 						</label>
 						<input
 							id="passwordConfirm"
@@ -378,7 +378,7 @@
 							bind:value={passwordConfirm}
 							required
 							disabled={loading}
-							placeholder="Nochmal Passwort eingeben"
+							placeholder="{$LL.auth.register.confirmPasswordPlaceholder2()}"
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
@@ -402,14 +402,13 @@
 							/>
 							<div class="ml-3 flex-1">
 								<span class="block font-medium text-gray-900 dark:text-white">
-									Angemeldet bleiben
+									{$LL.auth.register.keepLoggedIn()}
 								</span>
 								<span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">
 									{#if keepLoggedIn}
-										Sie bleiben 30 Tage angemeldet. Empfohlen für persönliche Geräte.
+										{$LL.auth.register.keepLoggedIn30Days()}
 									{:else}
-										Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen
-										für gemeinsam genutzte Computer.
+										{$LL.auth.register.keepLoggedIn8Hours()}
 									{/if}
 								</span>
 							</div>
@@ -447,7 +446,7 @@
 						{#if loading}
 							<span class="mr-2 animate-spin">⟳</span>
 						{/if}
-						{loading ? 'Erstelle Account...' : 'Account erstellen'}
+						{loading ? $LL.auth.register.creating() : $LL.auth.register.createAccount()}
 					</button>
 
 					{#if !isQRMode}
@@ -459,20 +458,20 @@
 							       disabled:cursor-not-allowed disabled:opacity-50
 							       dark:text-gray-400 dark:hover:text-gray-200"
 						>
-							← Zurück zur Zauberwort-Eingabe
+							{$LL.auth.register.backToMagicWord()}
 						</button>
 					{/if}
 				</form>
 			{/if}
 
 			<p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-				Haben Sie bereits einen Account?
+				{$LL.auth.register.alreadyHaveAccount()}
 				<button
 					type="button"
 					onclick={goToLogin}
 					class="ml-1 font-semibold text-blue-600 underline hover:text-blue-500"
 				>
-					Hier klicken zum einloggen.
+					{$LL.auth.register.clickToLogin()}
 				</button>
 			</p>
 		</div>
