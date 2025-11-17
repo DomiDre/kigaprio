@@ -1,0 +1,298 @@
+"""
+Tests for institution service.
+"""
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+from fastapi import HTTPException
+
+from priotag.services.institution import InstitutionService
+from priotag.models.institution import CreateInstitutionRequest, UpdateInstitutionRequest
+from priotag.models.pocketbase_schemas import InstitutionRecord
+
+
+@pytest.mark.asyncio
+async def test_get_institution_success(mock_httpx_client, sample_institution_data):
+    """Test successfully retrieving an institution by ID."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = sample_institution_data
+    mock_httpx_client.get.return_value = mock_response
+
+    # Test
+    result = await InstitutionService.get_institution("institution_123", "test_token")
+
+    # Verify
+    assert isinstance(result, InstitutionRecord)
+    assert result.id == "institution_123"
+    assert result.name == "Test University"
+    assert result.short_code == "TEST_UNIV"
+
+
+@pytest.mark.asyncio
+async def test_get_institution_not_found(mock_httpx_client):
+    """Test getting non-existent institution raises 404."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 404
+    mock_response.text = "Not found"
+    mock_httpx_client.get.return_value = mock_response
+
+    # Test and verify
+    with pytest.raises(HTTPException) as exc_info:
+        await InstitutionService.get_institution("nonexistent", "test_token")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_by_short_code_success(mock_httpx_client, sample_institution_data):
+    """Test successfully retrieving an institution by short code."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"items": [sample_institution_data]}
+    mock_httpx_client.get.return_value = mock_response
+
+    # Test
+    result = await InstitutionService.get_by_short_code("TEST_UNIV", "test_token")
+
+    # Verify
+    assert isinstance(result, InstitutionRecord)
+    assert result.short_code == "TEST_UNIV"
+    assert result.name == "Test University"
+
+
+@pytest.mark.asyncio
+async def test_get_by_short_code_not_found(mock_httpx_client):
+    """Test getting institution by non-existent short code raises 404."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"items": []}
+    mock_httpx_client.get.return_value = mock_response
+
+    # Test and verify
+    with pytest.raises(HTTPException) as exc_info:
+        await InstitutionService.get_by_short_code("NONEXISTENT", "test_token")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_institutions_active_only(
+    mock_httpx_client, sample_institution_data, sample_institution_data_2
+):
+    """Test listing only active institutions."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "items": [sample_institution_data, sample_institution_data_2]
+    }
+    mock_httpx_client.get.return_value = mock_response
+
+    # Test
+    result = await InstitutionService.list_institutions("test_token", active_only=True)
+
+    # Verify
+    assert len(result) == 2
+    assert all(isinstance(inst, InstitutionRecord) for inst in result)
+    assert result[0].short_code == "TEST_UNIV"
+    assert result[1].short_code == "SECOND_UNIV"
+
+    # Verify filter was applied
+    call_params = mock_httpx_client.get.call_args[1]["params"]
+    assert call_params["filter"] == "active=true"
+
+
+@pytest.mark.asyncio
+async def test_list_institutions_all(mock_httpx_client, sample_institution_data):
+    """Test listing all institutions including inactive."""
+    # Setup mock response
+    inactive_institution = sample_institution_data.copy()
+    inactive_institution["active"] = False
+    inactive_institution["id"] = "institution_inactive"
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "items": [sample_institution_data, inactive_institution]
+    }
+    mock_httpx_client.get.return_value = mock_response
+
+    # Test
+    result = await InstitutionService.list_institutions("test_token", active_only=False)
+
+    # Verify
+    assert len(result) == 2
+    # Verify no filter was applied
+    call_params = mock_httpx_client.get.call_args[1].get("params", {})
+    assert "filter" not in call_params or not call_params.get("filter")
+
+
+@pytest.mark.asyncio
+async def test_create_institution_success(mock_httpx_client, sample_institution_data):
+    """Test successfully creating an institution."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = sample_institution_data
+    mock_httpx_client.post.return_value = mock_response
+
+    # Test
+    create_data = CreateInstitutionRequest(
+        name="Test University",
+        short_code="TEST_UNIV",
+        registration_magic_word="TestMagic123",
+    )
+    result = await InstitutionService.create_institution(create_data, "test_token")
+
+    # Verify
+    assert isinstance(result, InstitutionRecord)
+    assert result.name == "Test University"
+    assert result.short_code == "TEST_UNIV"
+
+
+@pytest.mark.asyncio
+async def test_create_institution_duplicate_short_code(mock_httpx_client):
+    """Test creating institution with duplicate short code fails."""
+    # Setup mock response for duplicate
+    mock_response = AsyncMock()
+    mock_response.status_code = 400
+    mock_response.text = "Duplicate short_code"
+    mock_httpx_client.post.return_value = mock_response
+
+    # Test and verify
+    create_data = CreateInstitutionRequest(
+        name="Duplicate Uni",
+        short_code="EXISTING",
+        registration_magic_word="Magic123",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await InstitutionService.create_institution(create_data, "test_token")
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_institution_success(mock_httpx_client, sample_institution_data):
+    """Test successfully updating an institution."""
+    # Setup mock response
+    updated_data = sample_institution_data.copy()
+    updated_data["name"] = "Updated University Name"
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = updated_data
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Test
+    update_data = UpdateInstitutionRequest(name="Updated University Name")
+    result = await InstitutionService.update_institution(
+        "institution_123", update_data, "test_token"
+    )
+
+    # Verify
+    assert isinstance(result, InstitutionRecord)
+    assert result.name == "Updated University Name"
+    assert result.id == "institution_123"
+
+
+@pytest.mark.asyncio
+async def test_update_magic_word_success(mock_httpx_client, sample_institution_data):
+    """Test successfully updating institution magic word."""
+    # Setup mock response
+    updated_data = sample_institution_data.copy()
+    updated_data["registration_magic_word"] = "NewMagic456"
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = updated_data
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Test
+    result = await InstitutionService.update_magic_word(
+        "institution_123", "NewMagic456", "test_token"
+    )
+
+    # Verify
+    assert isinstance(result, InstitutionRecord)
+    assert result.registration_magic_word == "NewMagic456"
+
+
+@pytest.mark.asyncio
+async def test_update_magic_word_not_found(mock_httpx_client):
+    """Test updating magic word for non-existent institution fails."""
+    # Setup mock response
+    mock_response = AsyncMock()
+    mock_response.status_code = 404
+    mock_response.text = "Not found"
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Test and verify
+    with pytest.raises(HTTPException) as exc_info:
+        await InstitutionService.update_magic_word(
+            "nonexistent", "NewMagic", "test_token"
+        )
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_institution_without_auth_token(
+    mock_httpx_client, sample_institution_data
+):
+    """Test getting institution without auth token uses service account."""
+    # Setup mock responses
+    # First call: authenticate_service_account
+    auth_response = AsyncMock()
+    auth_response.status_code = 200
+    auth_response.json.return_value = {"token": "service_token"}
+
+    # Second call: get institution
+    inst_response = AsyncMock()
+    inst_response.status_code = 200
+    inst_response.json.return_value = sample_institution_data
+
+    mock_httpx_client.post.return_value = auth_response
+    mock_httpx_client.get.return_value = inst_response
+
+    # Test
+    result = await InstitutionService.get_institution("institution_123", auth_token=None)
+
+    # Verify
+    assert isinstance(result, InstitutionRecord)
+    # Verify service account was used
+    assert mock_httpx_client.post.called
+
+
+@pytest.mark.asyncio
+async def test_update_institution_partial_update(
+    mock_httpx_client, sample_institution_data
+):
+    """Test partial update only sends provided fields."""
+    # Setup mock response
+    updated_data = sample_institution_data.copy()
+    updated_data["active"] = False
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = updated_data
+    mock_httpx_client.patch.return_value = mock_response
+
+    # Test - only update active status
+    update_data = UpdateInstitutionRequest(active=False)
+    result = await InstitutionService.update_institution(
+        "institution_123", update_data, "test_token"
+    )
+
+    # Verify only active field was sent
+    call_json = mock_httpx_client.patch.call_args[1]["json"]
+    assert "active" in call_json
+    assert call_json["active"] is False
+    # Verify other fields were not sent (exclude_none=True)
+    assert "name" not in call_json
+    assert "short_code" not in call_json

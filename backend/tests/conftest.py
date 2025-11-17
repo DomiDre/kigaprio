@@ -128,6 +128,7 @@ def sample_user_data():
         "email": "test@example.com",
         "emailVisibility": False,
         "role": "user",
+        "institution_id": "institution_123",
         "salt": base64.b64encode(b"test_salt_16bytes").decode(),
         "user_wrapped_dek": base64.b64encode(b"wrapped_dek_data").decode(),
         "admin_wrapped_dek": base64.b64encode(b"admin_wrapped_dek").decode(),
@@ -149,7 +150,8 @@ def sample_admin_data():
         "username": "admin",
         "email": "admin@example.com",
         "emailVisibility": False,
-        "role": "admin",
+        "role": "institution_admin",
+        "institution_id": "institution_123",
         "salt": base64.b64encode(b"admin_salt_16byt").decode(),
         "user_wrapped_dek": base64.b64encode(b"admin_wrapped_dek_data").decode(),
         "admin_wrapped_dek": base64.b64encode(b"admin_admin_wrapped").decode(),
@@ -160,6 +162,65 @@ def sample_admin_data():
         "collectionName": "users",
         "created": "2025-01-01T00:00:00Z",
         "updated": "2025-01-08T12:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_super_admin_data():
+    """Sample super admin user data for testing."""
+    return {
+        "id": "super_admin_789",
+        "username": "superadmin",
+        "email": "superadmin@example.com",
+        "emailVisibility": False,
+        "role": "super_admin",
+        "institution_id": None,
+        "salt": base64.b64encode(b"super_salt_16byt").decode(),
+        "user_wrapped_dek": base64.b64encode(b"super_wrapped_dek").decode(),
+        "admin_wrapped_dek": base64.b64encode(b"super_admin_wrap").decode(),
+        "encrypted_fields": base64.b64encode(b'{"name":"Super Admin"}').decode(),
+        "lastSeen": "2025-01-08T14:00:00Z",
+        "verified": True,
+        "collectionId": "users_collection_id",
+        "collectionName": "users",
+        "created": "2025-01-01T00:00:00Z",
+        "updated": "2025-01-08T14:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_institution_data():
+    """Sample institution data for testing."""
+    return {
+        "id": "institution_123",
+        "name": "Test University",
+        "short_code": "TEST_UNIV",
+        "registration_magic_word": "TestMagic123",
+        "admin_public_key": None,
+        "settings": {},
+        "active": True,
+        "collectionId": "institutions_collection_id",
+        "collectionName": "institutions",
+        "created": "2025-01-01T00:00:00Z",
+        "updated": "2025-01-01T00:00:00Z",
+    }
+
+
+@pytest.fixture
+def sample_institution_data_2():
+    """Second sample institution for multi-institution testing."""
+    return {
+        "id": "institution_456",
+        "name": "Second University",
+        "short_code": "SECOND_UNIV",
+        "registration_magic_word": "SecondMagic456",
+        "admin_public_key": None,
+        "settings": {},
+        "active": True,
+        "collectionId": "institutions_collection_id",
+        "collectionName": "institutions",
+        "created": "2025-01-02T00:00:00Z",
+        "updated": "2025-01-02T00:00:00Z",
     }
 
 
@@ -207,6 +268,8 @@ def sample_session_info():
         id="test_user_123",
         username="testuser",
         is_admin=False,
+        role="user",
+        institution_id="institution_123",
     )
 
 
@@ -219,6 +282,22 @@ def sample_admin_session_info():
         id="admin_user_456",
         username="admin",
         is_admin=True,
+        role="institution_admin",
+        institution_id="institution_123",
+    )
+
+
+@pytest.fixture
+def sample_super_admin_session_info():
+    """Sample super admin session info for testing."""
+    from priotag.models.auth import SessionInfo
+
+    return SessionInfo(
+        id="super_admin_789",
+        username="superadmin",
+        is_admin=True,
+        role="super_admin",
+        institution_id=None,
     )
 
 
