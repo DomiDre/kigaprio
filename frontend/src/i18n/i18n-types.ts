@@ -155,9 +155,29 @@ type RootTranslation = {
 		}
 		register: {
 			/**
-			 * R​e​g​i​s​t​r​i​e​r​e​n
+			 * A​n​m​e​l​d​e​n
 			 */
 			title: string
+			/**
+			 * A​c​c​o​u​n​t​ ​z​u​r​ ​E​i​n​g​a​b​e​ ​d​e​r​ ​P​r​i​o​l​i​s​t​e​ ​e​r​s​t​e​l​l​e​n
+			 */
+			subtitle: string
+			/**
+			 * B​i​t​t​e​ ​g​e​b​e​n​ ​S​i​e​ ​d​a​s​ ​Z​a​u​b​e​r​w​o​r​t​ ​e​i​n​,​ ​d​a​s​ ​i​m​ ​G​e​b​ä​u​d​e​ ​h​i​n​t​e​r​l​e​g​t​ ​i​s​t
+			 */
+			subtitleMagicWord: string
+			/**
+			 * Z​u​g​a​n​g​s​v​e​r​i​f​i​z​i​e​r​u​n​g
+			 */
+			accessVerification: string
+			/**
+			 * Q​R​-​C​o​d​e​ ​e​r​k​a​n​n​t​!​ ​S​i​e​ ​k​ö​n​n​e​n​ ​s​i​c​h​ ​j​e​t​z​t​ ​r​e​g​i​s​t​r​i​e​r​e​n​.
+			 */
+			qrCodeDetected: string
+			/**
+			 * A​l​l​e​ ​D​a​t​e​n​ ​w​e​r​d​e​n​ ​E​n​d​-​t​o​-​E​n​d​ ​v​e​r​s​c​h​l​ü​s​s​e​l​t​.​ ​N​u​r​ ​S​i​e​ ​h​a​b​e​n​ ​Z​u​g​a​n​g​ ​z​u​ ​I​h​r​e​n​ ​I​n​f​o​r​m​a​t​i​o​n​e​n​.
+			 */
+			privacyInfo: string
 			/**
 			 * U​s​e​r​n​a​m​e
 			 */
@@ -195,17 +215,45 @@ type RootTranslation = {
 			 */
 			backToLogin: string
 			/**
+			 * ←​ ​Z​u​r​ü​c​k​ ​z​u​r​ ​Z​a​u​b​e​r​w​o​r​t​-​E​i​n​g​a​b​e
+			 */
+			backToMagicWord: string
+			/**
 			 * Z​a​u​b​e​r​w​o​r​t​ ​e​i​n​g​e​b​e​n
 			 */
 			magicWordPlaceholder: string
 			/**
-			 * Z​a​u​b​e​r​w​o​r​t​ ​v​e​r​i​f​i​z​i​e​r​e​n
+			 * U​s​e​r​n​a​m​e​ ​e​i​n​g​e​b​e​n
+			 */
+			usernamePlaceholder: string
+			/**
+			 * P​a​s​s​w​o​r​t​ ​e​i​n​g​e​b​e​n
+			 */
+			passwordPlaceholder: string
+			/**
+			 * N​o​c​h​m​a​l​ ​P​a​s​s​w​o​r​t​ ​e​i​n​g​e​b​e​n
+			 */
+			passwordConfirmPlaceholder: string
+			/**
+			 * V​o​l​l​s​t​ä​n​d​i​g​e​r​ ​N​a​m​e​ ​e​i​n​g​e​b​e​n
+			 */
+			fullNamePlaceholder: string
+			/**
+			 * Z​a​u​b​e​r​w​o​r​t​ ​ü​b​e​r​p​r​ü​f​e​n
 			 */
 			verifyMagicWord: string
 			/**
-			 * W​i​r​d​ ​v​e​r​i​f​i​z​i​e​r​t​.​.​.
+			 * Ü​b​e​r​p​r​ü​f​e​.​.​.
 			 */
 			verifying: string
+			/**
+			 * Z​a​u​b​e​r​w​o​r​t​ ​v​e​r​i​f​i​z​i​e​r​t​!​ ​S​i​e​ ​k​ö​n​n​e​n​ ​s​i​c​h​ ​j​e​t​z​t​ ​r​e​g​i​s​t​r​i​e​r​e​n​.
+			 */
+			verified: string
+			/**
+			 * D​a​s​ ​Z​a​u​b​e​r​w​o​r​t​ ​f​i​n​d​e​n​ ​S​i​e​ ​i​m​ ​E​i​n​g​a​n​g​s​b​e​r​e​i​c​h​ ​d​e​s​ ​G​e​b​ä​u​d​e​s
+			 */
+			magicWordInfo: string
 			/**
 			 * P​a​s​s​w​ö​r​t​e​r​ ​s​t​i​m​m​e​n​ ​n​i​c​h​t​ ​ü​b​e​r​e​i​n
 			 */
@@ -790,9 +838,29 @@ export type TranslationFunctions = {
 		}
 		register: {
 			/**
-			 * Registrieren
+			 * Anmelden
 			 */
 			title: () => LocalizedString
+			/**
+			 * Account zur Eingabe der Prioliste erstellen
+			 */
+			subtitle: () => LocalizedString
+			/**
+			 * Bitte geben Sie das Zauberwort ein, das im Gebäude hinterlegt ist
+			 */
+			subtitleMagicWord: () => LocalizedString
+			/**
+			 * Zugangsverifizierung
+			 */
+			accessVerification: () => LocalizedString
+			/**
+			 * QR-Code erkannt! Sie können sich jetzt registrieren.
+			 */
+			qrCodeDetected: () => LocalizedString
+			/**
+			 * Alle Daten werden End-to-End verschlüsselt. Nur Sie haben Zugang zu Ihren Informationen.
+			 */
+			privacyInfo: () => LocalizedString
 			/**
 			 * Username
 			 */
@@ -830,17 +898,45 @@ export type TranslationFunctions = {
 			 */
 			backToLogin: () => LocalizedString
 			/**
+			 * ← Zurück zur Zauberwort-Eingabe
+			 */
+			backToMagicWord: () => LocalizedString
+			/**
 			 * Zauberwort eingeben
 			 */
 			magicWordPlaceholder: () => LocalizedString
 			/**
-			 * Zauberwort verifizieren
+			 * Username eingeben
+			 */
+			usernamePlaceholder: () => LocalizedString
+			/**
+			 * Passwort eingeben
+			 */
+			passwordPlaceholder: () => LocalizedString
+			/**
+			 * Nochmal Passwort eingeben
+			 */
+			passwordConfirmPlaceholder: () => LocalizedString
+			/**
+			 * Vollständiger Name eingeben
+			 */
+			fullNamePlaceholder: () => LocalizedString
+			/**
+			 * Zauberwort überprüfen
 			 */
 			verifyMagicWord: () => LocalizedString
 			/**
-			 * Wird verifiziert...
+			 * Überprüfe...
 			 */
 			verifying: () => LocalizedString
+			/**
+			 * Zauberwort verifiziert! Sie können sich jetzt registrieren.
+			 */
+			verified: () => LocalizedString
+			/**
+			 * Das Zauberwort finden Sie im Eingangsbereich des Gebäudes
+			 */
+			magicWordInfo: () => LocalizedString
 			/**
 			 * Passwörter stimmen nicht überein
 			 */

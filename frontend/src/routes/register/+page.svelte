@@ -4,6 +4,8 @@
 	import { page } from '$app/stores';
 	import { authStore, isAuthenticated } from '$lib/auth.store';
 	import { apiService } from '$lib/api.service';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import { LL } from '$i18n/i18n-svelte';
 
 	let username = $state('');
 	let password = $state('');
@@ -49,7 +51,7 @@
 
 			if (!response.ok) {
 				const data = await response.json();
-				throw new Error(data.detail || 'Ungültiges Zauberwort');
+				throw new Error(data.detail || $LL.auth.register.errorInvalidMagicWord());
 			}
 
 			const data = await response.json();
@@ -71,12 +73,12 @@
 
 		// Basic validation
 		if (password !== passwordConfirm) {
-			error = 'Passwörter stimmen nicht überein';
+			error = $LL.auth.register.errorPasswordMismatch();
 			loading = false;
 			return;
 		}
 		if (password.length < 1) {
-			error = 'Password must be at least 1 character long';
+			error = $LL.auth.register.errorPasswordTooShort();
 			loading = false;
 			return;
 		}
@@ -136,13 +138,20 @@
 	class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 >
 	<div class="container mx-auto max-w-4xl px-4 py-8">
+		<!-- Language Switcher -->
+		<div class="mb-4 flex justify-end">
+			<LanguageSwitcher />
+		</div>
+
 		<!-- Header -->
 		<div class="mb-8 text-center">
-			<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">Anmelden</h1>
+			<h1 class="mb-2 text-4xl font-bold text-gray-800 dark:text-white">
+				{$LL.auth.register.title()}
+			</h1>
 			<p class="text-gray-600 dark:text-gray-300">
 				{magicWordVerified
-					? 'Account zur Eingabe der Prioliste erstellen'
-					: 'Bitte geben Sie das Zauberwort ein, das im Gebäude hinterlegt ist'}
+					? $LL.auth.register.subtitle()
+					: $LL.auth.register.subtitleMagicWord()}
 			</p>
 		</div>
 
@@ -170,7 +179,7 @@
 							for="magicWord"
 							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 						>
-							Zauberwort
+							{$LL.auth.register.magicWord()}
 						</label>
 						<input
 							id="magicWord"
@@ -178,7 +187,7 @@
 							bind:value={magicWord}
 							required
 							disabled={loading}
-							placeholder="Zauberwort eingeben"
+							placeholder={$LL.auth.register.magicWordPlaceholder()}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
@@ -217,7 +226,7 @@
 						{#if loading}
 							<span class="mr-2 animate-spin">⟳</span>
 						{/if}
-						{loading ? 'Überprüfe...' : 'Zauberwort überprüfen'}
+						{loading ? $LL.auth.register.verifying() : $LL.auth.register.verifyMagicWord()}
 					</button>
 				</form>
 			{:else}
@@ -229,8 +238,8 @@
 						<p class="flex items-center text-sm text-green-700 dark:text-green-400">
 							<span class="mr-2">{isQRMode ? '📱' : '✓'}</span>
 							{isQRMode
-								? 'QR-Code erkannt! Sie können sich jetzt registrieren.'
-								: 'Zauberwort verifiziert! Sie können sich jetzt registrieren.'}
+								? $LL.auth.register.qrCodeDetected()
+								: $LL.auth.register.verified()}
 						</p>
 					</div>
 
