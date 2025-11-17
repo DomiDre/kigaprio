@@ -304,7 +304,7 @@
 			let reDecryptions = 0;
 
 			// Create a set of current user names for efficient lookup
-			const currentUserNames = new SvelteSet(users.map(u => u.name));
+			const currentUserNames = new SvelteSet(users.map((u) => u.name));
 
 			// Remove cached users that no longer exist in the current user list
 			for (const cachedName of Array.from(decryptedUsers.keys())) {
@@ -320,7 +320,8 @@
 					// Check if encrypted data has changed (inexpensive string comparison)
 					const encryptedDataChanged =
 						cached.cachedEncryptedFields?.userEncryptedFields !== user.userEncryptedFields ||
-						cached.cachedEncryptedFields?.prioritiesEncryptedFields !== user.prioritiesEncryptedFields;
+						cached.cachedEncryptedFields?.prioritiesEncryptedFields !==
+							user.prioritiesEncryptedFields;
 
 					if (!encryptedDataChanged) {
 						// Data hasn't changed, use cached version
@@ -396,7 +397,9 @@
 				const messages = [];
 				if (newDecryptions > 0) messages.push(`${newDecryptions} neu`);
 				if (reDecryptions > 0) messages.push(`${reDecryptions} aktualisiert`);
-				console.log(`Entschlüsselt: ${messages.join(', ')} (${decryptedUsers.size} gesamt im Cache)`);
+				console.log(
+					`Entschlüsselt: ${messages.join(', ')} (${decryptedUsers.size} gesamt im Cache)`
+				);
 			}
 		} catch (err) {
 			console.error('Fehler während der inkrementellen Entschlüsselung:', err);
