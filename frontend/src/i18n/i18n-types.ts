@@ -107,6 +107,12 @@ type RootTranslation = {
 		 * T​a​g​e
 		 */
 		daysCount: string
+		/**
+		 * {​c​o​m​p​l​e​t​e​d​}​ ​v​o​n​ ​{​t​o​t​a​l​}​ ​W​o​c​h​e​n​ ​v​o​l​l​s​t​ä​n​d​i​g
+		 * @param {number} completed
+		 * @param {number} total
+		 */
+		weeksComplete: RequiredParams<'completed' | 'total'>
 	}
 	app: {
 		/**
@@ -1300,6 +1306,10 @@ export type TranslationFunctions = {
 		 * Tage
 		 */
 		daysCount: () => LocalizedString
+		/**
+		 * {completed} von {total} Wochen vollständig
+		 */
+		weeksComplete: (arg: { completed: number, total: number }) => LocalizedString
 	}
 	app: {
 		/**

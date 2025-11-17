@@ -249,7 +249,7 @@
 					})
 				: ''}
 			{@const currentPriority = week[dayKey]}
-			{@const dayName = dayNames[dayKey]}
+			{@const dayName = $LL.priorities.days[dayKey]()}
 			{@const startDateParts = week.startDate?.split('.')}
 			{@const fullDate =
 				startDateParts && dayDates[dayIndex]
@@ -306,7 +306,7 @@
 						{@const usedByDay = isUsedElsewhere
 							? dayKeys.find((day) => week[day] === priority)
 							: null}
-						{@const usedByDayName = usedByDay ? dayNames[usedByDay] : null}
+						{@const usedByDayName = usedByDay ? $LL.priorities.days[usedByDay]() : null}
 						{@const isDisabled = !!vacationDay || weekHasStarted}
 
 						<button

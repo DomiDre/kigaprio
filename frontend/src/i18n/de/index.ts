@@ -25,7 +25,8 @@ const de = {
 		imprint: 'Impressum',
 		privacy: 'Datenschutz',
 		progress: 'Fortschritt',
-		daysCount: 'Tage'
+		daysCount: 'Tage',
+		weeksComplete: '{completed:number} von {total:number} Wochen vollständig'
 	},
 
 	// App header/title
