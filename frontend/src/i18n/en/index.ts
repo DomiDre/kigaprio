@@ -23,7 +23,9 @@ const en = {
 		name: 'Name',
 		github: 'GitHub',
 		imprint: 'Imprint',
-		privacy: 'Privacy'
+		privacy: 'Privacy',
+		progress: 'Progress',
+		daysCount: 'Days'
 	},
 
 	// App header/title
@@ -138,7 +140,25 @@ const en = {
 		clickToSetPriority: 'Click to set priority',
 		holiday: 'Holiday',
 		vacation: 'Vacation',
-		weekend: 'Weekend'
+		weekend: 'Weekend',
+		// Edit modal
+		week: 'Week',
+		view: 'view',
+		edit: 'edit',
+		closeWindow: 'Close window',
+		weekStartedWarning: 'This week has already started and can no longer be edited.',
+		allDaysAssigned: 'All days have a priority assigned!',
+		done: 'Done',
+		publicHoliday: '🎉 Holiday',
+		vacationDay: '🏖️ Vacation',
+		absent: '📋 Absent',
+		priority: 'Priority',
+		priorityCannotBeSet: 'Priorities cannot be set for absence days',
+		weekAlreadyStarted: 'This week has already started and can no longer be edited',
+		swapPriority: 'Swap priority {priority} (currently at {day})',
+		selectPriority: 'Select priority {priority}',
+		willBeSwapped: 'Will be swapped',
+		locked: 'Locked'
 	},
 
 	// Dashboard

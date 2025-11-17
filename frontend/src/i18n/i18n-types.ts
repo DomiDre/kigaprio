@@ -99,6 +99,14 @@ type RootTranslation = {
 		 * D​a​t​e​n​s​c​h​u​t​z
 		 */
 		privacy: string
+		/**
+		 * F​o​r​t​s​c​h​r​i​t​t
+		 */
+		progress: string
+		/**
+		 * T​a​g​e
+		 */
+		daysCount: string
 	}
 	app: {
 		/**
@@ -487,6 +495,77 @@ type RootTranslation = {
 		 * W​o​c​h​e​n​e​n​d​e
 		 */
 		weekend: string
+		/**
+		 * W​o​c​h​e
+		 */
+		week: string
+		/**
+		 * a​n​s​e​h​e​n
+		 */
+		view: string
+		/**
+		 * b​e​a​r​b​e​i​t​e​n
+		 */
+		edit: string
+		/**
+		 * F​e​n​s​t​e​r​ ​s​c​h​l​i​e​ß​e​n
+		 */
+		closeWindow: string
+		/**
+		 * D​i​e​s​e​ ​W​o​c​h​e​ ​h​a​t​ ​b​e​r​e​i​t​s​ ​b​e​g​o​n​n​e​n​ ​u​n​d​ ​k​a​n​n​ ​n​i​c​h​t​ ​m​e​h​r​ ​b​e​a​r​b​e​i​t​e​t​ ​w​e​r​d​e​n​.
+		 */
+		weekStartedWarning: string
+		/**
+		 * A​l​l​e​ ​T​a​g​e​ ​h​a​b​e​n​ ​e​i​n​e​ ​P​r​i​o​r​i​t​ä​t​ ​z​u​g​e​w​i​e​s​e​n​!
+		 */
+		allDaysAssigned: string
+		/**
+		 * F​e​r​t​i​g
+		 */
+		done: string
+		/**
+		 * �​�​ ​F​e​i​e​r​t​a​g
+		 */
+		publicHoliday: string
+		/**
+		 * �​�​️​ ​U​r​l​a​u​b
+		 */
+		vacationDay: string
+		/**
+		 * �​�​ ​A​b​w​e​s​e​n​d
+		 */
+		absent: string
+		/**
+		 * P​r​i​o​r​i​t​ä​t
+		 */
+		priority: string
+		/**
+		 * P​r​i​o​r​i​t​ä​t​e​n​ ​k​ö​n​n​e​n​ ​n​i​c​h​t​ ​f​ü​r​ ​A​b​w​e​s​e​n​h​e​i​t​s​t​a​g​e​ ​g​e​s​e​t​z​t​ ​w​e​r​d​e​n
+		 */
+		priorityCannotBeSet: string
+		/**
+		 * D​i​e​s​e​ ​W​o​c​h​e​ ​h​a​t​ ​b​e​r​e​i​t​s​ ​b​e​g​o​n​n​e​n​ ​u​n​d​ ​k​a​n​n​ ​n​i​c​h​t​ ​m​e​h​r​ ​b​e​a​r​b​e​i​t​e​t​ ​w​e​r​d​e​n
+		 */
+		weekAlreadyStarted: string
+		/**
+		 * P​r​i​o​r​i​t​ä​t​ ​{​p​r​i​o​r​i​t​y​}​ ​t​a​u​s​c​h​e​n​ ​(​a​k​t​u​e​l​l​ ​b​e​i​ ​{​d​a​y​}​)
+		 * @param {string} day
+		 * @param {number} priority
+		 */
+		swapPriority: RequiredParams<'day' | 'priority'>
+		/**
+		 * P​r​i​o​r​i​t​ä​t​ ​{​p​r​i​o​r​i​t​y​}​ ​w​ä​h​l​e​n
+		 * @param {number} priority
+		 */
+		selectPriority: RequiredParams<'priority'>
+		/**
+		 * W​i​r​d​ ​g​e​t​a​u​s​c​h​t
+		 */
+		willBeSwapped: string
+		/**
+		 * G​e​s​p​e​r​r​t
+		 */
+		locked: string
 	}
 	dashboard: {
 		/**
@@ -1187,6 +1266,14 @@ export type TranslationFunctions = {
 		 * Datenschutz
 		 */
 		privacy: () => LocalizedString
+		/**
+		 * Fortschritt
+		 */
+		progress: () => LocalizedString
+		/**
+		 * Tage
+		 */
+		daysCount: () => LocalizedString
 	}
 	app: {
 		/**
@@ -1575,6 +1662,74 @@ export type TranslationFunctions = {
 		 * Wochenende
 		 */
 		weekend: () => LocalizedString
+		/**
+		 * Woche
+		 */
+		week: () => LocalizedString
+		/**
+		 * ansehen
+		 */
+		view: () => LocalizedString
+		/**
+		 * bearbeiten
+		 */
+		edit: () => LocalizedString
+		/**
+		 * Fenster schließen
+		 */
+		closeWindow: () => LocalizedString
+		/**
+		 * Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden.
+		 */
+		weekStartedWarning: () => LocalizedString
+		/**
+		 * Alle Tage haben eine Priorität zugewiesen!
+		 */
+		allDaysAssigned: () => LocalizedString
+		/**
+		 * Fertig
+		 */
+		done: () => LocalizedString
+		/**
+		 * 🎉 Feiertag
+		 */
+		publicHoliday: () => LocalizedString
+		/**
+		 * 🏖️ Urlaub
+		 */
+		vacationDay: () => LocalizedString
+		/**
+		 * 📋 Abwesend
+		 */
+		absent: () => LocalizedString
+		/**
+		 * Priorität
+		 */
+		priority: () => LocalizedString
+		/**
+		 * Prioritäten können nicht für Abwesenheitstage gesetzt werden
+		 */
+		priorityCannotBeSet: () => LocalizedString
+		/**
+		 * Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden
+		 */
+		weekAlreadyStarted: () => LocalizedString
+		/**
+		 * Priorität {priority} tauschen (aktuell bei {day})
+		 */
+		swapPriority: (arg: { day: string, priority: number }) => LocalizedString
+		/**
+		 * Priorität {priority} wählen
+		 */
+		selectPriority: (arg: { priority: number }) => LocalizedString
+		/**
+		 * Wird getauscht
+		 */
+		willBeSwapped: () => LocalizedString
+		/**
+		 * Gesperrt
+		 */
+		locked: () => LocalizedString
 	}
 	dashboard: {
 		/**

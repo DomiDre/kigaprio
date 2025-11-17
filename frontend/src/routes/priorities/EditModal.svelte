@@ -5,6 +5,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { dayKeys, dayNames, priorityColors } from '$lib/priorities.config';
 	import { getVacationDayForDate, getValidPriorities, isWeekStarted } from '$lib/dateHelpers.utils';
+	import { LL } from '$i18n/i18n-svelte';
 
 	type Props = {
 		editingWeek: WeekData;
@@ -221,8 +222,8 @@
 			<div class="flex items-center gap-4">
 				<div>
 					<h3 class="text-xl font-bold text-gray-800 dark:text-white">
-						Woche {editingWeek.weekNumber}
-						{weekHasStarted ? 'ansehen' : 'bearbeiten'}
+						{$LL.priorities.week()} {editingWeek.weekNumber}
+						{weekHasStarted ? $LL.priorities.view() : $LL.priorities.edit()}
 					</h3>
 					{#if editingWeek.startDate && editingWeek.endDate}
 						<p class="text-sm text-gray-500 dark:text-gray-400">
@@ -253,7 +254,7 @@
 										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 									></path>
 								</svg>
-								Speichere...
+								{$LL.priorities.saving()}
 							</div>
 						{:else if saveStatus === 'saved'}
 							<div
@@ -266,7 +267,7 @@
 										clip-rule="evenodd"
 									/>
 								</svg>
-								Gespeichert
+								{$LL.priorities.saved()}
 							</div>
 						{:else if saveStatus === 'error'}
 							<div
@@ -279,7 +280,7 @@
 										clip-rule="evenodd"
 									/>
 								</svg>
-								Fehler beim Speichern
+								{$LL.priorities.errorSaving()}
 							</div>
 						{/if}
 					</div>
@@ -288,7 +289,7 @@
 
 			<button
 				onclick={handleClose}
-				aria-label="Fenster schließen"
+				aria-label="{$LL.priorities.closeWindow()}"
 				class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 			>
 				<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -321,7 +322,7 @@
 						/>
 					</svg>
 					<span class="text-sm font-medium text-orange-800 dark:text-orange-200">
-						Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden.
+						{$LL.priorities.weekStartedWarning()}
 					</span>
 				</div>
 			</div>
@@ -332,7 +333,7 @@
 			>
 				<div class="flex items-center justify-between">
 					<span class="text-green-700 dark:text-green-300">
-						✅ Alle Tage haben eine Priorität zugewiesen!
+						✅ {$LL.priorities.allDaysAssigned()}
 					</span>
 					<button
 						onclick={handleClose}
@@ -345,9 +346,9 @@
 		{:else}
 			<div class="mb-4">
 				<div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-					<span>Fortschritt</span>
+					<span>{$LL.common.progress()}</span>
 					<span
-						>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)} Tage</span
+						>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)} {$LL.common.daysCount()}</span
 					>
 				</div>
 				<div class="mt-1 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
@@ -408,10 +409,10 @@
 									title={vacationDay.description}
 								>
 									{vacationDay.type === 'vacation'
-										? '🏖️ Urlaub'
+										? $LL.priorities.vacationDay()
 										: vacationDay.type === 'public_holiday'
-											? '🎉 Feiertag'
-											: '📋 Abwesend'}
+											? $LL.priorities.publicHoliday()
+											: $LL.priorities.absent()}
 								</span>
 							{/if}
 						</div>
@@ -419,7 +420,7 @@
 							<div
 								class="rounded-full bg-purple-200 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-800 dark:text-purple-200"
 							>
-								Priorität {currentPriority}
+								{$LL.priorities.priority()} {currentPriority}
 							</div>
 						{/if}
 					</div>
@@ -451,12 +452,12 @@
 								onclick={() => !isDisabled && selectEditPriority(dayKey, typedPriority)}
 								disabled={isDisabled}
 								title={vacationDay
-									? 'Prioritäten können nicht für Abwesenheitstage gesetzt werden'
+									? $LL.priorities.priorityCannotBeSet()
 									: weekHasStarted
-										? 'Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden'
+										? $LL.priorities.weekAlreadyStarted()
 										: isUsedElsewhere
-											? `Priorität ${priority} tauschen (aktuell bei ${usedByDayName})`
-											: `Priorität ${priority} wählen`}
+											? $LL.priorities.swapPriority({ priority, day: usedByDayName || '' })
+											: $LL.priorities.selectPriority({ priority })}
 							>
 								{priority}
 								{#if isUsedElsewhere && !isDisabled}

@@ -23,7 +23,9 @@ const de = {
 		name: 'Name',
 		github: 'GitHub',
 		imprint: 'Impressum',
-		privacy: 'Datenschutz'
+		privacy: 'Datenschutz',
+		progress: 'Fortschritt',
+		daysCount: 'Tage'
 	},
 
 	// App header/title
@@ -138,7 +140,25 @@ const de = {
 		clickToSetPriority: 'Klicken Sie, um die Priorität zu setzen',
 		holiday: 'Feiertag',
 		vacation: 'Urlaub',
-		weekend: 'Wochenende'
+		weekend: 'Wochenende',
+		// Edit modal
+		week: 'Woche',
+		view: 'ansehen',
+		edit: 'bearbeiten',
+		closeWindow: 'Fenster schließen',
+		weekStartedWarning: 'Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden.',
+		allDaysAssigned: 'Alle Tage haben eine Priorität zugewiesen!',
+		done: 'Fertig',
+		publicHoliday: '🎉 Feiertag',
+		vacationDay: '🏖️ Urlaub',
+		absent: '📋 Abwesend',
+		priority: 'Priorität',
+		priorityCannotBeSet: 'Prioritäten können nicht für Abwesenheitstage gesetzt werden',
+		weekAlreadyStarted: 'Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden',
+		swapPriority: 'Priorität {priority:number} tauschen (aktuell bei {day:string})',
+		selectPriority: 'Priorität {priority:number} wählen',
+		willBeSwapped: 'Wird getauscht',
+		locked: 'Gesperrt'
 	},
 
 	// Dashboard
