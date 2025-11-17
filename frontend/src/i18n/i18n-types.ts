@@ -376,9 +376,21 @@ type RootTranslation = {
 		 */
 		saved: string
 		/**
+		 * P​r​i​o​r​i​t​ä​t​e​n​ ​e​r​f​o​l​g​r​e​i​c​h​ ​g​e​s​p​e​i​c​h​e​r​t
+		 */
+		savedSuccess: string
+		/**
 		 * F​e​h​l​e​r​ ​b​e​i​m​ ​S​p​e​i​c​h​e​r​n
 		 */
 		errorSaving: string
+		/**
+		 * F​e​h​l​e​r​ ​b​e​i​m​ ​S​p​e​i​c​h​e​r​n​.​ ​B​i​t​t​e​ ​v​e​r​s​u​c​h​e​n​ ​S​i​e​ ​e​s​ ​e​r​n​e​u​t​.
+		 */
+		errorSavingRetry: string
+		/**
+		 * J​e​d​e​r​ ​W​o​c​h​e​n​t​a​g​ ​m​u​s​s​ ​e​i​n​e​ ​e​i​n​d​e​u​t​i​g​e​ ​P​r​i​o​r​i​t​ä​t​ ​h​a​b​e​n
+		 */
+		errorUniquePriorities: string
 		/**
 		 * K​e​i​n​e​ ​D​a​t​e​n​ ​f​ü​r​ ​d​i​e​s​e​n​ ​M​o​n​a​t
 		 */
@@ -1059,9 +1071,21 @@ export type TranslationFunctions = {
 		 */
 		saved: () => LocalizedString
 		/**
+		 * Prioritäten erfolgreich gespeichert
+		 */
+		savedSuccess: () => LocalizedString
+		/**
 		 * Fehler beim Speichern
 		 */
 		errorSaving: () => LocalizedString
+		/**
+		 * Fehler beim Speichern. Bitte versuchen Sie es erneut.
+		 */
+		errorSavingRetry: () => LocalizedString
+		/**
+		 * Jeder Wochentag muss eine eindeutige Priorität haben
+		 */
+		errorUniquePriorities: () => LocalizedString
 		/**
 		 * Keine Daten für diesen Monat
 		 */
