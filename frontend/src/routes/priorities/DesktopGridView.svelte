@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { WeekData, WeekPriority } from '$lib/priorities.types';
 	import type { VacationDay } from '$lib/vacation-days.types';
-	import { dayNames, priorityColors } from '$lib/priorities.config';
+	import { dayKeys, priorityColors } from '$lib/priorities.config';
 	import { getVacationDayForDate, isWeekStarted } from '$lib/dateHelpers.utils';
 	import { SvelteDate } from 'svelte/reactivity';
 	import { LL } from '$i18n/i18n-svelte';
@@ -75,7 +75,8 @@
 			</div>
 
 			<div class="space-y-2">
-				{#each Object.entries(dayNames) as [dayKey, dayName], dayIndex (dayKey)}
+				{#each dayKeys as dayKey, dayIndex (dayKey)}
+					{@const dayName = $LL.priorities.days[dayKey]()}
 					{@const priority = week[dayKey as keyof WeekPriority]}
 					{@const fullDate = getFullDateForDay(week, dayIndex)}
 					{@const vacationDay = getVacation(fullDate)}

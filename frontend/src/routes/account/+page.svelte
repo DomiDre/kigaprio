@@ -153,7 +153,7 @@
 
 	// Delete account
 	async function deleteAccount() {
-		if (deleteConfirmation !== 'LÖSCHEN') {
+		if (deleteConfirmation !== $LL.account.deleteConfirmText()) {
 			error = $LL.account.errorDeleteConfirm();
 			setTimeout(() => (error = ''), 3000);
 			return;
@@ -291,7 +291,7 @@
 								d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
 							/>
 						</svg>
-						Prioritäten
+						{$LL.priorities.title()}
 					</a>
 				</div>
 			</div>
@@ -658,7 +658,7 @@
 					<div class="flex gap-3">
 						<button
 							onclick={deleteAccount}
-							disabled={deletionInProgress || deleteConfirmation !== 'LÖSCHEN'}
+							disabled={deletionInProgress || deleteConfirmation !== $LL.account.deleteConfirmText()}
 							class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
 						>
 							{#if deletionInProgress}
