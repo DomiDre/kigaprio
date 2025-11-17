@@ -371,7 +371,7 @@
 							for="current-password"
 							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 						>
-							Aktuelles Passwort
+							{$LL.account.currentPassword()}
 						</label>
 						<div class="relative mt-1">
 							<input
@@ -389,7 +389,7 @@
 							for="new-password"
 							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 						>
-							Neues Passwort
+							{$LL.account.newPassword()}
 						</label>
 						<div class="relative mt-1">
 							<input
@@ -422,7 +422,7 @@
 							for="confirm-password"
 							class="block text-sm font-medium text-gray-700 dark:text-gray-300"
 						>
-							Neues Passwort bestätigen
+							{$LL.account.confirmNewPassword()}
 						</label>
 						<div class="relative mt-1">
 							<input
@@ -443,7 +443,7 @@
 							class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-500"
 						/>
 						<label for="show-passwords" class="ml-2 text-sm text-gray-700 dark:text-gray-300">
-							Passwörter anzeigen
+							{$LL.account.showPasswords()}
 						</label>
 					</div>
 
@@ -607,7 +607,7 @@
 							onclick={() => (showDataModal = false)}
 							class="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
 						>
-							Schließen
+							{$LL.account.close()}
 						</button>
 					</div>
 				</div>
@@ -675,7 +675,7 @@
 							disabled={deletionInProgress}
 							class="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
 						>
-							Abbrechen
+							{$LL.account.cancel()}
 						</button>
 					</div>
 				</div>

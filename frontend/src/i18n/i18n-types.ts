@@ -496,6 +496,14 @@ type RootTranslation = {
 		 */
 		weekend: string
 		/**
+		 * O​f​f​e​n
+		 */
+		open: string
+		/**
+		 * ✓​ ​F​e​r​t​i​g
+		 */
+		complete: string
+		/**
 		 * W​o​c​h​e
 		 */
 		week: string
@@ -516,9 +524,17 @@ type RootTranslation = {
 		 */
 		weekStartedWarning: string
 		/**
+		 * W​o​c​h​e​ ​b​e​r​e​i​t​s​ ​g​e​s​t​a​r​t​e​t
+		 */
+		weekAlreadyStartedTooltip: string
+		/**
 		 * A​l​l​e​ ​T​a​g​e​ ​h​a​b​e​n​ ​e​i​n​e​ ​P​r​i​o​r​i​t​ä​t​ ​z​u​g​e​w​i​e​s​e​n​!
 		 */
 		allDaysAssigned: string
+		/**
+		 * ✅​ ​A​l​l​e​ ​T​a​g​e​ ​h​a​b​e​n​ ​e​i​n​e​ ​P​r​i​o​r​i​t​ä​t​!
+		 */
+		allDaysHavePriority: string
 		/**
 		 * F​e​r​t​i​g
 		 */
@@ -558,6 +574,16 @@ type RootTranslation = {
 		 * @param {number} priority
 		 */
 		selectPriority: RequiredParams<'priority'>
+		/**
+		 * T​a​u​s​c​h​e​n​ ​m​i​t​ ​{​d​a​y​}
+		 * @param {string} day
+		 */
+		swapWith: RequiredParams<'day'>
+		/**
+		 * P​r​i​o​r​i​t​ä​t​ ​{​p​r​i​o​r​i​t​y​}
+		 * @param {number} priority
+		 */
+		priorityNumber: RequiredParams<'priority'>
 		/**
 		 * W​i​r​d​ ​g​e​t​a​u​s​c​h​t
 		 */
@@ -1663,6 +1689,14 @@ export type TranslationFunctions = {
 		 */
 		weekend: () => LocalizedString
 		/**
+		 * Offen
+		 */
+		open: () => LocalizedString
+		/**
+		 * ✓ Fertig
+		 */
+		complete: () => LocalizedString
+		/**
 		 * Woche
 		 */
 		week: () => LocalizedString
@@ -1683,9 +1717,17 @@ export type TranslationFunctions = {
 		 */
 		weekStartedWarning: () => LocalizedString
 		/**
+		 * Woche bereits gestartet
+		 */
+		weekAlreadyStartedTooltip: () => LocalizedString
+		/**
 		 * Alle Tage haben eine Priorität zugewiesen!
 		 */
 		allDaysAssigned: () => LocalizedString
+		/**
+		 * ✅ Alle Tage haben eine Priorität!
+		 */
+		allDaysHavePriority: () => LocalizedString
 		/**
 		 * Fertig
 		 */
@@ -1722,6 +1764,14 @@ export type TranslationFunctions = {
 		 * Priorität {priority} wählen
 		 */
 		selectPriority: (arg: { priority: number }) => LocalizedString
+		/**
+		 * Tauschen mit {day}
+		 */
+		swapWith: (arg: { day: string }) => LocalizedString
+		/**
+		 * Priorität {priority}
+		 */
+		priorityNumber: (arg: { priority: number }) => LocalizedString
 		/**
 		 * Wird getauscht
 		 */

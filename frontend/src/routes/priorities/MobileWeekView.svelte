@@ -9,6 +9,7 @@
 		getValidPriorities,
 		isWeekStarted
 	} from '$lib/dateHelpers.utils';
+	import { LL } from '$i18n/i18n-svelte';
 
 	type Props = {
 		week: WeekData;
@@ -140,7 +141,7 @@
 	<div class="mb-4 flex items-center justify-between">
 		<div>
 			<h3 class="text-lg font-bold text-gray-800 dark:text-white">
-				Woche {week.weekNumber}
+				{$LL.priorities.week()} {week.weekNumber}
 			</h3>
 			<p class="text-xs text-gray-500 dark:text-gray-400">
 				{week.startDate} - {week.endDate}
@@ -182,11 +183,11 @@
 								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 							></path>
 						</svg>
-						Speichern...
+						{$LL.priorities.saving()}
 					{:else if saveStatus === 'saved'}
-						✓ Gespeichert
+						{$LL.priorities.saved()}
 					{:else if saveStatus === 'error'}
-						✗ Fehler
+						{$LL.priorities.errorSaving()}
 					{/if}
 				</span>
 			{/if}
@@ -200,10 +201,10 @@
 						: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}"
 			>
 				{weekCompleted
-					? '✓ Fertig'
+					? $LL.priorities.complete()
 					: getCompletedDaysCount() > 0
 						? `${getCompletedDaysCount()}/${getTotalNonVacationDays()}`
-						: 'Offen'}
+						: $LL.priorities.open()}
 			</span>
 		</div>
 	</div>
@@ -214,7 +215,7 @@
 			class="mb-3 rounded-lg border border-orange-200 bg-orange-50 p-2 text-xs text-orange-800 dark:border-orange-800 dark:bg-orange-900/20 dark:text-orange-200"
 			transition:scale={{ duration: 300 }}
 		>
-			⚠️ Diese Woche hat bereits begonnen und kann nicht mehr bearbeitet werden.
+			{$LL.priorities.weekStartedWarning()}
 		</div>
 	{/if}
 
@@ -234,7 +235,7 @@
 		<div
 			class="mb-4 rounded-lg bg-green-50 p-2 text-center text-sm text-green-700 dark:bg-green-900 dark:text-green-300"
 		>
-			✅ Alle Tage haben eine Priorität!
+			{$LL.priorities.allDaysHavePriority()}
 		</div>
 	{/if}
 
@@ -280,10 +281,10 @@
 								title={vacationDay.description}
 							>
 								{vacationDay.type === 'vacation'
-									? '🏖️ Urlaub'
+									? $LL.priorities.vacationDay()
 									: vacationDay.type === 'public_holiday'
-										? '🎉 Feiertag'
-										: '📋 Abwesend'}
+										? $LL.priorities.publicHoliday()
+										: $LL.priorities.absent()}
 							</span>
 						{/if}
 					</div>
@@ -322,12 +323,12 @@
 							onclick={() => !isDisabled && handlePrioritySelect(dayKey, typedPriority)}
 							disabled={isDisabled}
 							title={vacationDay
-								? 'Prioritäten können nicht für Abwesenheitstage gesetzt werden'
+								? $LL.priorities.priorityCannotBeSet()
 								: weekHasStarted
-									? 'Diese Woche hat bereits begonnen'
+									? $LL.priorities.weekAlreadyStarted()
 									: isUsedElsewhere
-										? `Tauschen mit ${usedByDayName}`
-										: `Priorität ${priority}`}
+										? $LL.priorities.swapWith({ day: usedByDayName || '' })
+										: $LL.priorities.priorityNumber({ priority })}
 						>
 							{priority}
 							{#if isUsedElsewhere && !isDisabled}

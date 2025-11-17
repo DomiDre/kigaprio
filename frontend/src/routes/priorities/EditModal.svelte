@@ -339,7 +339,7 @@
 						onclick={handleClose}
 						class="rounded-lg bg-green-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-green-700"
 					>
-						Fertig
+						{$LL.priorities.done()}
 					</button>
 				</div>
 			</div>
@@ -463,7 +463,7 @@
 								{#if isUsedElsewhere && !isDisabled}
 									<span
 										class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white"
-										title="Wird getauscht"
+										title="{$LL.priorities.willBeSwapped()}"
 									>
 										⇄
 									</span>

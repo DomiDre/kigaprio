@@ -141,13 +141,18 @@ const en = {
 		holiday: 'Holiday',
 		vacation: 'Vacation',
 		weekend: 'Weekend',
+		// Status labels
+		open: 'Open',
+		complete: '✓ Complete',
 		// Edit modal
 		week: 'Week',
 		view: 'view',
 		edit: 'edit',
 		closeWindow: 'Close window',
 		weekStartedWarning: 'This week has already started and can no longer be edited.',
+		weekAlreadyStartedTooltip: 'Week already started',
 		allDaysAssigned: 'All days have a priority assigned!',
+		allDaysHavePriority: '✅ All days have a priority!',
 		done: 'Done',
 		publicHoliday: '🎉 Holiday',
 		vacationDay: '🏖️ Vacation',
@@ -157,6 +162,8 @@ const en = {
 		weekAlreadyStarted: 'This week has already started and can no longer be edited',
 		swapPriority: 'Swap priority {priority} (currently at {day})',
 		selectPriority: 'Select priority {priority}',
+		swapWith: 'Swap with {day}',
+		priorityNumber: 'Priority {priority}',
 		willBeSwapped: 'Will be swapped',
 		locked: 'Locked'
 	},

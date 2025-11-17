@@ -4,6 +4,7 @@
 	import { dayNames, priorityColors } from '$lib/priorities.config';
 	import { getVacationDayForDate, isWeekStarted } from '$lib/dateHelpers.utils';
 	import { SvelteDate } from 'svelte/reactivity';
+	import { LL } from '$i18n/i18n-svelte';
 
 	type Props = {
 		weeks: WeekData[];
@@ -45,10 +46,10 @@
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-2">
 					<h3 class="font-bold text-gray-800 dark:text-white">
-						Woche {week.weekNumber}
+						{$LL.priorities.week()} {week.weekNumber}
 					</h3>
 					{#if weekStarted}
-						<span class="text-orange-600 dark:text-orange-400" title="Woche bereits gestartet">
+						<span class="text-orange-600 dark:text-orange-400" title="{$LL.priorities.weekAlreadyStartedTooltip()}">
 							🔒
 						</span>
 					{/if}
@@ -62,10 +63,10 @@
 							: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}"
 				>
 					{week.status === 'completed'
-						? '✓ Fertig'
+						? $LL.priorities.complete()
 						: week.status === 'pending'
-							? 'Offen'
-							: 'Gesperrt'}
+							? $LL.priorities.open()
+							: $LL.priorities.locked()}
 				</span>
 			</div>
 
@@ -91,7 +92,7 @@
 							{#if vacationDay}
 								<span
 									class="text-xs"
-									title={`${vacationDay.type === 'vacation' ? 'Urlaub' : vacationDay.type === 'public_holiday' ? 'Feiertag' : 'Abwesend'}: ${vacationDay.description}`}
+									title={`${vacationDay.type === 'vacation' ? $LL.priorities.vacation() : vacationDay.type === 'public_holiday' ? $LL.priorities.holiday() : $LL.priorities.absent()}: ${vacationDay.description}`}
 								>
 									{vacationDay.type === 'vacation'
 										? '🏖️'
@@ -120,7 +121,7 @@
 					: 'bg-purple-600 text-white hover:bg-purple-700'}"
 				onclick={() => openEditModal(week, index)}
 			>
-				{weekStarted ? 'Ansehen' : 'Bearbeiten'}
+				{weekStarted ? $LL.priorities.view() : $LL.priorities.edit()}
 			</button>
 		</div>
 	{/each}
