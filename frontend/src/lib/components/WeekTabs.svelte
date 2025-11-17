@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { WeekData } from '$lib/priorities.types';
 	import { getWeekStatus } from '$lib/dateHelpers.utils';
+	import { LL } from '$i18n/i18n-svelte';
 
 	export let weeks: WeekData[];
 	export let activeWeekIndex: number;
@@ -18,7 +19,7 @@
 					: 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}"
 			onclick={() => (activeWeekIndex = index)}
 		>
-			<span>Woche {week.weekNumber}</span>
+			<span>{$LL.priorities.week()} {week.weekNumber}</span>
 			<span class="mt-1 text-xs">
 				{#if status === 'completed'}
 					<span class="inline-block rounded-full bg-green-500 px-2 py-0.5 font-bold text-white"
