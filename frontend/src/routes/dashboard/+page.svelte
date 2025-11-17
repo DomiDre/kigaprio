@@ -210,39 +210,41 @@
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
 		<div class="container mx-auto max-w-6xl px-4 py-10">
-		<!-- Navigation Bar -->
-		<div class="mb-6">
-			<div class="mb-4 flex items-center justify-between">
-				<h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">{$LL.dashboard.title()}</h1>
-				<LanguageSwitcher />
-			</div>
-			<div class="flex flex-wrap gap-3">
-				<a
-					href="/priorities"
-					class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
+			<!-- Navigation Bar -->
+			<div class="mb-6">
+				<div class="mb-4 flex items-center justify-between">
+					<h1 class="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
+						{$LL.dashboard.title()}
+					</h1>
+					<LanguageSwitcher />
+				</div>
+				<div class="flex flex-wrap gap-3">
+					<a
+						href="/priorities"
+						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-						/>
-					</svg>
-					{$LL.priorities.title()}
-				</a>
-				<button
-					class="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
-					on:click={handleLogout}>{$LL.auth.logout()}</button
-				>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+							/>
+						</svg>
+						{$LL.priorities.title()}
+					</a>
+					<button
+						class="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-700"
+						on:click={handleLogout}>{$LL.auth.logout()}</button
+					>
+				</div>
 			</div>
-		</div>
 
 			<!-- Welcome Section -->
 			<div class="mb-8 text-center">
@@ -286,7 +288,9 @@
 					<!-- Completion Rate (Days Filled) -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
-							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">{$LL.dashboard.progress()}</span>
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+								>{$LL.dashboard.progress()}</span
+							>
 							<span class="text-2xl">📊</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
@@ -306,14 +310,18 @@
 					<!-- Most Important Day -->
 					<div class="rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800">
 						<div class="mb-2 flex items-center justify-between">
-							<span class="text-sm font-medium text-gray-600 dark:text-gray-400">{$LL.dashboard.focusDay()}</span>
+							<span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+								>{$LL.dashboard.focusDay()}</span
+							>
 							<span class="text-2xl">🔥</span>
 						</div>
 						<div class="mb-1 text-2xl font-bold text-gray-800 dark:text-white">
 							{mostCommonHighPriorityDay || '-'}
 						</div>
 						<div class="text-xs text-gray-600 dark:text-gray-400">
-							{mostCommonHighPriorityDay ? $LL.dashboard.oftenHighPriority() : $LL.dashboard.noData()}
+							{mostCommonHighPriorityDay
+								? $LL.dashboard.oftenHighPriority()
+								: $LL.dashboard.noData()}
 						</div>
 					</div>
 
@@ -347,7 +355,8 @@
 								>
 									<div>
 										<span class="font-medium text-gray-800 dark:text-gray-200">
-											{$LL.dashboard.week()} {week.weekNumber}
+											{$LL.dashboard.week()}
+											{week.weekNumber}
 										</span>
 									</div>
 									<div>
@@ -371,7 +380,9 @@
 						{#if !allWeeksCompleted && getNextIncompleteWeek()}
 							<div class="mt-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
 								<p class="text-sm text-blue-700 dark:text-blue-300">
-									💡 {@html $LL.dashboard.nextWeekToWorkOn({ weekNumber: getNextIncompleteWeek() || 0 })}
+									💡 {@html $LL.dashboard.nextWeekToWorkOn({
+										weekNumber: getNextIncompleteWeek() || 0
+									})}
 								</p>
 								<a
 									href="/priorities"
@@ -389,7 +400,9 @@
 					class="flex items-center justify-between rounded-xl bg-white p-6 shadow-lg dark:bg-gray-800"
 				>
 					<div>
-						<h3 class="font-semibold text-gray-800 dark:text-white">{$LL.dashboard.accountManagement()}</h3>
+						<h3 class="font-semibold text-gray-800 dark:text-white">
+							{$LL.dashboard.accountManagement()}
+						</h3>
 						<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
 							{$LL.dashboard.accountManagementDesc()}
 						</p>

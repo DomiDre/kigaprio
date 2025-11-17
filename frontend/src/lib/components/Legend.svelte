@@ -16,7 +16,7 @@
 		<!-- Priority Legend -->
 		<div class="flex flex-wrap items-center justify-center gap-4 text-sm">
 			<span class="font-semibold text-gray-700 dark:text-gray-300">{$LL.priorities.title()}:</span>
-			{#each priorities as { num, key }}
+			{#each priorities as { num, key } (num)}
 				<div class="flex items-center gap-2">
 					<span
 						class="flex h-8 w-8 items-center justify-center rounded-full {priorityColors[

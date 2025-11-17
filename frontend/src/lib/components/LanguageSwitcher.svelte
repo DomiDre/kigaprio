@@ -24,11 +24,11 @@
 </script>
 
 <div class="flex items-center gap-2">
-	{#each languages as lang}
+	{#each languages as lang (lang.code)}
 		<button
 			type="button"
 			onclick={() => switchLanguage(lang.code)}
-			class="flex items-center gap-2 rounded-lg px-2 py-2 sm:px-3 text-sm font-medium transition-colors
+			class="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-3
 					 {$locale === lang.code
 				? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
 				: 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'}"

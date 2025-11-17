@@ -3,7 +3,7 @@
 	import type { VacationDay } from '$lib/vacation-days.types';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { dayKeys, dayNames, priorityColors } from '$lib/priorities.config';
+	import { dayKeys, priorityColors } from '$lib/priorities.config';
 	import { getVacationDayForDate, getValidPriorities, isWeekStarted } from '$lib/dateHelpers.utils';
 	import { LL } from '$i18n/i18n-svelte';
 
@@ -222,7 +222,8 @@
 			<div class="flex items-center gap-4">
 				<div>
 					<h3 class="text-xl font-bold text-gray-800 dark:text-white">
-						{$LL.priorities.week()} {editingWeek.weekNumber}
+						{$LL.priorities.week()}
+						{editingWeek.weekNumber}
 						{weekHasStarted ? $LL.priorities.view() : $LL.priorities.edit()}
 					</h3>
 					{#if editingWeek.startDate && editingWeek.endDate}
@@ -289,7 +290,7 @@
 
 			<button
 				onclick={handleClose}
-				aria-label="{$LL.priorities.closeWindow()}"
+				aria-label={$LL.priorities.closeWindow()}
 				class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 			>
 				<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,7 +349,8 @@
 				<div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
 					<span>{$LL.common.progress()}</span>
 					<span
-						>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)} {$LL.common.daysCount()}</span
+						>{getAssignedDaysCount(editingWeek)} / {getTotalNonVacationDays(editingWeek)}
+						{$LL.common.daysCount()}</span
 					>
 				</div>
 				<div class="mt-1 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
@@ -420,7 +422,8 @@
 							<div
 								class="rounded-full bg-purple-200 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-800 dark:text-purple-200"
 							>
-								{$LL.priorities.priority()} {currentPriority}
+								{$LL.priorities.priority()}
+								{currentPriority}
 							</div>
 						{/if}
 					</div>
@@ -463,7 +466,7 @@
 								{#if isUsedElsewhere && !isDisabled}
 									<span
 										class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white"
-										title="{$LL.priorities.willBeSwapped()}"
+										title={$LL.priorities.willBeSwapped()}
 									>
 										⇄
 									</span>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { WeekData, Priority, DayName } from '$lib/priorities.types';
 	import type { VacationDay } from '$lib/vacation-days.types';
-	import { dayNames, dayKeys, priorityColors } from '$lib/priorities.config';
+	import { dayKeys, priorityColors } from '$lib/priorities.config';
 	import { scale } from 'svelte/transition';
 	import {
 		isWeekComplete,
@@ -141,7 +141,8 @@
 	<div class="mb-4 flex items-center justify-between">
 		<div>
 			<h3 class="text-lg font-bold text-gray-800 dark:text-white">
-				{$LL.priorities.week()} {week.weekNumber}
+				{$LL.priorities.week()}
+				{week.weekNumber}
 			</h3>
 			<p class="text-xs text-gray-500 dark:text-gray-400">
 				{week.startDate} - {week.endDate}

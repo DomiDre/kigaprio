@@ -11,8 +11,10 @@
 	<div class="text-center">
 		<div class="mb-4 flex items-center justify-between sm:justify-center sm:gap-4">
 			<div class="flex-1 sm:flex-initial"></div>
-			<h1 class="text-2xl sm:text-4xl font-bold text-gray-800 dark:text-white">{$LL.priorities.title()}</h1>
-			<div class="flex-1 sm:flex-initial flex justify-end">
+			<h1 class="text-2xl font-bold text-gray-800 sm:text-4xl dark:text-white">
+				{$LL.priorities.title()}
+			</h1>
+			<div class="flex flex-1 justify-end sm:flex-initial">
 				<LanguageSwitcher />
 			</div>
 		</div>

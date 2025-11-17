@@ -1,4 +1,4 @@
-import type { BaseTranslation } from '../i18n-types'
+import type { BaseTranslation } from '../i18n-types';
 
 const de = {
 	// Common
@@ -43,11 +43,13 @@ const de = {
 			password: 'Passwort',
 			keepLoggedIn: 'Angemeldet bleiben',
 			keepLoggedInDesc30Days: 'Sie bleiben 30 Tage angemeldet. Empfohlen für persönliche Geräte.',
-			keepLoggedInDesc8Hours: 'Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen für gemeinsam genutzte Computer.',
+			keepLoggedInDesc8Hours:
+				'Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen für gemeinsam genutzte Computer.',
 			loginButton: 'Anmelden',
 			loggingIn: 'Wird angemeldet...',
 			registerButton: 'Registrieren',
-			securityNote: 'Gespeicherte Daten werden Serverseitig verschlüsselt. Wir können Ihre persönlichen Informationen nicht lesen.'
+			securityNote:
+				'Gespeicherte Daten werden Serverseitig verschlüsselt. Wir können Ihre persönlichen Informationen nicht lesen.'
 		},
 		register: {
 			title: 'Anmelden',
@@ -55,7 +57,8 @@ const de = {
 			subtitleMagicWord: 'Bitte geben Sie das Zauberwort ein, das im Gebäude hinterlegt ist',
 			accessVerification: 'Zugangsverifizierung',
 			qrCodeDetected: 'QR-Code erkannt! Sie können sich jetzt registrieren.',
-			privacyInfo: 'Alle Daten werden End-to-End verschlüsselt. Nur Sie haben Zugang zu Ihren Informationen.',
+			privacyInfo:
+				'Alle Daten werden End-to-End verschlüsselt. Nur Sie haben Zugang zu Ihren Informationen.',
 			username: 'Username',
 			password: 'Passwort',
 			passwordConfirm: 'Passwort bestätigen',
@@ -82,7 +85,8 @@ const de = {
 			traditionalRegistration: 'Normale Registrierung',
 			privacyNotice: 'Datenschutzhinweis:',
 			privacyPseudonymPlaintext: '🔓 Ihr Pseudonym (Loginname) wird im Klartext gespeichert',
-			privacyNameEncrypted: '🔒 Der Name Ihres Kindes wird verschlüsselt in der Datenbank gespeichert',
+			privacyNameEncrypted:
+				'🔒 Der Name Ihres Kindes wird verschlüsselt in der Datenbank gespeichert',
 			childName: 'Name Ihres Kindes',
 			encrypted: 'Verschlüsselt',
 			childNamePlaceholder: 'z.B. Max Mustermann',
@@ -94,7 +98,8 @@ const de = {
 			confirmPasswordLabel: 'Passwort bestätigen',
 			confirmPasswordPlaceholder2: 'Nochmal Passwort eingeben',
 			keepLoggedIn30Days: 'Sie bleiben 30 Tage angemeldet. Empfohlen für persönliche Geräte.',
-			keepLoggedIn8Hours: 'Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen für gemeinsam genutzte Computer.',
+			keepLoggedIn8Hours:
+				'Sie werden nach 8 Stunden oder beim Schließen des Browsers abgemeldet. Empfohlen für gemeinsam genutzte Computer.',
 			creating: 'Erstelle Account...',
 			createAccount: 'Account erstellen',
 			alreadyHaveAccount: 'Haben Sie bereits einen Account?',
@@ -221,7 +226,8 @@ const de = {
 		confirmNewPassword: 'Neues Passwort bestätigen',
 		updateProfile: 'Profil aktualisieren',
 		deleteAccount: 'Konto löschen',
-		deleteAccountConfirm: 'Möchten Sie Ihr Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+		deleteAccountConfirm:
+			'Möchten Sie Ihr Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
 		// Account page specific
 		accountManagement: 'Account-Verwaltung',
 		accountInfo: 'Account-Informationen',
@@ -250,7 +256,8 @@ const de = {
 		errorChangingPassword: 'Fehler beim Ändern des Passworts',
 		// Data management
 		dataManagement: '📊 Datenverwaltung (DSGVO)',
-		gdprNotice: 'Gemäß der Datenschutz-Grundverordnung haben Sie das Recht auf Auskunft, Berichtigung und Löschung Ihrer personenbezogenen Daten.',
+		gdprNotice:
+			'Gemäß der Datenschutz-Grundverordnung haben Sie das Recht auf Auskunft, Berichtigung und Löschung Ihrer personenbezogenen Daten.',
 		viewStoredData: 'Gespeicherte Daten einsehen',
 		exportData: 'Daten exportieren',
 		errorFetchingData: 'Fehler beim Abrufen der Daten: {error:string}',
@@ -258,13 +265,15 @@ const de = {
 		errorExportingData: 'Fehler beim Exportieren: {error:string}',
 		// Delete account
 		dangerZone: '⚠️ Gefahrenzone',
-		deleteWarning: 'Das Löschen Ihres Accounts ist unwiderruflich. Alle Ihre Daten werden permanent gelöscht.',
+		deleteWarning:
+			'Das Löschen Ihres Accounts ist unwiderruflich. Alle Ihre Daten werden permanent gelöscht.',
 		deleteAccountButton: 'Account löschen',
 		deleteConfirmTitle: '⚠️ Account dauerhaft löschen',
 		deleteIrreversible: 'Diese Aktion ist unwiderruflich! Folgende Daten werden gelöscht:',
 		deleteItemAccount: 'Ihr Benutzerkonto und alle Anmeldedaten',
 		deleteItemPriorities: 'Alle gespeicherten Prioritäten',
-		deletionReport: 'Nach der Löschung erhalten Sie einen Löschbericht als Nachweis gemäß DSGVO Art. 17.',
+		deletionReport:
+			'Nach der Löschung erhalten Sie einen Löschbericht als Nachweis gemäß DSGVO Art. 17.',
 		deleteConfirmPrompt: 'Geben Sie <strong>LÖSCHEN</strong> zur Bestätigung ein:',
 		deleteConfirmText: 'LÖSCHEN',
 		deleting: 'Lösche Account...',
@@ -277,11 +286,13 @@ const de = {
 		// Data modal
 		yourStoredData: 'Ihre gespeicherten Daten',
 		close: 'Schließen',
-		gdprDataInfo: 'ℹ️ Dies ist eine vollständige Kopie aller Daten, die wir über Sie speichern (DSGVO Art. 15)',
+		gdprDataInfo:
+			'ℹ️ Dies ist eine vollständige Kopie aller Daten, die wir über Sie speichern (DSGVO Art. 15)',
 		exportAsJson: 'Als JSON exportieren',
 		// Session expired
 		sessionExpiredTitle: 'Sitzung abgelaufen',
-		sessionExpiredMessage: 'Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...',
+		sessionExpiredMessage:
+			'Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet...',
 		errorSessionExpired: 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.',
 		errorLoadingAccountInfo: 'Fehler beim Laden der Kontoinformationen',
 		loadingAccount: 'Lade Account...'
@@ -350,6 +361,6 @@ const de = {
 		title: 'Admin',
 		dashboard: 'Admin Dashboard'
 	}
-} satisfies BaseTranslation
+} satisfies BaseTranslation;
 
-export default de
+export default de;

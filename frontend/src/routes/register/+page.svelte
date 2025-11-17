@@ -149,9 +149,7 @@
 				{$LL.auth.register.title()}
 			</h1>
 			<p class="text-gray-600 dark:text-gray-300">
-				{magicWordVerified
-					? $LL.auth.register.subtitle()
-					: $LL.auth.register.subtitleMagicWord()}
+				{magicWordVerified ? $LL.auth.register.subtitle() : $LL.auth.register.subtitleMagicWord()}
 			</p>
 		</div>
 
@@ -237,9 +235,7 @@
 					>
 						<p class="flex items-center text-sm text-green-700 dark:text-green-400">
 							<span class="mr-2">{isQRMode ? '📱' : '✓'}</span>
-							{isQRMode
-								? $LL.auth.register.qrCodeDetected()
-								: $LL.auth.register.verified()}
+							{isQRMode ? $LL.auth.register.qrCodeDetected() : $LL.auth.register.verified()}
 						</p>
 					</div>
 
@@ -295,7 +291,7 @@
 							type="text"
 							bind:value={fullName}
 							disabled={loading}
-							placeholder="{$LL.auth.register.childNamePlaceholder()}"
+							placeholder={$LL.auth.register.childNamePlaceholder()}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
@@ -333,7 +329,7 @@
 							bind:value={username}
 							required
 							disabled={loading}
-							placeholder="{$LL.auth.register.pseudonymPlaceholder()}"
+							placeholder={$LL.auth.register.pseudonymPlaceholder()}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
@@ -357,7 +353,7 @@
 							bind:value={password}
 							required
 							disabled={loading}
-							placeholder="{$LL.auth.register.passwordPlaceholder()}"
+							placeholder={$LL.auth.register.passwordPlaceholder()}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50
@@ -378,7 +374,7 @@
 							bind:value={passwordConfirm}
 							required
 							disabled={loading}
-							placeholder="{$LL.auth.register.confirmPasswordPlaceholder2()}"
+							placeholder={$LL.auth.register.confirmPasswordPlaceholder2()}
 							class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
 								   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
 								   disabled:cursor-not-allowed disabled:opacity-50

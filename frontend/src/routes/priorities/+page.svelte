@@ -30,7 +30,6 @@
 	import ProtectedRoute from '$lib/components/ProtectedRoute.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { LL } from '$i18n/i18n-svelte';
-	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 
 	// Component state
 	const monthOptions = getMonthOptions();

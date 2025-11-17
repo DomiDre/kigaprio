@@ -229,14 +229,16 @@
 </script>
 
 {#if isLoading}
-	<Loading message=$LL.account.loadingAccount() />
+	<Loading message="$LL.account.loadingAccount()" />
 {:else if dekMissing}
 	<div
 		class="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
 		<div class="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800">
 			<div class="mb-4 text-6xl">⚠️</div>
-			<h2 class="mb-4 text-2xl font-bold text-gray-800 dark:text-white">{$LL.account.sessionExpiredTitle()}</h2>
+			<h2 class="mb-4 text-2xl font-bold text-gray-800 dark:text-white">
+				{$LL.account.sessionExpiredTitle()}
+			</h2>
 			<p class="mb-4 text-gray-600 dark:text-gray-300">
 				{$LL.account.sessionExpiredMessage()}
 			</p>
@@ -248,55 +250,57 @@
 		class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800"
 	>
 		<div class="container mx-auto max-w-4xl px-4 py-10">
-		<!-- Navigation Bar -->
-		<div class="mb-8">
-			<div class="mb-4 flex items-center justify-between">
-				<h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">{$LL.account.accountManagement()}</h1>
-				<LanguageSwitcher />
-			</div>
-			<div class="flex flex-wrap gap-3">
-				<a
-					href="/dashboard"
-					class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
+			<!-- Navigation Bar -->
+			<div class="mb-8">
+				<div class="mb-4 flex items-center justify-between">
+					<h1 class="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
+						{$LL.account.accountManagement()}
+					</h1>
+					<LanguageSwitcher />
+				</div>
+				<div class="flex flex-wrap gap-3">
+					<a
+						href="/dashboard"
+						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-						/>
-					</svg>
-					Dashboard
-				</a>
-				<a
-					href="/priorities"
-					class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+							/>
+						</svg>
+						Dashboard
+					</a>
+					<a
+						href="/priorities"
+						class="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-						/>
-					</svg>
-					{$LL.priorities.title()}
-				</a>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+							/>
+						</svg>
+						{$LL.priorities.title()}
+					</a>
+				</div>
 			</div>
-		</div>
 
 			{#if error}
 				<div class="mb-6 rounded-lg bg-red-100 p-4 text-red-700 dark:bg-red-900 dark:text-red-300">
@@ -319,21 +323,33 @@
 				</h2>
 				<div class="grid gap-4 md:grid-cols-2">
 					<div>
-						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">{$LL.account.username()}</div>
-						<p class="mt-1 text-gray-800 dark:text-gray-200">{username || $LL.account.notAvailable()}</p>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">
+							{$LL.account.username()}
+						</div>
+						<p class="mt-1 text-gray-800 dark:text-gray-200">
+							{username || $LL.account.notAvailable()}
+						</p>
 					</div>
 					<div>
-						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">{$LL.account.accountCreated()}</div>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">
+							{$LL.account.accountCreated()}
+						</div>
 						<p class="mt-1 text-gray-800 dark:text-gray-200">
 							{accountCreated || $LL.account.notAvailable()}
 						</p>
 					</div>
 					<div>
-						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">{$LL.account.lastLogin()}</div>
-						<p class="mt-1 text-gray-800 dark:text-gray-200">{lastSeen || $LL.account.notAvailable()}</p>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">
+							{$LL.account.lastLogin()}
+						</div>
+						<p class="mt-1 text-gray-800 dark:text-gray-200">
+							{lastSeen || $LL.account.notAvailable()}
+						</p>
 					</div>
 					<div>
-						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">{$LL.account.accountStatus()}</div>
+						<div class="text-sm font-medium text-gray-600 dark:text-gray-400">
+							{$LL.account.accountStatus()}
+						</div>
 						<p class="mt-1">
 							<span
 								class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
@@ -524,7 +540,9 @@
 			<div
 				class="rounded-xl border-2 border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20"
 			>
-				<h2 class="mb-4 text-xl font-semibold text-red-600 dark:text-red-400">{$LL.account.dangerZone()}</h2>
+				<h2 class="mb-4 text-xl font-semibold text-red-600 dark:text-red-400">
+					{$LL.account.dangerZone()}
+				</h2>
 				<p class="mb-4 text-sm text-gray-700 dark:text-gray-300">
 					{$LL.account.deleteWarning()}
 				</p>
@@ -563,7 +581,7 @@
 						</h3>
 						<button
 							onclick={() => (showDataModal = false)}
-							aria-label="{$LL.account.close()}"
+							aria-label={$LL.account.close()}
 							class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
 						>
 							<svg
@@ -660,7 +678,8 @@
 					<div class="flex gap-3">
 						<button
 							onclick={deleteAccount}
-							disabled={deletionInProgress || deleteConfirmation !== $LL.account.deleteConfirmText()}
+							disabled={deletionInProgress ||
+								deleteConfirmation !== $LL.account.deleteConfirmText()}
 							class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
 						>
 							{#if deletionInProgress}
@@ -685,5 +704,5 @@
 		{/if}
 	</div>
 {:else}
-	<Loading message=$LL.common.loading() />
+	<Loading message="$LL.common.loading()" />
 {/if}

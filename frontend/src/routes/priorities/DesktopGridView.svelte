@@ -46,10 +46,14 @@
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-2">
 					<h3 class="font-bold text-gray-800 dark:text-white">
-						{$LL.priorities.week()} {week.weekNumber}
+						{$LL.priorities.week()}
+						{week.weekNumber}
 					</h3>
 					{#if weekStarted}
-						<span class="text-orange-600 dark:text-orange-400" title="{$LL.priorities.weekAlreadyStartedTooltip()}">
+						<span
+							class="text-orange-600 dark:text-orange-400"
+							title={$LL.priorities.weekAlreadyStartedTooltip()}
+						>
 							🔒
 						</span>
 					{/if}

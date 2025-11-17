@@ -1,4 +1,4 @@
-import type { Translation } from '../i18n-types'
+import type { Translation } from '../i18n-types';
 
 const en = {
 	// Common
@@ -42,12 +42,15 @@ const en = {
 			username: 'Username',
 			password: 'Password',
 			keepLoggedIn: 'Keep me logged in',
-			keepLoggedInDesc30Days: 'You will stay logged in for 30 days. Recommended for personal devices.',
-			keepLoggedInDesc8Hours: 'You will be logged out after 8 hours or when closing the browser. Recommended for shared computers.',
+			keepLoggedInDesc30Days:
+				'You will stay logged in for 30 days. Recommended for personal devices.',
+			keepLoggedInDesc8Hours:
+				'You will be logged out after 8 hours or when closing the browser. Recommended for shared computers.',
 			loginButton: 'Log in',
 			loggingIn: 'Logging in...',
 			registerButton: 'Register',
-			securityNote: 'Stored data is encrypted server-side. We cannot read your personal information.'
+			securityNote:
+				'Stored data is encrypted server-side. We cannot read your personal information.'
 		},
 		register: {
 			title: 'Sign Up',
@@ -82,8 +85,8 @@ const en = {
 			traditionalRegistration: 'Traditional Registration',
 			privacyNotice: 'Privacy Notice:',
 			privacyPseudonymPlaintext: '🔓 Your pseudonym (login name) is stored in plain text',
-			privacyNameEncrypted: '🔒 Your child\'s name is stored encrypted in the database',
-			childName: 'Your child\'s name',
+			privacyNameEncrypted: "🔒 Your child's name is stored encrypted in the database",
+			childName: "Your child's name",
 			encrypted: 'Encrypted',
 			childNamePlaceholder: 'e.g. John Doe',
 			childNameHint: 'Stored encrypted in the database',
@@ -94,7 +97,8 @@ const en = {
 			confirmPasswordLabel: 'Confirm password',
 			confirmPasswordPlaceholder2: 'Enter password again',
 			keepLoggedIn30Days: 'You will stay logged in for 30 days. Recommended for personal devices.',
-			keepLoggedIn8Hours: 'You will be logged out after 8 hours or when closing the browser. Recommended for shared computers.',
+			keepLoggedIn8Hours:
+				'You will be logged out after 8 hours or when closing the browser. Recommended for shared computers.',
 			creating: 'Creating account...',
 			createAccount: 'Create account',
 			alreadyHaveAccount: 'Already have an account?',
@@ -221,7 +225,8 @@ const en = {
 		confirmNewPassword: 'Confirm new password',
 		updateProfile: 'Update profile',
 		deleteAccount: 'Delete account',
-		deleteAccountConfirm: 'Are you sure you want to delete your account? This action cannot be undone.',
+		deleteAccountConfirm:
+			'Are you sure you want to delete your account? This action cannot be undone.',
 		// Account page specific
 		accountManagement: 'Account Management',
 		accountInfo: 'Account Information',
@@ -250,7 +255,8 @@ const en = {
 		errorChangingPassword: 'Error changing password',
 		// Data management
 		dataManagement: '📊 Data Management (GDPR)',
-		gdprNotice: 'Under the General Data Protection Regulation, you have the right to access, rectification, and deletion of your personal data.',
+		gdprNotice:
+			'Under the General Data Protection Regulation, you have the right to access, rectification, and deletion of your personal data.',
 		viewStoredData: 'View stored data',
 		exportData: 'Export data',
 		errorFetchingData: 'Error fetching data: {error}',
@@ -258,13 +264,15 @@ const en = {
 		errorExportingData: 'Error exporting: {error}',
 		// Delete account
 		dangerZone: '⚠️ Danger Zone',
-		deleteWarning: 'Deleting your account is irreversible. All your data will be permanently deleted.',
+		deleteWarning:
+			'Deleting your account is irreversible. All your data will be permanently deleted.',
 		deleteAccountButton: 'Delete account',
 		deleteConfirmTitle: '⚠️ Permanently delete account',
 		deleteIrreversible: 'This action is irreversible! The following data will be deleted:',
 		deleteItemAccount: 'Your user account and all login data',
 		deleteItemPriorities: 'All saved priorities',
-		deletionReport: 'After deletion, you will receive a deletion report as proof according to GDPR Art. 17.',
+		deletionReport:
+			'After deletion, you will receive a deletion report as proof according to GDPR Art. 17.',
 		deleteConfirmPrompt: 'Enter <strong>DELETE</strong> to confirm:',
 		deleteConfirmText: 'DELETE',
 		deleting: 'Deleting account...',
@@ -350,6 +358,6 @@ const en = {
 		title: 'Admin',
 		dashboard: 'Admin Dashboard'
 	}
-} satisfies Translation
+} satisfies Translation;
 
-export default en
+export default en;
