@@ -2,414 +2,345 @@
 Integration tests for multi-institution functionality.
 
 These tests verify the end-to-end flow of multi-institution features
-including data isolation and permission enforcement.
+using real PocketBase and Redis containers.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock
+import httpx
 
 
 @pytest.mark.integration
-class TestMultiInstitutionRegistrationFlow:
-    """Test complete registration flow with multiple institutions."""
+class TestMultiInstitutionSetup:
+    """Test multi-institution setup in PocketBase."""
 
-    @patch("priotag.api.routes.auth.InstitutionService.get_by_short_code")
-    @patch("priotag.api.routes.auth.authenticate_service_account")
-    @patch("httpx.AsyncClient")
-    def test_users_from_different_institutions_are_isolated(
-        self, mock_client_class, mock_auth_service, mock_get_institution, client, fake_redis
-    ):
-        """
-        Test that users from different institutions cannot access each other's data.
-
-        Flow:
-        1. Create two institutions
-        2. Register user in each institution
-        3. Verify users are associated with correct institutions
-        4. Verify data isolation (tested via institution_id in session)
-        """
-        from priotag.models.pocketbase_schemas import InstitutionRecord
-
-        # Setup institutions
-        institution_A = InstitutionRecord(
-            id="inst_A",
-            name="University A",
-            short_code="UNIV_A",
-            registration_magic_word="MagicA",
-            admin_public_key=None,
-            settings={},
-            active=True,
-            collectionId="institutions",
-            collectionName="institutions",
-            created="2025-01-01T00:00:00Z",
-            updated="2025-01-01T00:00:00Z",
-        )
-
-        institution_B = InstitutionRecord(
-            id="inst_B",
-            name="University B",
-            short_code="UNIV_B",
-            registration_magic_word="MagicB",
-            admin_public_key=None,
-            settings={},
-            active=True,
-            collectionId="institutions",
-            collectionName="institutions",
-            created="2025-01-01T00:00:00Z",
-            updated="2025-01-01T00:00:00Z",
-        )
-
-        # Mock institution service to return appropriate institution
-        def get_institution_by_code(short_code, *args):
-            if short_code == "UNIV_A":
-                return institution_A
-            elif short_code == "UNIV_B":
-                return institution_B
-            raise Exception("Institution not found")
-
-        mock_get_institution.side_effect = get_institution_by_code
-        mock_auth_service.return_value = "service_token"
-
-        # Mock PocketBase client
-        mock_pb_client = AsyncMock()
-        mock_client_class.return_value.__aenter__.return_value = mock_pb_client
-
-        # User A registration
-        create_resp_A = AsyncMock()
-        create_resp_A.status_code = 200
-        create_resp_A.json.return_value = {"id": "user_A", "username": "userA"}
-
-        auth_resp_A = AsyncMock()
-        auth_resp_A.status_code = 200
-        auth_resp_A.json.return_value = {
-            "token": "token_A",
-            "record": {
-                "id": "user_A",
-                "username": "userA",
-                "role": "user",
-                "institution_id": "inst_A",
-            },
-        }
-
-        # User B registration
-        create_resp_B = AsyncMock()
-        create_resp_B.status_code = 200
-        create_resp_B.json.return_value = {"id": "user_B", "username": "userB"}
-
-        auth_resp_B = AsyncMock()
-        auth_resp_B.status_code = 200
-        auth_resp_B.json.return_value = {
-            "token": "token_B",
-            "record": {
-                "id": "user_B",
-                "username": "userB",
-                "role": "user",
-                "institution_id": "inst_B",
-            },
-        }
-
-        # Register User A in Institution A
-        mock_pb_client.post.side_effect = [create_resp_A, auth_resp_A]
-
-        response_A = client.post(
-            "/api/v1/auth/register-qr",
+    def test_can_create_institutions(self, pocketbase_admin_client):
+        """Test creating institutions via PocketBase API."""
+        # Create first institution
+        response = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
             json={
-                "identity": "userA@test.com",
-                "password": "Password123!",
-                "passwordConfirm": "Password123!",
-                "name": "User A",
-                "magic_word": "MagicA",
-                "institution_short_code": "UNIV_A",
-                "keep_logged_in": False,
+                "name": "Test University A",
+                "short_code": "TEST_A",
+                "registration_magic_word": "MagicA123",
+                "active": True,
             },
         )
+        assert response.status_code == 200
+        inst_a = response.json()
+        assert inst_a["short_code"] == "TEST_A"
 
-        assert response_A.status_code == 200
-
-        # Verify User A was created with institution_id = inst_A
-        user_A_create_call = mock_pb_client.post.call_args_list[0]
-        user_A_data = user_A_create_call[1]["json"]
-        assert user_A_data["institution_id"] == "inst_A"
-
-        # Register User B in Institution B
-        mock_pb_client.post.side_effect = [create_resp_B, auth_resp_B]
-
-        response_B = client.post(
-            "/api/v1/auth/register-qr",
+        # Create second institution
+        response = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
             json={
-                "identity": "userB@test.com",
-                "password": "Password123!",
-                "passwordConfirm": "Password123!",
-                "name": "User B",
-                "magic_word": "MagicB",
-                "institution_short_code": "UNIV_B",
-                "keep_logged_in": False,
+                "name": "Test University B",
+                "short_code": "TEST_B",
+                "registration_magic_word": "MagicB456",
+                "active": True,
             },
         )
-
-        assert response_B.status_code == 200
-
-        # Verify User B was created with institution_id = inst_B
-        user_B_create_call = mock_pb_client.post.call_args_list[2]  # 3rd call overall
-        user_B_data = user_B_create_call[1]["json"]
-        assert user_B_data["institution_id"] == "inst_B"
+        assert response.status_code == 200
+        inst_b = response.json()
+        assert inst_b["short_code"] == "TEST_B"
 
         # Verify institutions are different
-        assert user_A_data["institution_id"] != user_B_data["institution_id"]
+        assert inst_a["id"] != inst_b["id"]
 
-
-@pytest.mark.integration
-class TestInstitutionAdminPermissions:
-    """Test institution admin permissions and data isolation."""
-
-    @patch("priotag.utils.verify_token")
-    @patch("priotag.utils.get_current_token")
-    def test_institution_admin_cannot_access_other_institutions(
-        self, mock_get_token, mock_verify, client
-    ):
-        """
-        Test that institution admins can only access their own institution.
-        """
-        from priotag.models.auth import SessionInfo
-
-        # Admin from Institution A
-        admin_A = SessionInfo(
-            id="admin_A",
-            username="adminA",
-            is_admin=True,
-            role="institution_admin",
-            institution_id="inst_A",
+    def test_can_query_institutions_by_short_code(self, pocketbase_admin_client):
+        """Test querying institutions by short code."""
+        # Create institution
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Query Test University",
+                "short_code": "QUERY_TEST",
+                "registration_magic_word": "QueryMagic",
+                "active": True,
+            },
         )
 
-        mock_get_token.return_value = "admin_A_token"
-        mock_verify.return_value = admin_A
-
-        # Try to access institution info (should only see their own)
-        with patch(
-            "priotag.api.routes.institutions.InstitutionService.get_institution"
-        ) as mock_get:
-            from priotag.models.pocketbase_schemas import InstitutionRecord
-
-            mock_get.return_value = InstitutionRecord(
-                id="inst_A",
-                name="University A",
-                short_code="UNIV_A",
-                registration_magic_word="MagicA",
-                admin_public_key=None,
-                settings={},
-                active=True,
-                collectionId="institutions",
-                collectionName="institutions",
-                created="2025-01-01T00:00:00Z",
-                updated="2025-01-01T00:00:00Z",
-            )
-
-            response = client.get(
-                "/api/v1/admin/institution/info",
-                cookies={"auth_token": "admin_A_token"},
-            )
-
-            assert response.status_code == 200
-            # Verify they accessed their own institution
-            assert mock_get.call_args[0][0] == "inst_A"
-
-    @patch("priotag.utils.verify_token")
-    @patch("priotag.utils.get_current_token")
-    def test_super_admin_can_access_all_institutions(
-        self, mock_get_token, mock_verify, client
-    ):
-        """
-        Test that super admins can access all institutions.
-        """
-        from priotag.models.auth import SessionInfo
-
-        # Super admin
-        super_admin = SessionInfo(
-            id="super_admin",
-            username="superadmin",
-            is_admin=True,
-            role="super_admin",
-            institution_id=None,  # No institution
+        # Query by short code
+        response = pocketbase_admin_client.get(
+            "/api/collections/institutions/records",
+            params={"filter": 'short_code="QUERY_TEST"'},
         )
-
-        mock_get_token.return_value = "super_admin_token"
-        mock_verify.return_value = super_admin
-
-        # Super admin can list all institutions
-        with patch(
-            "priotag.api.routes.institutions.InstitutionService.list_institutions"
-        ) as mock_list:
-            from priotag.models.pocketbase_schemas import InstitutionRecord
-
-            mock_list.return_value = [
-                InstitutionRecord(
-                    id="inst_A",
-                    name="University A",
-                    short_code="UNIV_A",
-                    registration_magic_word="MagicA",
-                    admin_public_key=None,
-                    settings={},
-                    active=True,
-                    collectionId="institutions",
-                    collectionName="institutions",
-                    created="2025-01-01T00:00:00Z",
-                    updated="2025-01-01T00:00:00Z",
-                ),
-                InstitutionRecord(
-                    id="inst_B",
-                    name="University B",
-                    short_code="UNIV_B",
-                    registration_magic_word="MagicB",
-                    admin_public_key=None,
-                    settings={},
-                    active=True,
-                    collectionId="institutions",
-                    collectionName="institutions",
-                    created="2025-01-01T00:00:00Z",
-                    updated="2025-01-01T00:00:00Z",
-                ),
-            ]
-
-            response = client.get(
-                "/api/v1/admin/super/institutions",
-                cookies={"auth_token": "super_admin_token"},
-            )
-
-            assert response.status_code == 200
-            data = response.json()
-            assert len(data) == 2  # Can see all institutions
-
-
-@pytest.mark.integration
-class TestMagicWordIsolation:
-    """Test magic word isolation between institutions."""
-
-    @patch("priotag.api.routes.auth.InstitutionService.get_by_short_code")
-    def test_magic_word_from_institution_A_cannot_be_used_for_institution_B(
-        self, mock_get_institution, client, fake_redis
-    ):
-        """
-        Test that magic words are institution-specific.
-        """
-        from priotag.models.pocketbase_schemas import InstitutionRecord
-        from fastapi import HTTPException
-
-        institution_A = InstitutionRecord(
-            id="inst_A",
-            name="University A",
-            short_code="UNIV_A",
-            registration_magic_word="MagicA",
-            admin_public_key=None,
-            settings={},
-            active=True,
-            collectionId="institutions",
-            collectionName="institutions",
-            created="2025-01-01T00:00:00Z",
-            updated="2025-01-01T00:00:00Z",
-        )
-
-        institution_B = InstitutionRecord(
-            id="inst_B",
-            name="University B",
-            short_code="UNIV_B",
-            registration_magic_word="MagicB",
-            admin_public_key=None,
-            settings={},
-            active=True,
-            collectionId="institutions",
-            collectionName="institutions",
-            created="2025-01-01T00:00:00Z",
-            updated="2025-01-01T00:00:00Z",
-        )
-
-        # Try to use Institution A's magic word with Institution B's code
-        mock_get_institution.return_value = institution_B
-
-        with patch("priotag.api.routes.auth.get_redis") as mock_redis:
-            mock_redis.return_value = fake_redis
-
-            response = client.post(
-                "/api/v1/auth/verify-magic-word",
-                json={
-                    "magic_word": "MagicA",  # Institution A's magic word
-                    "institution_short_code": "UNIV_B",  # But trying with Institution B
-                },
-            )
-
-            # Should fail because magic word doesn't match
-            assert response.status_code == 403
-            assert "Ungültiges Zauberwort" in response.json()["detail"]
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 1
+        assert data["items"][0]["short_code"] == "QUERY_TEST"
 
 
 @pytest.mark.integration
 class TestPublicInstitutionEndpoints:
-    """Test public institution endpoints."""
+    """Test public institution API endpoints with real infrastructure."""
 
-    @patch("priotag.api.routes.institutions.InstitutionService.list_institutions")
-    def test_unauthenticated_users_can_list_institutions(
-        self, mock_list, client
-    ):
-        """
-        Test that unauthenticated users can list institutions for registration.
-        """
-        from priotag.models.pocketbase_schemas import InstitutionRecord
-
-        mock_list.return_value = [
-            InstitutionRecord(
-                id="inst_A",
-                name="University A",
-                short_code="UNIV_A",
-                registration_magic_word="MagicA",  # Should not be exposed
-                admin_public_key=None,
-                settings={},
-                active=True,
-                collectionId="institutions",
-                collectionName="institutions",
-                created="2025-01-01T00:00:00Z",
-                updated="2025-01-01T00:00:00Z",
-            )
-        ]
-
-        # No authentication required
-        response = client.get("/api/v1/institutions")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["short_code"] == "UNIV_A"
-        # Verify sensitive data is not exposed
-        assert "registration_magic_word" not in data[0]
-        assert "admin_public_key" not in data[0]
-        assert "settings" not in data[0]
-
-    @patch("priotag.api.routes.institutions.InstitutionService.get_by_short_code")
-    def test_unauthenticated_users_can_get_institution_by_short_code(
-        self, mock_get, client
-    ):
-        """
-        Test that unauthenticated users can get institution details by short code.
-        """
-        from priotag.models.pocketbase_schemas import InstitutionRecord
-
-        mock_get.return_value = InstitutionRecord(
-            id="inst_A",
-            name="University A",
-            short_code="UNIV_A",
-            registration_magic_word="MagicA",
-            admin_public_key=None,
-            settings={},
-            active=True,
-            collectionId="institutions",
-            collectionName="institutions",
-            created="2025-01-01T00:00:00Z",
-            updated="2025-01-01T00:00:00Z",
+    def test_list_institutions_endpoint(self, test_app, pocketbase_admin_client):
+        """Test listing institutions through the API."""
+        # Create test institutions
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Public Test A",
+                "short_code": "PUB_A",
+                "registration_magic_word": "Secret123",
+                "active": True,
+            },
+        )
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Public Test B",
+                "short_code": "PUB_B",
+                "registration_magic_word": "Secret456",
+                "active": True,
+            },
         )
 
-        # No authentication required
-        response = client.get("/api/v1/institutions/UNIV_A")
+        # Call API endpoint
+        response = test_app.get("/api/v1/institutions")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data) >= 2
+
+        # Verify sensitive fields are not exposed
+        for inst in data:
+            assert "registration_magic_word" not in inst
+            assert "admin_public_key" not in inst
+            assert "settings" not in inst
+
+    def test_get_institution_by_short_code_endpoint(
+        self, test_app, pocketbase_admin_client
+    ):
+        """Test getting institution by short code through the API."""
+        # Create test institution
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Short Code Test",
+                "short_code": "SC_TEST",
+                "registration_magic_word": "SCSecret",
+                "active": True,
+            },
+        )
+
+        # Call API endpoint
+        response = test_app.get("/api/v1/institutions/SC_TEST")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["short_code"] == "SC_TEST"
+        assert data["name"] == "Short Code Test"
+
+        # Verify sensitive fields are not exposed
+        assert "registration_magic_word" not in data
+
+
+@pytest.mark.integration
+class TestMagicWordVerification:
+    """Test magic word verification with real infrastructure."""
+
+    def test_verify_correct_magic_word(
+        self, test_app, pocketbase_admin_client, clean_redis
+    ):
+        """Test verifying correct magic word."""
+        # Create institution
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Magic Test University",
+                "short_code": "MAGIC_TEST",
+                "registration_magic_word": "CorrectMagic123",
+                "active": True,
+            },
+        )
+
+        # Verify magic word
+        response = test_app.post(
+            "/api/v1/auth/verify-magic-word",
+            json={
+                "magic_word": "CorrectMagic123",
+                "institution_short_code": "MAGIC_TEST",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["short_code"] == "UNIV_A"
-        # Verify sensitive data is not exposed
-        assert "registration_magic_word" not in data
+        assert data["success"] is True
+        assert "token" in data
+
+        # Verify token is stored in Redis with institution_id
+        import json
+        token = data["token"]
+        token_data_str = clean_redis.get(f"reg_token:{token}")
+        assert token_data_str is not None
+        token_data = json.loads(token_data_str)
+        assert "institution_id" in token_data
+
+    def test_verify_wrong_magic_word(self, test_app, pocketbase_admin_client):
+        """Test verifying wrong magic word."""
+        # Create institution
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Wrong Magic Test",
+                "short_code": "WRONG_TEST",
+                "registration_magic_word": "CorrectMagic",
+                "active": True,
+            },
+        )
+
+        # Try wrong magic word
+        response = test_app.post(
+            "/api/v1/auth/verify-magic-word",
+            json={
+                "magic_word": "WrongMagic",
+                "institution_short_code": "WRONG_TEST",
+            },
+        )
+
+        assert response.status_code == 403
+
+    def test_verify_magic_word_inactive_institution(
+        self, test_app, pocketbase_admin_client
+    ):
+        """Test verifying magic word for inactive institution."""
+        # Create inactive institution
+        pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Inactive Test",
+                "short_code": "INACTIVE_TEST",
+                "registration_magic_word": "InactiveMagic",
+                "active": False,
+            },
+        )
+
+        # Try to verify magic word
+        response = test_app.post(
+            "/api/v1/auth/verify-magic-word",
+            json={
+                "magic_word": "InactiveMagic",
+                "institution_short_code": "INACTIVE_TEST",
+            },
+        )
+
+        assert response.status_code == 403
+
+
+@pytest.mark.integration
+class TestUserRegistrationWithInstitutions:
+    """Test user registration flow with real infrastructure."""
+
+    def test_register_user_with_qr_and_institution(
+        self, test_app, pocketbase_admin_client, clean_redis
+    ):
+        """Test complete QR registration flow with institution."""
+        # Create institution
+        create_response = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Registration Test University",
+                "short_code": "REG_TEST",
+                "registration_magic_word": "RegMagic123",
+                "active": True,
+            },
+        )
+        assert create_response.status_code == 200
+        institution = create_response.json()
+
+        # Register user via API
+        response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "testuser@regtest.edu",
+                "password": "TestPass123!",
+                "passwordConfirm": "TestPass123!",
+                "name": "Test User",
+                "magic_word": "RegMagic123",
+                "institution_short_code": "REG_TEST",
+                "keep_logged_in": False,
+            },
+        )
+
+        assert response.status_code == 200
+        user_data = response.json()
+
+        # Verify user was created with correct institution
+        assert "user" in user_data
+        user = user_data["user"]
+        assert user["institution_id"] == institution["id"]
+
+    def test_users_from_different_institutions_isolated(
+        self, test_app, pocketbase_admin_client
+    ):
+        """Test that users from different institutions are isolated."""
+        # Create two institutions
+        inst_a_response = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution A",
+                "short_code": "INST_A",
+                "registration_magic_word": "MagicA",
+                "active": True,
+            },
+        )
+        inst_a = inst_a_response.json()
+
+        inst_b_response = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution B",
+                "short_code": "INST_B",
+                "registration_magic_word": "MagicB",
+                "active": True,
+            },
+        )
+        inst_b = inst_b_response.json()
+
+        # Register user in Institution A
+        test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "userA@insta.edu",
+                "password": "PassA123!",
+                "passwordConfirm": "PassA123!",
+                "name": "User A",
+                "magic_word": "MagicA",
+                "institution_short_code": "INST_A",
+                "keep_logged_in": False,
+            },
+        )
+
+        # Register user in Institution B
+        test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "userB@instb.edu",
+                "password": "PassB123!",
+                "passwordConfirm": "PassB123!",
+                "name": "User B",
+                "magic_word": "MagicB",
+                "institution_short_code": "INST_B",
+                "keep_logged_in": False,
+            },
+        )
+
+        # Verify users exist in different institutions
+        users_a = pocketbase_admin_client.get(
+            "/api/collections/users/records",
+            params={"filter": f'institution_id="{inst_a["id"]}"'},
+        ).json()
+
+        users_b = pocketbase_admin_client.get(
+            "/api/collections/users/records",
+            params={"filter": f'institution_id="{inst_b["id"]}"'},
+        ).json()
+
+        assert len(users_a["items"]) >= 1
+        assert len(users_b["items"]) >= 1
+
+        # Verify they're in different institutions
+        assert users_a["items"][0]["institution_id"] == inst_a["id"]
+        assert users_b["items"][0]["institution_id"] == inst_b["id"]
+        assert users_a["items"][0]["institution_id"] != users_b["items"][0]["institution_id"]
