@@ -13,6 +13,7 @@ from priotag.models.vacation_days import (
     VacationDayResponse,
     VacationDayUpdate,
     VacationDayUserResponse,
+    validate_date_format,
 )
 from priotag.services.pocketbase_service import POCKETBASE_URL
 from priotag.utils import get_current_token, require_admin, verify_token
@@ -289,6 +290,12 @@ async def get_vacation_day(
     Returns:
         Vacation day record
     """
+    # Validate date format to prevent filter injection
+    try:
+        validate_date_format(date)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
     async with httpx.AsyncClient() as client:
         # Build filter with institution isolation
         base_filter = f'date ~ "{date}"'
@@ -338,6 +345,12 @@ async def update_vacation_day(
     Returns:
         Updated vacation day record
     """
+    # Validate date format to prevent filter injection
+    try:
+        validate_date_format(date)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
     async with httpx.AsyncClient() as client:
         # Find the vacation day with institution filtering
         base_filter = f'date ~ "{date}"'
@@ -415,6 +428,12 @@ async def delete_vacation_day(
     Returns:
         Success message
     """
+    # Validate date format to prevent filter injection
+    try:
+        validate_date_format(date)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
     async with httpx.AsyncClient() as client:
         # Find the vacation day with institution filtering
         base_filter = f'date ~ "{date}"'
@@ -565,8 +584,6 @@ async def get_vacation_days_in_range(
         List of vacation day records within the date range (simplified for users)
     """
     # Validate date format
-    from priotag.models.vacation_days import validate_date_format
-
     try:
         validate_date_format(start_date)
         validate_date_format(end_date)

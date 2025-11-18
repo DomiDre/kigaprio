@@ -845,7 +845,7 @@ async def change_password(
                             )
                             session_info = json.loads(session_data)
                             # Only delete sessions for this user
-                            if session_info.get("user_id") == current_session.id:
+                            if session_info.get("id") == current_session.id:
                                 redis_client.delete(key_str)
                                 invalidated_count += 1
 
@@ -858,10 +858,11 @@ async def change_password(
             # Create new session with new token
             session_key = f"session:{new_token}"
             session_info = {
-                "user_id": current_session.id,
+                "id": current_session.id,
                 "username": current_session.username,
-                "role": "admin" if current_session.is_admin else "user",
+                "role": current_session.role,
                 "is_admin": current_session.is_admin,
+                "institution_id": current_session.institution_id,
             }
 
             # Set session duration (8 hours for regular users, 15 minutes for admins)

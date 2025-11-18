@@ -1718,3 +1718,429 @@ class TestInputValidationFilterInjection:
         )
         # Should reject with 422 (validation error)
         assert entries_response.status_code == 422
+
+
+@pytest.mark.integration
+class TestSecurityAudit4Fixes:
+    """Test fixes for vulnerabilities found in Security Audit #4."""
+
+    def test_priority_get_rejects_malicious_month(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that GET /api/v1/priorities/{month} rejects malicious month values.
+
+        Security Audit #4 Issue #1: Filter injection in priority GET endpoint.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution",
+                "short_code": "TEST_PRI_GET",
+                "registration_magic_word": "TestMagic123",
+                "active": True,
+            },
+        ).json()
+
+        # Register a user
+        register_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_pri_get@test.edu",
+                "password": "TestPass123!",
+                "passwordConfirm": "TestPass123!",
+                "name": "Test User",
+                "institution_short_code": "TEST_PRI_GET",
+                "magic_word": "TestMagic123",
+                "keep_logged_in": True,
+            },
+        )
+        assert register_response.status_code == 200
+
+        # Try to get priorities with malicious month value
+        malicious_month = '2025-01" || userId!=""'
+        get_response = test_app.get(f"/api/v1/priorities/{malicious_month}")
+
+        # Should reject with 422 (validation error)
+        assert get_response.status_code == 422
+        assert "Monat" in get_response.json()["detail"] or "format" in get_response.json()["detail"].lower()
+
+    def test_priority_delete_rejects_malicious_month(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that DELETE /api/v1/priorities/{month} rejects malicious month values.
+
+        Security Audit #4 Issue #2: Filter injection in priority DELETE endpoint.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution",
+                "short_code": "TEST_PRI_DEL",
+                "registration_magic_word": "TestMagic456",
+                "active": True,
+            },
+        ).json()
+
+        # Register a user
+        register_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_pri_del@test.edu",
+                "password": "TestPass456!",
+                "passwordConfirm": "TestPass456!",
+                "name": "Test User Delete",
+                "institution_short_code": "TEST_PRI_DEL",
+                "magic_word": "TestMagic456",
+                "keep_logged_in": True,
+            },
+        )
+        assert register_response.status_code == 200
+
+        # Try to delete priorities with malicious month value
+        malicious_month = '2025-01" || identifier!=null'
+        delete_response = test_app.delete(f"/api/v1/priorities/{malicious_month}")
+
+        # Should reject with 422 (validation error)
+        assert delete_response.status_code == 422
+        assert "Monat" in delete_response.json()["detail"] or "format" in delete_response.json()["detail"].lower()
+
+    def test_vacation_day_get_rejects_malicious_date(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that GET /api/v1/admin/vacation-days/{date} rejects malicious date values.
+
+        Security Audit #4 Issue #3: Filter injection in admin vacation day GET endpoint.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution VD",
+                "short_code": "TEST_VD_GET",
+                "registration_magic_word": "TestVDGet123",
+                "active": True,
+            },
+        ).json()
+
+        # Create institution admin
+        admin_response = pocketbase_admin_client.post(
+            "/api/collections/users/records",
+            json={
+                "username": "admin_vd_get@inst.edu",
+                "password": "AdminVD123!",
+                "passwordConfirm": "AdminVD123!",
+                "role": "institution_admin",
+                "institution_id": institution["id"],
+                "salt": "test_salt",
+                "user_wrapped_dek": "test_dek",
+                "admin_wrapped_dek": "test_admin_dek",
+                "encrypted_fields": {},
+            },
+        ).json()
+
+        # Login as admin
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_vd_get@inst.edu",
+                "password": "AdminVD123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to get vacation day with malicious date
+        malicious_date = '2025-01-01" || type="public_holiday'
+        get_response = test_app.get(
+            f"/api/v1/admin/vacation-days/{malicious_date}"
+        )
+
+        # Should reject with 422 (validation error)
+        assert get_response.status_code == 422
+        assert "format" in get_response.json()["detail"].lower()
+
+    def test_vacation_day_update_rejects_malicious_date(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that PUT /api/v1/admin/vacation-days/{date} rejects malicious date values.
+
+        Security Audit #4 Issue #4: Filter injection in admin vacation day PUT endpoint.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution VD Update",
+                "short_code": "TEST_VD_PUT",
+                "registration_magic_word": "TestVDPut456",
+                "active": True,
+            },
+        ).json()
+
+        # Create institution admin
+        admin_response = pocketbase_admin_client.post(
+            "/api/collections/users/records",
+            json={
+                "username": "admin_vd_put@inst.edu",
+                "password": "AdminVDPut456!",
+                "passwordConfirm": "AdminVDPut456!",
+                "role": "institution_admin",
+                "institution_id": institution["id"],
+                "salt": "test_salt",
+                "user_wrapped_dek": "test_dek",
+                "admin_wrapped_dek": "test_admin_dek",
+                "encrypted_fields": {},
+            },
+        ).json()
+
+        # Login as admin
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_vd_put@inst.edu",
+                "password": "AdminVDPut456!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to update vacation day with malicious date
+        malicious_date = '2025-01-01" || institution_id!=""'
+        put_response = test_app.put(
+            f"/api/v1/admin/vacation-days/{malicious_date}",
+            json={"type": "public_holiday", "description": "Test"},
+        )
+
+        # Should reject with 422 (validation error)
+        assert put_response.status_code == 422
+        assert "format" in put_response.json()["detail"].lower()
+
+    def test_vacation_day_delete_rejects_malicious_date(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that DELETE /api/v1/admin/vacation-days/{date} rejects malicious date values.
+
+        Security Audit #4 Issue #4: Filter injection in admin vacation day DELETE endpoint.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution VD Delete",
+                "short_code": "TEST_VD_DEL",
+                "registration_magic_word": "TestVDDel789",
+                "active": True,
+            },
+        ).json()
+
+        # Create institution admin
+        admin_response = pocketbase_admin_client.post(
+            "/api/collections/users/records",
+            json={
+                "username": "admin_vd_del@inst.edu",
+                "password": "AdminVDDel789!",
+                "passwordConfirm": "AdminVDDel789!",
+                "role": "institution_admin",
+                "institution_id": institution["id"],
+                "salt": "test_salt",
+                "user_wrapped_dek": "test_dek",
+                "admin_wrapped_dek": "test_admin_dek",
+                "encrypted_fields": {},
+            },
+        ).json()
+
+        # Login as admin
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_vd_del@inst.edu",
+                "password": "AdminVDDel789!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to delete vacation day with malicious date
+        malicious_date = '2025-01-01" || type=""'
+        delete_response = test_app.delete(
+            f"/api/v1/admin/vacation-days/{malicious_date}"
+        )
+
+        # Should reject with 422 (validation error)
+        assert delete_response.status_code == 422
+        assert "format" in delete_response.json()["detail"].lower()
+
+    def test_change_password_invalidates_old_sessions(
+        self, test_app, pocketbase_admin_client, redis_client
+    ):
+        """
+        Test that changing password invalidates all old sessions.
+
+        Security Audit #4 Issue #5: Session invalidation bug in change password.
+        This is the MOST CRITICAL fix - ensures old sessions are invalidated.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution PW",
+                "short_code": "TEST_PW_CHANGE",
+                "registration_magic_word": "TestPWChange123",
+                "active": True,
+            },
+        ).json()
+
+        # Register a user
+        register_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_pw_change@test.edu",
+                "password": "OldPassword123!",
+                "passwordConfirm": "OldPassword123!",
+                "name": "Test User PW",
+                "institution_short_code": "TEST_PW_CHANGE",
+                "magic_word": "TestPWChange123",
+                "keep_logged_in": True,
+            },
+        )
+        assert register_response.status_code == 200
+
+        # Get the auth token from session 1
+        session1_cookies = register_response.cookies
+
+        # Verify session 1 works
+        verify1_response = test_app.get("/api/v1/auth/verify")
+        assert verify1_response.status_code == 200
+
+        # Login again from "another device" (session 2)
+        login2_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "user_pw_change@test.edu",
+                "password": "OldPassword123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login2_response.status_code == 200
+        session2_cookies = login2_response.cookies
+
+        # Verify both sessions work
+        test_app.cookies.clear()
+        test_app.cookies.update(session1_cookies)
+        verify1_response = test_app.get("/api/v1/auth/verify")
+        assert verify1_response.status_code == 200
+
+        test_app.cookies.clear()
+        test_app.cookies.update(session2_cookies)
+        verify2_response = test_app.get("/api/v1/auth/verify")
+        assert verify2_response.status_code == 200
+
+        # Change password using session 2
+        change_pw_response = test_app.post(
+            "/api/v1/auth/change-password",
+            json={
+                "current_password": "OldPassword123!",
+                "new_password": "NewPassword456!",
+            },
+        )
+        assert change_pw_response.status_code == 200
+        session3_cookies = change_pw_response.cookies  # New session after password change
+
+        # Verify that session 1 (old session) is now INVALID
+        test_app.cookies.clear()
+        test_app.cookies.update(session1_cookies)
+        verify_old_session_response = test_app.get("/api/v1/auth/verify")
+        # Session 1 should be invalid (401 Unauthorized)
+        assert verify_old_session_response.status_code == 401
+
+        # Verify that session 2 (the one that changed password) is also INVALID
+        # because it was replaced with session 3
+        test_app.cookies.clear()
+        test_app.cookies.update(session2_cookies)
+        verify_pw_change_session_response = test_app.get("/api/v1/auth/verify")
+        assert verify_pw_change_session_response.status_code == 401
+
+        # Verify that the NEW session (session 3) works
+        test_app.cookies.clear()
+        test_app.cookies.update(session3_cookies)
+        verify_new_session_response = test_app.get("/api/v1/auth/verify")
+        assert verify_new_session_response.status_code == 200
+
+        # Verify we can use the new password
+        test_app.post("/api/v1/auth/logout")
+        login_new_pw_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "user_pw_change@test.edu",
+                "password": "NewPassword456!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_new_pw_response.status_code == 200
+
+    def test_account_deletion_rate_limiting(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that account deletion endpoint has rate limiting.
+
+        Security Audit #4 Issue #6: No rate limiting on account deletion.
+        """
+        # Create institution
+        institution = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Test Institution Delete",
+                "short_code": "TEST_DEL_RATE",
+                "registration_magic_word": "TestDelRate123",
+                "active": True,
+            },
+        ).json()
+
+        # Register a user
+        register_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_del_rate@test.edu",
+                "password": "TestDelRate123!",
+                "passwordConfirm": "TestDelRate123!",
+                "name": "Test User Delete Rate",
+                "institution_short_code": "TEST_DEL_RATE",
+                "magic_word": "TestDelRate123",
+                "keep_logged_in": True,
+            },
+        )
+        assert register_response.status_code == 200
+
+        # First deletion attempt
+        delete1_response = test_app.delete("/api/v1/account/delete")
+        # Should succeed (user deleted)
+        assert delete1_response.status_code == 200
+
+        # Register the same user again
+        register2_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_del_rate@test.edu",
+                "password": "TestDelRate456!",
+                "passwordConfirm": "TestDelRate456!",
+                "name": "Test User Delete Rate 2",
+                "institution_short_code": "TEST_DEL_RATE",
+                "magic_word": "TestDelRate123",
+                "keep_logged_in": True,
+            },
+        )
+        assert register2_response.status_code == 200
+
+        # Immediate second deletion attempt (should be rate limited)
+        delete2_response = test_app.delete("/api/v1/account/delete")
+        # Should be rate limited (429 Too Many Requests)
+        assert delete2_response.status_code == 429
+        assert "viele" in delete2_response.json()["detail"].lower()
