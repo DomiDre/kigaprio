@@ -961,3 +961,453 @@ class TestPrioritiesHaveInstitutionId:
 
         assert len(priorities["items"]) == 1
         assert priorities["items"][0]["institution_id"] == inst["id"]
+
+
+@pytest.mark.integration
+class TestUserVacationDaysIsolation:
+    """Test that regular users cannot see vacation days from other institutions."""
+
+    def test_user_cannot_see_other_institutions_vacation_days(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that regular user in Institution A cannot see vacation days from Institution B.
+
+        This is a CRITICAL security test for user-facing vacation days endpoints.
+        """
+        # Create two institutions
+        inst_a = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution A User Vac Test",
+                "short_code": "INST_A_USER_VAC",
+                "registration_magic_word": "MagicAUserVac",
+                "active": True,
+            },
+        ).json()
+
+        inst_b = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution B User Vac Test",
+                "short_code": "INST_B_USER_VAC",
+                "registration_magic_word": "MagicBUserVac",
+                "active": True,
+            },
+        ).json()
+
+        # Create vacation day for institution B
+        vacation_b = pocketbase_admin_client.post(
+            "/api/collections/vacation_days/records",
+            json={
+                "date": "2025-12-31",
+                "type": "public_holiday",
+                "description": "New Year's Eve",
+                "created_by": "admin_b",
+                "institution_id": inst_b["id"],
+            },
+        ).json()
+
+        # Create vacation day for institution A
+        vacation_a = pocketbase_admin_client.post(
+            "/api/collections/vacation_days/records",
+            json={
+                "date": "2025-12-30",
+                "type": "vacation",
+                "description": "Institution A Vacation",
+                "created_by": "admin_a",
+                "institution_id": inst_a["id"],
+            },
+        ).json()
+
+        # Register regular user in Institution A
+        user_a_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_a_vac@insta.edu",
+                "password": "UserAVac123!",
+                "passwordConfirm": "UserAVac123!",
+                "name": "User A Vac",
+                "magic_word": "MagicAUserVac",
+                "institution_short_code": "INST_A_USER_VAC",
+                "keep_logged_in": True,
+            },
+        )
+        assert user_a_response.status_code == 200
+
+        # Get all vacation days as user A (should NOT include institution B's vacation day)
+        vacation_response = test_app.get("/api/v1/vacation-days?year=2025")
+        assert vacation_response.status_code == 200
+        vacation_days = vacation_response.json()
+
+        # Verify user A can only see their institution's vacation days
+        vacation_dates = [v["date"] for v in vacation_days]
+        assert "2025-12-30" in vacation_dates  # Institution A's vacation day
+        assert "2025-12-31" not in vacation_dates  # Institution B's vacation day (MUST NOT be visible)
+
+    def test_user_cannot_see_other_institution_vacation_days_by_date(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that regular user cannot query specific vacation days from other institutions.
+        """
+        # Create two institutions
+        inst_a = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution A User Vac Single Test",
+                "short_code": "INST_A_USER_VAC_SINGLE",
+                "registration_magic_word": "MagicAUserVacSingle",
+                "active": True,
+            },
+        ).json()
+
+        inst_b = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution B User Vac Single Test",
+                "short_code": "INST_B_USER_VAC_SINGLE",
+                "registration_magic_word": "MagicBUserVacSingle",
+                "active": True,
+            },
+        ).json()
+
+        # Create vacation day for institution B
+        vacation_b = pocketbase_admin_client.post(
+            "/api/collections/vacation_days/records",
+            json={
+                "date": "2025-11-20",
+                "type": "public_holiday",
+                "description": "Institution B Holiday",
+                "created_by": "admin_b",
+                "institution_id": inst_b["id"],
+            },
+        ).json()
+
+        # Register regular user in Institution A
+        user_a_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_a_vac_single@insta.edu",
+                "password": "UserAVacSingle123!",
+                "passwordConfirm": "UserAVacSingle123!",
+                "name": "User A Vac Single",
+                "magic_word": "MagicAUserVacSingle",
+                "institution_short_code": "INST_A_USER_VAC_SINGLE",
+                "keep_logged_in": True,
+            },
+        )
+        assert user_a_response.status_code == 200
+
+        # Try to get Institution B's vacation day by date (should fail)
+        vacation_response = test_app.get("/api/v1/vacation-days/2025-11-20")
+        assert vacation_response.status_code == 404  # Not found (filtered by institution)
+
+    def test_user_vacation_days_range_endpoint_filters_by_institution(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that vacation days range endpoint filters by institution.
+        """
+        # Create two institutions
+        inst_a = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution A Range Test",
+                "short_code": "INST_A_RANGE",
+                "registration_magic_word": "MagicARange",
+                "active": True,
+            },
+        ).json()
+
+        inst_b = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution B Range Test",
+                "short_code": "INST_B_RANGE",
+                "registration_magic_word": "MagicBRange",
+                "active": True,
+            },
+        ).json()
+
+        # Create vacation days for both institutions in same date range
+        pocketbase_admin_client.post(
+            "/api/collections/vacation_days/records",
+            json={
+                "date": "2025-06-01",
+                "type": "vacation",
+                "description": "Institution A June Vacation",
+                "created_by": "admin_a",
+                "institution_id": inst_a["id"],
+            },
+        )
+
+        pocketbase_admin_client.post(
+            "/api/collections/vacation_days/records",
+            json={
+                "date": "2025-06-15",
+                "type": "vacation",
+                "description": "Institution B June Vacation",
+                "created_by": "admin_b",
+                "institution_id": inst_b["id"],
+            },
+        )
+
+        # Register user in Institution A
+        user_a_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_a_range@insta.edu",
+                "password": "UserARange123!",
+                "passwordConfirm": "UserARange123!",
+                "name": "User A Range",
+                "magic_word": "MagicARange",
+                "institution_short_code": "INST_A_RANGE",
+                "keep_logged_in": True,
+            },
+        )
+        assert user_a_response.status_code == 200
+
+        # Get vacation days in range (should only see Institution A's)
+        vacation_response = test_app.get(
+            "/api/v1/vacation-days/range?start_date=2025-06-01&end_date=2025-06-30"
+        )
+        assert vacation_response.status_code == 200
+        vacation_days = vacation_response.json()
+
+        # Should only see Institution A's vacation day
+        assert len(vacation_days) == 1
+        assert vacation_days[0]["date"] == "2025-06-01"
+        assert vacation_days[0]["description"] == "Institution A June Vacation"
+
+
+@pytest.mark.integration
+class TestAdminPriorityUpdateDeleteIsolation:
+    """Test that admin priority update/delete operations respect institution boundaries."""
+
+    def test_institution_admin_cannot_update_other_institution_priorities(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that institution admin from A cannot update priorities from Institution B.
+
+        This is a CRITICAL security test.
+        """
+        # Create two institutions
+        inst_a = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution A Priority Update Test",
+                "short_code": "INST_A_PRIO_UPDATE",
+                "registration_magic_word": "MagicAPrioUpdate",
+                "active": True,
+            },
+        ).json()
+
+        inst_b = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution B Priority Update Test",
+                "short_code": "INST_B_PRIO_UPDATE",
+                "registration_magic_word": "MagicBPrioUpdate",
+                "active": True,
+            },
+        ).json()
+
+        # Create user in Institution B and their priority
+        user_b_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_b_prio_update@instb.edu",
+                "password": "UserBPrioUpdate123!",
+                "passwordConfirm": "UserBPrioUpdate123!",
+                "name": "User B Priority Update",
+                "magic_word": "MagicBPrioUpdate",
+                "institution_short_code": "INST_B_PRIO_UPDATE",
+                "keep_logged_in": True,
+            },
+        )
+        assert user_b_response.status_code == 200
+        user_b_id = user_b_response.json()["user"]["id"]
+
+        # User B creates a priority
+        priority_response = test_app.put(
+            "/api/v1/priorities/2025-03",
+            json=[
+                {
+                    "weekNumber": 1,
+                    "monday": 1,
+                    "tuesday": 2,
+                    "wednesday": 3,
+                    "thursday": 1,
+                    "friday": 2,
+                }
+            ],
+        )
+        assert priority_response.status_code == 200
+
+        # Get priority ID
+        priorities = pocketbase_admin_client.get(
+            "/api/collections/priorities/records",
+            params={"filter": f'userId="{user_b_id}" && month="2025-03"'},
+        ).json()
+        priority_id = priorities["items"][0]["id"]
+
+        # Logout user B
+        test_app.post("/api/v1/auth/logout")
+
+        # Register institution admin in Institution A
+        admin_a_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_a_prio_update@insta.edu",
+                "password": "AdminAPrioUpdate123!",
+                "passwordConfirm": "AdminAPrioUpdate123!",
+                "name": "Admin A Priority Update",
+                "magic_word": "MagicAPrioUpdate",
+                "institution_short_code": "INST_A_PRIO_UPDATE",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_a_response.status_code == 200
+        admin_a_user_id = admin_a_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_a_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin A to refresh session
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_a_prio_update@insta.edu",
+                "password": "AdminAPrioUpdate123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to update Institution B's priority (should fail)
+        update_response = test_app.patch(
+            f"/api/v1/admin/priorities/{priority_id}",
+            json={"encrypted_fields": "tampered_data"},
+        )
+        assert update_response.status_code == 403  # Forbidden
+
+    def test_institution_admin_cannot_delete_other_institution_priorities(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that institution admin from A cannot delete priorities from Institution B.
+
+        This is a CRITICAL security test.
+        """
+        # Create two institutions
+        inst_a = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution A Priority Delete Test",
+                "short_code": "INST_A_PRIO_DELETE",
+                "registration_magic_word": "MagicAPrioDelete",
+                "active": True,
+            },
+        ).json()
+
+        inst_b = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution B Priority Delete Test",
+                "short_code": "INST_B_PRIO_DELETE",
+                "registration_magic_word": "MagicBPrioDelete",
+                "active": True,
+            },
+        ).json()
+
+        # Create user in Institution B and their priority
+        user_b_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "user_b_prio_delete@instb.edu",
+                "password": "UserBPrioDelete123!",
+                "passwordConfirm": "UserBPrioDelete123!",
+                "name": "User B Priority Delete",
+                "magic_word": "MagicBPrioDelete",
+                "institution_short_code": "INST_B_PRIO_DELETE",
+                "keep_logged_in": True,
+            },
+        )
+        assert user_b_response.status_code == 200
+        user_b_id = user_b_response.json()["user"]["id"]
+
+        # User B creates a priority
+        priority_response = test_app.put(
+            "/api/v1/priorities/2025-04",
+            json=[
+                {
+                    "weekNumber": 1,
+                    "monday": 1,
+                    "tuesday": 2,
+                    "wednesday": 3,
+                    "thursday": 1,
+                    "friday": 2,
+                }
+            ],
+        )
+        assert priority_response.status_code == 200
+
+        # Get priority ID
+        priorities = pocketbase_admin_client.get(
+            "/api/collections/priorities/records",
+            params={"filter": f'userId="{user_b_id}" && month="2025-04"'},
+        ).json()
+        priority_id = priorities["items"][0]["id"]
+
+        # Logout user B
+        test_app.post("/api/v1/auth/logout")
+
+        # Register institution admin in Institution A
+        admin_a_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_a_prio_delete@insta.edu",
+                "password": "AdminAPrioDelete123!",
+                "passwordConfirm": "AdminAPrioDelete123!",
+                "name": "Admin A Priority Delete",
+                "magic_word": "MagicAPrioDelete",
+                "institution_short_code": "INST_A_PRIO_DELETE",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_a_response.status_code == 200
+        admin_a_user_id = admin_a_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_a_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin A to refresh session
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_a_prio_delete@insta.edu",
+                "password": "AdminAPrioDelete123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to delete Institution B's priority (should fail)
+        delete_response = test_app.delete(f"/api/v1/admin/priorities/{priority_id}")
+        assert delete_response.status_code == 403  # Forbidden
+
+        # Verify priority still exists
+        verify_response = pocketbase_admin_client.get(
+            f"/api/collections/priorities/records/{priority_id}"
+        )
+        assert verify_response.status_code == 200

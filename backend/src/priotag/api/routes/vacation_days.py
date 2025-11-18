@@ -467,17 +467,18 @@ async def delete_vacation_day(
 @user_router.get("/vacation-days", response_model=list[VacationDayUserResponse])
 async def get_vacation_days_for_users(
     token: str = Depends(get_current_token),
-    _=Depends(verify_token),
+    session: SessionInfo = Depends(verify_token),
     year: int | None = None,
     month: int | None = None,
     type: str | None = None,
 ):
     """
     User endpoint to get vacation days with optional filtering.
-    Users can see all vacation days to know when the office is closed.
+    Users can only see vacation days from their own institution.
 
     Args:
         token: User auth token
+        session: User session information
         year: Optional year filter (e.g., 2025)
         month: Optional month filter (1-12)
         type: Optional type filter (vacation, admin_leave, public_holiday)
@@ -485,9 +486,20 @@ async def get_vacation_days_for_users(
     Returns:
         List of vacation day records (simplified for users)
     """
+    # Verify user has institution_id
+    if not session.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Benutzer ist keiner Institution zugeordnet",
+        )
+
     async with httpx.AsyncClient() as client:
-        # Build filter
+        # Build filter with institution filtering
         filters = []
+
+        # Add institution filter first (CRITICAL for multi-institution isolation)
+        filters.append(f'institution_id="{session.institution_id}"')
+
         if year and month:
             # Filter by specific year and month
             filters.append(
@@ -503,11 +515,9 @@ async def get_vacation_days_for_users(
         if type:
             filters.append(f'type="{type}"')
 
-        filter_str = " && ".join(filters) if filters else ""
+        filter_str = " && ".join(filters)
 
-        params: dict[str, Any] = {"perPage": 500, "sort": "date"}
-        if filter_str:
-            params["filter"] = filter_str
+        params: dict[str, Any] = {"perPage": 500, "sort": "date", "filter": filter_str}
 
         response = await client.get(
             f"{POCKETBASE_URL}/api/collections/vacation_days/records",
@@ -536,17 +546,19 @@ async def get_vacation_days_in_range(
     start_date: str,
     end_date: str,
     token: str = Depends(get_current_token),
-    _=Depends(verify_token),
+    session: SessionInfo = Depends(verify_token),
     type: str | None = None,
 ):
     """
     User endpoint to get vacation days within a date range.
     Useful for displaying vacation days in a calendar view.
+    Users can only see vacation days from their own institution.
 
     Args:
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
         token: User auth token
+        session: User session information
         type: Optional type filter (vacation, admin_leave, public_holiday)
 
     Returns:
@@ -561,9 +573,22 @@ async def get_vacation_days_in_range(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    # Verify user has institution_id
+    if not session.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Benutzer ist keiner Institution zugeordnet",
+        )
+
     async with httpx.AsyncClient() as client:
-        # Build filter for date range
-        filters = [f'date >= "{start_date}" && date <= "{end_date}"']
+        # Build filter for date range with institution filtering
+        filters = []
+
+        # Add institution filter first (CRITICAL for multi-institution isolation)
+        filters.append(f'institution_id="{session.institution_id}"')
+
+        # Add date range filter
+        filters.append(f'date >= "{start_date}" && date <= "{end_date}"')
 
         if type:
             filters.append(f'type="{type}"')
@@ -598,23 +623,34 @@ async def get_vacation_days_in_range(
 async def get_vacation_day_for_users(
     date: str,
     token: str = Depends(get_current_token),
-    _=Depends(verify_token),
+    session: SessionInfo = Depends(verify_token),
 ):
     """
     User endpoint to check if a specific date is a vacation day.
+    Users can only see vacation days from their own institution.
 
     Args:
         date: Date in YYYY-MM-DD format
         token: User auth token
+        session: User session information
 
     Returns:
         Vacation day record if exists (simplified for users)
     """
+    # Verify user has institution_id
+    if not session.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Benutzer ist keiner Institution zugeordnet",
+        )
+
     async with httpx.AsyncClient() as client:
-        # Use substring match for date comparison
+        # Build filter with institution filtering
+        filter_str = f'date ~ "{date}" && institution_id="{session.institution_id}"'
+
         response = await client.get(
             f"{POCKETBASE_URL}/api/collections/vacation_days/records",
-            params={"filter": f'date ~ "{date}"'},
+            params={"filter": filter_str},
             headers={"Authorization": f"Bearer {token}"},
         )
 

@@ -837,13 +837,45 @@ async def update_priority(
     priority_id: str,
     request: UpdatePriorityRequest,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Update a priority record's encrypted fields.
     The client must decrypt, modify, and re-encrypt the data before sending.
+
+    Institution admins can only update priorities from their institution.
+    Super admins can update any priority.
     """
     async with httpx.AsyncClient() as client:
+        # Fetch priority first to verify institution ownership
+        get_response = await client.get(
+            f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if get_response.status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail="Prioritätsdatensatz nicht gefunden",
+            )
+
+        if get_response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Fehler beim Abrufen der Priorität",
+            )
+
+        priority = get_response.json()
+
+        # Verify institution ownership (super admins bypass this check)
+        if session.role != "super_admin":
+            if priority.get("institution_id") != session.institution_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Keine Berechtigung für diese Priorität",
+                )
+
+        # Now update the priority
         response = await client.patch(
             f"{POCKETBASE_URL}/api/collections/priorities/records/{priority_id}",
             json={"encrypted_fields": request.encrypted_fields},
@@ -875,10 +907,13 @@ async def update_priority(
 async def delete_priority(
     priority_id: str,
     token: str = Depends(get_current_token),
-    _=Depends(require_admin),
+    session: SessionInfo = Depends(require_admin),
 ):
     """
     Delete a specific priority record by its ID.
+
+    Institution admins can only delete priorities from their institution.
+    Super admins can delete any priority.
     """
     async with httpx.AsyncClient() as client:
         # Get priority details for response message
@@ -900,6 +935,15 @@ async def delete_priority(
             )
 
         priority_data = priority_response.json()
+
+        # Verify institution ownership (super admins bypass this check)
+        if session.role != "super_admin":
+            if priority_data.get("institution_id") != session.institution_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Keine Berechtigung für diese Priorität",
+                )
+
         month = priority_data.get("month", "unknown")
 
         # Delete the priority record
