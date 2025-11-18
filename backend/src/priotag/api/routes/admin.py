@@ -275,7 +275,9 @@ async def get_user_submissions(
         # Add institution filtering to user query
         # Wrap user_id_filter in parentheses if adding institution filter
         if session.role != "super_admin" and session.institution_id:
-            user_filter = f"({user_id_filter}) && institution_id='{session.institution_id}'"
+            user_filter = (
+                f"({user_id_filter}) && institution_id='{session.institution_id}'"
+            )
         else:
             user_filter = user_id_filter
 
@@ -339,7 +341,8 @@ async def get_user_for_admin(
     """
     # Validate username format to prevent filter injection
     import re
-    if not re.match(r'^[a-zA-Z0-9.@_-]+$', user_id):
+
+    if not re.match(r"^[a-zA-Z0-9.@_-]+$", user_id):
         raise HTTPException(
             status_code=422,
             detail="Ungültiges Benutzernamen-Format",
@@ -420,13 +423,14 @@ async def create_manual_priority(
 
     # Validate and sanitize identifier to prevent filter injection
     import re
+
     identifier = request.identifier.strip()
     if not identifier:
         raise HTTPException(
             status_code=422,
             detail="Identifier darf nicht leer sein",
         )
-    if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
+    if not re.match(r"^[a-zA-Z0-9_-]+$", identifier):
         raise HTTPException(
             status_code=422,
             detail="Identifier darf nur Buchstaben, Zahlen, Bindestriche und Unterstriche enthalten",
@@ -457,7 +461,9 @@ async def create_manual_priority(
 
     async with httpx.AsyncClient() as client:
         # Check if entry already exists for this identifier + month + institution
-        base_check_filter = f'manual = true && month="{request.month}" && identifier="{identifier}"'
+        base_check_filter = (
+            f'manual = true && month="{request.month}" && identifier="{identifier}"'
+        )
         check_filter = build_institution_filter(auth_data, base_check_filter)
 
         check_response = await client.get(
@@ -596,7 +602,9 @@ async def get_manual_entries(
         # Add institution filtering to user query
         # Wrap user_id_filter in parentheses if adding institution filter
         if session.role != "super_admin" and session.institution_id:
-            user_filter = f"({user_id_filter}) && institution_id='{session.institution_id}'"
+            user_filter = (
+                f"({user_id_filter}) && institution_id='{session.institution_id}'"
+            )
         else:
             user_filter = user_id_filter
 
@@ -663,13 +671,14 @@ async def delete_manual_entry(
 
     # Sanitize identifier to prevent filter injection
     import re
+
     identifier = identifier.strip()
     if not identifier:
         raise HTTPException(
             status_code=422,
             detail="Identifier darf nicht leer sein",
         )
-    if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
+    if not re.match(r"^[a-zA-Z0-9_-]+$", identifier):
         raise HTTPException(
             status_code=422,
             detail="Identifier darf nur Buchstaben, Zahlen, Bindestriche und Unterstriche enthalten",
@@ -773,12 +782,10 @@ async def update_user(
         if request.email is not None:
             update_data["email"] = request.email
         if request.role is not None:
-            if request.role not in ["user", "service", "admin", "generic"]:
-                raise HTTPException(
-                    status_code=422,
-                    detail="Ungültige Rolle. Erlaubte Werte: user, service, admin, generic",
-                )
-            update_data["role"] = request.role
+            raise HTTPException(
+                status_code=422,
+                detail="Es ist nicht erlaubt die Rolle zu ändern.",
+            )
 
         if not update_data:
             raise HTTPException(

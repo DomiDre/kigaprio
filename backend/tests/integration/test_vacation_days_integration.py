@@ -104,7 +104,7 @@ class TestVacationDaysIntegration:
         # Update role to admin
         response = pocketbase_admin_client.patch(
             f"/api/collections/users/records/{user_id}",
-            json={"role": "admin"},
+            json={"role": "institution_admin"},
         )
         assert response.status_code == 200
 

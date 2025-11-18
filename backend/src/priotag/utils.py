@@ -222,9 +222,9 @@ async def require_admin(
     """
     Dependency that requires admin role.
 
-    Accepts: "admin" (legacy), "institution_admin", "super_admin"
+    Accepts: "institution_admin", "super_admin"
     """
-    if session.role not in ["admin", "institution_admin", "super_admin"]:
+    if session.role not in ["institution_admin", "super_admin"]:
         raise HTTPException(
             status_code=403,
             detail="Administratorrechte erforderlich",
@@ -238,7 +238,7 @@ async def require_institution_admin(
     """
     Dependency that requires institution admin or super admin role.
     """
-    if session.role not in ["admin", "institution_admin", "super_admin"]:
+    if session.role not in ["institution_admin", "super_admin"]:
         raise HTTPException(
             status_code=403,
             detail="Administratorrechte erforderlich",
@@ -262,8 +262,8 @@ async def require_super_admin(
 
 def extract_session_info_from_record(record: UsersResponse) -> SessionInfo:
     """Extract session info from PocketBase user record."""
-    # Check for admin roles (supports both legacy "admin" and new roles)
-    is_admin = record.role in ["admin", "institution_admin", "super_admin"]
+    # Check for admin roles
+    is_admin = record.role in ["institution_admin", "super_admin"]
 
     return SessionInfo(
         id=record.id,

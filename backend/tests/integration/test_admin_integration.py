@@ -97,10 +97,10 @@ class TestAdminIntegration:
 
         user_id = users[0]["id"]
 
-        # Update role to admin
+        # Update role to institution_admin
         response = pocketbase_admin_client.patch(
             f"/api/collections/users/records/{user_id}",
-            json={"role": "admin"},
+            json={"role": "institution_admin"},
         )
         assert response.status_code == 200
 

@@ -64,7 +64,7 @@ class SessionInfo(BaseModel):
     id: str
     username: str
     is_admin: bool  # Kept for backward compatibility
-    role: Literal["user", "institution_admin", "super_admin", "generic", "service", "admin"]
+    role: Literal["user", "institution_admin", "super_admin", "service"]
     institution_id: Optional[str] = None  # None for super_admin
 
 

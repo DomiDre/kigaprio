@@ -31,18 +31,6 @@ class TestRequireAdmin:
         result = await require_admin(sample_admin_session_info)
         assert result.role == "institution_admin"
 
-    async def test_require_admin_with_legacy_admin(self):
-        """Test legacy admin role passes require_admin check."""
-        legacy_admin = SessionInfo(
-            id="legacy_admin",
-            username="legacy",
-            is_admin=True,
-            role="admin",
-            institution_id="inst_123",
-        )
-        result = await require_admin(legacy_admin)
-        assert result.role == "admin"
-
     async def test_require_admin_with_regular_user_fails(self, sample_session_info):
         """Test regular user fails require_admin check."""
         with pytest.raises(HTTPException) as exc_info:
@@ -69,9 +57,7 @@ class TestRequireInstitutionAdmin:
         result = await require_institution_admin(sample_super_admin_session_info)
         assert result.role == "super_admin"
 
-    async def test_require_institution_admin_with_user_fails(
-        self, sample_session_info
-    ):
+    async def test_require_institution_admin_with_user_fails(self, sample_session_info):
         """Test regular user fails institution_admin check."""
         with pytest.raises(HTTPException) as exc_info:
             await require_institution_admin(sample_session_info)
@@ -149,7 +135,11 @@ class TestRoleHierarchy:
     def test_is_admin_flag_for_all_admin_types(self):
         """Test is_admin flag is True for all admin types."""
         super_admin = SessionInfo(
-            id="s1", username="s", is_admin=True, role="super_admin", institution_id=None
+            id="s1",
+            username="s",
+            is_admin=True,
+            role="super_admin",
+            institution_id=None,
         )
         inst_admin = SessionInfo(
             id="i1",
@@ -158,17 +148,9 @@ class TestRoleHierarchy:
             role="institution_admin",
             institution_id="inst_123",
         )
-        legacy_admin = SessionInfo(
-            id="l1",
-            username="l",
-            is_admin=True,
-            role="admin",
-            institution_id="inst_123",
-        )
 
         assert super_admin.is_admin is True
         assert inst_admin.is_admin is True
-        assert legacy_admin.is_admin is True
 
 
 class TestDataIsolationLogic:

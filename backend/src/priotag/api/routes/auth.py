@@ -149,9 +149,7 @@ async def verify_magic_word(
 
     # Check if institution is active
     if not institution.active:
-        raise HTTPException(
-            status_code=403, detail="Diese Institution ist nicht aktiv"
-        )
+        raise HTTPException(status_code=403, detail="Diese Institution ist nicht aktiv")
 
     # Get institution's magic word
     magic_word = institution.registration_magic_word
@@ -215,9 +213,7 @@ async def register_user(
                 status_code=500, detail="Token enthält keine Institution-ID"
             )
     except (json.JSONDecodeError, KeyError) as e:
-        raise HTTPException(
-            status_code=500, detail="Ungültige Token-Daten"
-        ) from e
+        raise HTTPException(status_code=500, detail="Ungültige Token-Daten") from e
 
     # Delete token (one-time use)
     redis_client.delete(token_key)
@@ -322,7 +318,8 @@ async def register_user(
                 "id": auth_data["record"]["id"],
                 "username": auth_data["record"]["username"],
                 "role": auth_data["record"]["role"],
-                "is_admin": auth_data["record"]["role"] in ["admin", "institution_admin", "super_admin"],
+                "is_admin": auth_data["record"]["role"]
+                in ["institution_admin", "super_admin"],
                 "institution_id": auth_data["record"].get("institution_id"),
             }
 
@@ -384,9 +381,7 @@ async def register_user_qr(
 
     # Check if institution is active
     if not institution.active:
-        raise HTTPException(
-            status_code=403, detail="Diese Institution ist nicht aktiv"
-        )
+        raise HTTPException(status_code=403, detail="Diese Institution ist nicht aktiv")
 
     # Get institution's magic word
     magic_word = institution.registration_magic_word
@@ -511,7 +506,8 @@ async def register_user_qr(
                 "id": auth_data["record"]["id"],
                 "username": auth_data["record"]["username"],
                 "role": auth_data["record"]["role"],
-                "is_admin": auth_data["record"]["role"] in ["admin", "institution_admin", "super_admin"],
+                "is_admin": auth_data["record"]["role"]
+                in ["institution_admin", "super_admin"],
                 "institution_id": auth_data["record"].get("institution_id"),
             }
 
@@ -666,9 +662,11 @@ async def login_user(
             set_auth_cookies(response, token, dek, cookie_max_age)
 
             return LoginResponse(
-                message="Erfolgreich als Administrator angemeldet"
-                if is_admin
-                else "Erfolgreich angemeldet",
+                message=(
+                    "Erfolgreich als Administrator angemeldet"
+                    if is_admin
+                    else "Erfolgreich angemeldet"
+                ),
             )
 
     except HTTPException:

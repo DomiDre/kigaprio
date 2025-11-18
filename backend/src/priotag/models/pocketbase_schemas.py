@@ -13,7 +13,7 @@ class UsersResponse(BaseModel):
     emailVisibility: bool
     verified: bool
     username: str
-    role: Literal["user", "service", "admin", "institution_admin", "super_admin", "generic"]
+    role: Literal["user", "service", "institution_admin", "super_admin"]
     admin_wrapped_dek: str
     user_wrapped_dek: str
     salt: str

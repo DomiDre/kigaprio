@@ -239,7 +239,7 @@ session_info = {
     "id": auth_data["record"]["id"],  # ← Uses "id" not "user_id"
     "username": auth_data["record"]["username"],
     "role": auth_data["record"]["role"],
-    "is_admin": auth_data["record"]["role"] in ["admin", "institution_admin", "super_admin"],
+    "is_admin": auth_data["record"]["role"] in ["institution_admin", "super_admin"],
     "institution_id": auth_data["record"].get("institution_id"),
 }
 
