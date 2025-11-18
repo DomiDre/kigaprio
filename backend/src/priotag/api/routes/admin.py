@@ -337,6 +337,14 @@ async def get_user_for_admin(
     Institution admins can only access users from their institution.
     Super admins can access any user.
     """
+    # Validate username format to prevent filter injection
+    import re
+    if not re.match(r'^[a-zA-Z0-9.@_-]+$', user_id):
+        raise HTTPException(
+            status_code=422,
+            detail="Ungültiges Benutzernamen-Format",
+        )
+
     async with httpx.AsyncClient() as client:
         try:
             # Build filter with institution isolation
@@ -410,12 +418,18 @@ async def create_manual_priority(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    # Validate and clean identifier
+    # Validate and sanitize identifier to prevent filter injection
+    import re
     identifier = request.identifier.strip()
     if not identifier:
         raise HTTPException(
             status_code=422,
             detail="Identifier darf nicht leer sein",
+        )
+    if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
+        raise HTTPException(
+            status_code=422,
+            detail="Identifier darf nur Buchstaben, Zahlen, Bindestriche und Unterstriche enthalten",
         )
 
     # Validate that we have at least some priority data
@@ -530,6 +544,12 @@ async def get_manual_entries(
     Institution admins only see manual entries from their institution.
     Super admins see all manual entries.
     """
+    # Validate month format to prevent filter injection
+    try:
+        validate_month_format_and_range(month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
     async with httpx.AsyncClient() as client:
         # Build filter with institution isolation
         base_filter = f'manual = true && month="{month}" && identifier!=null'
@@ -635,6 +655,26 @@ async def delete_manual_entry(
     Institution admins can only delete manual entries from their institution.
     Super admins can delete any manual entry.
     """
+    # Validate month format to prevent filter injection
+    try:
+        validate_month_format_and_range(month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # Sanitize identifier to prevent filter injection
+    import re
+    identifier = identifier.strip()
+    if not identifier:
+        raise HTTPException(
+            status_code=422,
+            detail="Identifier darf nicht leer sein",
+        )
+    if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
+        raise HTTPException(
+            status_code=422,
+            detail="Identifier darf nur Buchstaben, Zahlen, Bindestriche und Unterstriche enthalten",
+        )
+
     async with httpx.AsyncClient() as client:
         # Find the entry with institution filtering
         base_filter = f'manual = true && month="{month}" && identifier="{identifier}"'

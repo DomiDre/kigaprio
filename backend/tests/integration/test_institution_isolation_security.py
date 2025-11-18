@@ -1411,3 +1411,310 @@ class TestAdminPriorityUpdateDeleteIsolation:
             f"/api/collections/priorities/records/{priority_id}"
         )
         assert verify_response.status_code == 200
+
+
+@pytest.mark.integration
+class TestInputValidationFilterInjection:
+    """Test that input validation prevents filter injection attacks."""
+
+    def test_manual_entry_delete_rejects_malicious_month(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that manual entry delete endpoint rejects malicious month parameter.
+        """
+        # Create institution and admin
+        inst = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution Filter Injection Test",
+                "short_code": "INST_FILTER",
+                "registration_magic_word": "MagicFilter123",
+                "active": True,
+            },
+        ).json()
+
+        admin_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_filter@inst.edu",
+                "password": "AdminFilter123!",
+                "passwordConfirm": "AdminFilter123!",
+                "name": "Admin Filter",
+                "magic_word": "MagicFilter123",
+                "institution_short_code": "INST_FILTER",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_response.status_code == 200
+        admin_user_id = admin_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_filter@inst.edu",
+                "password": "AdminFilter123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to delete with malicious month parameter (filter injection attempt)
+        malicious_month = '2025-01" || manual = false && userId="'
+        delete_response = test_app.delete(
+            f"/api/v1/admin/manual-entry/{malicious_month}/test-id"
+        )
+        # Should reject with 422 (validation error), not execute the query
+        assert delete_response.status_code == 422
+
+    def test_manual_entry_delete_rejects_malicious_identifier(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that manual entry delete endpoint rejects malicious identifier parameter.
+        """
+        # Create institution and admin
+        inst = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution Identifier Injection Test",
+                "short_code": "INST_ID_INJ",
+                "registration_magic_word": "MagicIdInj123",
+                "active": True,
+            },
+        ).json()
+
+        admin_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_id_inj@inst.edu",
+                "password": "AdminIdInj123!",
+                "passwordConfirm": "AdminIdInj123!",
+                "name": "Admin Id Injection",
+                "magic_word": "MagicIdInj123",
+                "institution_short_code": "INST_ID_INJ",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_response.status_code == 200
+        admin_user_id = admin_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_id_inj@inst.edu",
+                "password": "AdminIdInj123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to delete with malicious identifier (filter injection attempt)
+        malicious_identifier = 'test" || identifier!=""'
+        delete_response = test_app.delete(
+            f"/api/v1/admin/manual-entry/2025-01/{malicious_identifier}"
+        )
+        # Should reject with 422 (validation error)
+        assert delete_response.status_code == 422
+
+    def test_manual_priority_create_rejects_malicious_identifier(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that manual priority create endpoint rejects malicious identifier.
+        """
+        # Create institution and admin
+        inst = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution Manual Priority Injection Test",
+                "short_code": "INST_MANUAL_INJ",
+                "registration_magic_word": "MagicManualInj123",
+                "active": True,
+            },
+        ).json()
+
+        admin_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_manual_inj@inst.edu",
+                "password": "AdminManualInj123!",
+                "passwordConfirm": "AdminManualInj123!",
+                "name": "Admin Manual Injection",
+                "magic_word": "MagicManualInj123",
+                "institution_short_code": "INST_MANUAL_INJ",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_response.status_code == 200
+        admin_user_id = admin_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_manual_inj@inst.edu",
+                "password": "AdminManualInj123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to create manual priority with malicious identifier
+        malicious_identifier = 'test" || manual = false && userId="'
+        create_response = test_app.post(
+            "/api/v1/admin/manual-priority",
+            json={
+                "identifier": malicious_identifier,
+                "month": "2025-01",
+                "weeks": [
+                    {
+                        "weekNumber": 1,
+                        "monday": 1,
+                        "tuesday": 2,
+                        "wednesday": 3,
+                        "thursday": 1,
+                        "friday": 2,
+                    }
+                ],
+            },
+        )
+        # Should reject with 422 (validation error)
+        assert create_response.status_code == 422
+
+    def test_get_user_for_admin_rejects_malicious_username(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that get user for admin endpoint rejects malicious username.
+        """
+        # Create institution and admin
+        inst = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution Username Injection Test",
+                "short_code": "INST_USER_INJ",
+                "registration_magic_word": "MagicUserInj123",
+                "active": True,
+            },
+        ).json()
+
+        admin_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_user_inj@inst.edu",
+                "password": "AdminUserInj123!",
+                "passwordConfirm": "AdminUserInj123!",
+                "name": "Admin User Injection",
+                "magic_word": "MagicUserInj123",
+                "institution_short_code": "INST_USER_INJ",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_response.status_code == 200
+        admin_user_id = admin_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_user_inj@inst.edu",
+                "password": "AdminUserInj123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to get user with malicious username (filter injection attempt)
+        malicious_username = "test' || role='super_admin"
+        user_response = test_app.get(f"/api/v1/admin/users/info/{malicious_username}")
+        # Should reject with 422 (validation error)
+        assert user_response.status_code == 422
+
+    def test_get_manual_entries_rejects_invalid_month(
+        self, test_app, pocketbase_admin_client
+    ):
+        """
+        Test that get manual entries endpoint validates month parameter.
+        """
+        # Create institution and admin
+        inst = pocketbase_admin_client.post(
+            "/api/collections/institutions/records",
+            json={
+                "name": "Institution Month Validation Test",
+                "short_code": "INST_MONTH_VAL",
+                "registration_magic_word": "MagicMonthVal123",
+                "active": True,
+            },
+        ).json()
+
+        admin_response = test_app.post(
+            "/api/v1/auth/register-qr",
+            json={
+                "identity": "admin_month_val@inst.edu",
+                "password": "AdminMonthVal123!",
+                "passwordConfirm": "AdminMonthVal123!",
+                "name": "Admin Month Validation",
+                "magic_word": "MagicMonthVal123",
+                "institution_short_code": "INST_MONTH_VAL",
+                "keep_logged_in": True,
+            },
+        )
+        assert admin_response.status_code == 200
+        admin_user_id = admin_response.json()["user"]["id"]
+
+        # Elevate to institution_admin
+        pocketbase_admin_client.patch(
+            f"/api/collections/users/records/{admin_user_id}",
+            json={"role": "institution_admin"},
+        )
+
+        # Re-login as admin
+        test_app.post("/api/v1/auth/logout")
+        login_response = test_app.post(
+            "/api/v1/auth/login",
+            json={
+                "identity": "admin_month_val@inst.edu",
+                "password": "AdminMonthVal123!",
+                "keep_logged_in": True,
+            },
+        )
+        assert login_response.status_code == 200
+
+        # Try to get manual entries with malicious month
+        malicious_month = '2025-01" || manual != true'
+        entries_response = test_app.get(
+            f"/api/v1/admin/manual-entries/{malicious_month}"
+        )
+        # Should reject with 422 (validation error)
+        assert entries_response.status_code == 422
