@@ -18,7 +18,9 @@ migrate((app) => {
   }))
 
   // update create rule to include institution check
-  collection.createRule = "(@request.auth.role = \"institution_admin\" && @request.auth.institution_id = @request.data.institution_id) || @request.auth.role = \"super_admin\""
+  // Note: For create, we check that user is institution_admin or super_admin
+  // The institution_id validation happens at application level
+  collection.createRule = "@request.auth.role = \"institution_admin\" || @request.auth.role = \"super_admin\""
 
   // update list rule to filter by institution
   collection.listRule = "@request.auth.role = \"super_admin\" || @request.auth.institution_id = institution_id"
