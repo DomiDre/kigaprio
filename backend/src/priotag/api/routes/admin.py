@@ -1,11 +1,9 @@
 import httpx
-import redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from priotag.models.admin import (
     ManualPriorityRecordForAdmin,
     ManualPriorityRequest,
-    UpdateMagicWordRequest,
     UpdatePriorityRequest,
     UpdateUserRequest,
     UserPriorityRecordForAdmin,
@@ -14,12 +12,7 @@ from priotag.models.auth import SessionInfo
 from priotag.models.pocketbase_schemas import PriorityRecord, UsersResponse
 from priotag.models.priorities import validate_month_format_and_range
 from priotag.services.encryption import EncryptionManager
-from priotag.services.magic_word import (
-    create_or_update_magic_word,
-    get_magic_word_from_cache_or_db,
-)
 from priotag.services.pocketbase_service import POCKETBASE_URL
-from priotag.services.redis_service import get_redis
 from priotag.utils import get_current_dek, get_current_token, require_admin
 
 router = APIRouter()
@@ -110,73 +103,6 @@ async def verify_user_belongs_to_institution(
             )
 
         return user
-
-
-@router.get("/magic-word-info")
-async def get_magic_word_info(
-    token: str = Depends(get_current_token),
-    _=Depends(require_admin),
-    redis_client: redis.Redis = Depends(get_redis),
-):
-    """Admin endpoint to check current magic word settings"""
-
-    try:
-        magic_word = await get_magic_word_from_cache_or_db(redis_client)
-        if not magic_word:
-            raise HTTPException(
-                status_code=500, detail="No magic word initialized on database"
-            )
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{POCKETBASE_URL}/api/collections/system_settings/records",
-                params={"filter": 'key="registration_magic_word"'},
-                headers={"Authorization": f"Bearer {token}"},
-            )
-
-            last_updated = None
-            last_updated_by = None
-
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("items") and len(data["items"]) > 0:
-                    record = data["items"][0]
-                    last_updated = record.get("updated")
-                    last_updated_by = record.get("last_updated_by")
-
-        return {
-            "current_magic_word": magic_word,
-            "last_updated": last_updated,
-            "last_updated_by": last_updated_by,
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/update-magic-word")
-async def update_magic_word(
-    request: UpdateMagicWordRequest,
-    token: str = Depends(get_current_token),
-    session_info: SessionInfo = Depends(require_admin),
-    redis_client: redis.Redis = Depends(get_redis),
-):
-    """Admin endpoint to update the magic word"""
-
-    admin_id = session_info.username
-
-    success = await create_or_update_magic_word(
-        request.new_magic_word, token, redis_client, admin_id
-    )
-
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to update magic word")
-
-    return {
-        "success": True,
-        "message": "Magic word updated successfully",
-        "updated_by": admin_id,
-    }
 
 
 @router.get("/total-users")

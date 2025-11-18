@@ -1,6 +1,6 @@
 """Pydantic models of schemas in pocketbase collections"""
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -18,7 +18,7 @@ class UsersResponse(BaseModel):
     user_wrapped_dek: str
     salt: str
     encrypted_fields: str
-    institution_id: Optional[str] = None
+    institution_id: str | None = None
     collectionId: str
     collectionName: str
     created: str
@@ -35,7 +35,7 @@ class PriorityRecord(BaseModel):
     month: str
     encrypted_fields: str
     manual: bool
-    institution_id: Optional[str] = None
+    institution_id: str | None = None
     collectionId: str
     collectionName: str
     created: str
@@ -50,7 +50,7 @@ class VacationDayRecord(BaseModel):
     type: Literal["vacation", "admin_leave", "public_holiday"]
     description: str
     created_by: str
-    institution_id: Optional[str] = None
+    institution_id: str | None = None
     collectionId: str
     collectionName: str
     created: str
@@ -64,10 +64,22 @@ class InstitutionRecord(BaseModel):
     name: str
     short_code: str
     registration_magic_word: str
-    admin_public_key: Optional[str] = None
-    settings: dict = {}
+    admin_public_key: str | None = None
+    settings: dict | None = None
     active: bool = True
     collectionId: str
     collectionName: str
     created: str
     updated: str
+
+
+class InstitutionViewRecord(BaseModel):
+    """Institution record (stored in database)."""
+
+    id: str
+    name: str
+    short_code: str
+    admin_public_key: str | None = None
+    settings: dict | None = None
+    collectionId: str
+    collectionName: str

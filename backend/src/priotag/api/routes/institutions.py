@@ -33,7 +33,7 @@ async def list_institutions():
     Users need this information to select an institution during registration/login.
     """
     try:
-        institutions = await InstitutionService.list_institutions(active_only=True)
+        institutions = await InstitutionService.list_institutions()
 
         # Return only public fields
         return [
@@ -41,9 +41,6 @@ async def list_institutions():
                 id=inst.id,
                 name=inst.name,
                 short_code=inst.short_code,
-                active=inst.active,
-                created=inst.created,
-                updated=inst.updated,
             )
             for inst in institutions
         ]
@@ -51,7 +48,7 @@ async def list_institutions():
         raise
     except Exception as e:
         logger.error(f"Error listing institutions: {e}")
-        raise HTTPException(status_code=500, detail="Error listing institutions")
+        raise HTTPException(status_code=500, detail="Error listing institutions") from e
 
 
 @router.get("/institutions/{short_code}", response_model=InstitutionResponse)
@@ -69,15 +66,12 @@ async def get_institution_by_short_code(short_code: str):
             id=institution.id,
             name=institution.name,
             short_code=institution.short_code,
-            active=institution.active,
-            created=institution.created,
-            updated=institution.updated,
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching institution {short_code}: {e}")
-        raise HTTPException(status_code=500, detail="Error fetching institution")
+        raise HTTPException(status_code=500, detail="Error fetching institution") from e
 
 
 # ============================================================================
@@ -85,9 +79,7 @@ async def get_institution_by_short_code(short_code: str):
 # ============================================================================
 
 
-@router.get(
-    "/admin/super/institutions", response_model=list[InstitutionDetailResponse]
-)
+@router.get("/admin/super/institutions", response_model=list[InstitutionDetailResponse])
 async def list_all_institutions_admin(
     session: SessionInfo = Depends(require_super_admin),
     token: str = Depends(get_current_token),
@@ -99,9 +91,7 @@ async def list_all_institutions_admin(
     about all institutions.
     """
     try:
-        institutions = await InstitutionService.list_institutions(
-            auth_token=token, active_only=False
-        )
+        institutions = await InstitutionService.list_all_institutions(auth_token=token)
 
         # Return detailed fields for super admin
         return [
@@ -122,7 +112,7 @@ async def list_all_institutions_admin(
         raise
     except Exception as e:
         logger.error(f"Error listing institutions for admin: {e}")
-        raise HTTPException(status_code=500, detail="Error listing institutions")
+        raise HTTPException(status_code=500, detail="Error listing institutions") from e
 
 
 @router.post("/admin/super/institutions", response_model=InstitutionDetailResponse)
@@ -137,7 +127,9 @@ async def create_institution(
     This endpoint is for super admins only.
     """
     try:
-        institution = await InstitutionService.create_institution(data, auth_token=token)
+        institution = await InstitutionService.create_institution(
+            data, auth_token=token
+        )
 
         return InstitutionDetailResponse(
             id=institution.id,
@@ -154,7 +146,7 @@ async def create_institution(
         raise
     except Exception as e:
         logger.error(f"Error creating institution: {e}")
-        raise HTTPException(status_code=500, detail="Error creating institution")
+        raise HTTPException(status_code=500, detail="Error creating institution") from e
 
 
 @router.put(
@@ -192,7 +184,7 @@ async def update_institution(
         raise
     except Exception as e:
         logger.error(f"Error updating institution {institution_id}: {e}")
-        raise HTTPException(status_code=500, detail="Error updating institution")
+        raise HTTPException(status_code=500, detail="Error updating institution") from e
 
 
 # ============================================================================
@@ -251,7 +243,9 @@ async def get_my_institution(
         raise
     except Exception as e:
         logger.error(f"Error fetching institution info: {e}")
-        raise HTTPException(status_code=500, detail="Error fetching institution info")
+        raise HTTPException(
+            status_code=500, detail="Error fetching institution info"
+        ) from e
 
 
 @router.patch("/admin/institution/magic-word", response_model=InstitutionDetailResponse)
@@ -299,4 +293,4 @@ async def update_institution_magic_word(
         raise
     except Exception as e:
         logger.error(f"Error updating magic word: {e}")
-        raise HTTPException(status_code=500, detail="Error updating magic word")
+        raise HTTPException(status_code=500, detail="Error updating magic word") from e

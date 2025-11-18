@@ -368,6 +368,7 @@ def mock_httpx_client():
 def client():
     """Provide TestClient for API testing."""
     from fastapi.testclient import TestClient
+
     from priotag.main import app
 
     return TestClient(app)

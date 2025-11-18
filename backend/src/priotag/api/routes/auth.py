@@ -36,7 +36,6 @@ from priotag.models.cookie import (
 )
 from priotag.services.encryption import EncryptionManager
 from priotag.services.institution import InstitutionService
-from priotag.services.magic_word import get_magic_word_from_cache_or_db
 from priotag.services.pocketbase_service import POCKETBASE_URL
 from priotag.services.redis_service import get_redis
 from priotag.services.service_account import authenticate_service_account
@@ -144,7 +143,9 @@ async def verify_magic_word(
         )
     except HTTPException as e:
         if e.status_code == 404:
-            raise HTTPException(status_code=404, detail="Institution nicht gefunden")
+            raise HTTPException(
+                status_code=404, detail="Institution nicht gefunden"
+            ) from e
         raise
 
     # Check if institution is active
@@ -376,7 +377,9 @@ async def register_user_qr(
         )
     except HTTPException as e:
         if e.status_code == 404:
-            raise HTTPException(status_code=404, detail="Institution nicht gefunden")
+            raise HTTPException(
+                status_code=404, detail="Institution nicht gefunden"
+            ) from e
         raise
 
     # Check if institution is active

@@ -2,13 +2,17 @@
 Tests for institution service.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import HTTPException
 
-from priotag.services.institution import InstitutionService
-from priotag.models.institution import CreateInstitutionRequest, UpdateInstitutionRequest
+from priotag.models.institution import (
+    CreateInstitutionRequest,
+    UpdateInstitutionRequest,
+)
 from priotag.models.pocketbase_schemas import InstitutionRecord
+from priotag.services.institution import InstitutionService
 
 
 @pytest.mark.asyncio
@@ -353,7 +357,9 @@ async def test_get_institution_without_auth_token(
     mock_client_class.return_value = mock_client
 
     # Test
-    result = await InstitutionService.get_institution("institution_123", auth_token=None)
+    result = await InstitutionService.get_institution(
+        "institution_123", auth_token=None
+    )
 
     # Verify
     assert isinstance(result, InstitutionRecord)
@@ -385,7 +391,7 @@ async def test_update_institution_partial_update(
 
     # Test - only update active status
     update_data = UpdateInstitutionRequest(active=False)
-    result = await InstitutionService.update_institution(
+    await InstitutionService.update_institution(
         "institution_123", update_data, "test_token"
     )
 

@@ -21,7 +21,7 @@ class TestInstitutionDataIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A",
@@ -31,7 +31,7 @@ class TestInstitutionDataIsolation:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B",
@@ -126,7 +126,7 @@ class TestInstitutionDataIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Priority Test",
@@ -210,7 +210,7 @@ class TestInstitutionDataIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Update Test",
@@ -220,7 +220,7 @@ class TestInstitutionDataIsolation:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Update Test",
@@ -295,7 +295,7 @@ class TestInstitutionDataIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Delete Test",
@@ -305,7 +305,7 @@ class TestInstitutionDataIsolation:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Delete Test",
@@ -383,7 +383,7 @@ class TestInstitutionDataIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Count Test",
@@ -393,7 +393,7 @@ class TestInstitutionDataIsolation:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Count Test",
@@ -486,7 +486,7 @@ class TestSuperAdminAccess:
         Test that super admin can see users from all institutions.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Super Test",
@@ -496,7 +496,7 @@ class TestSuperAdminAccess:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Super Test",
@@ -539,7 +539,7 @@ class TestSuperAdminAccess:
         user_b_id = user_b_response.json()["user"]["id"]
 
         # Create super admin directly in PocketBase (no institution)
-        super_admin = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/users/records",
             json={
                 "username": "super_admin_test",
@@ -576,7 +576,7 @@ class TestSuperAdminAccess:
         Test that super admin sees total user count across all institutions.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Total Test",
@@ -586,7 +586,7 @@ class TestSuperAdminAccess:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Total Test",
@@ -627,7 +627,7 @@ class TestSuperAdminAccess:
             )
 
         # Create super admin directly in PocketBase (no institution)
-        super_admin = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/users/records",
             json={
                 "username": "super_admin_total_test",
@@ -671,7 +671,7 @@ class TestVacationDaysIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Vacation Test",
@@ -754,7 +754,7 @@ class TestVacationDaysIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Delete Vac Test",
@@ -997,7 +997,7 @@ class TestUserVacationDaysIsolation:
         ).json()
 
         # Create vacation day for institution B
-        vacation_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/vacation_days/records",
             json={
                 "date": "2025-12-31",
@@ -1009,7 +1009,7 @@ class TestUserVacationDaysIsolation:
         ).json()
 
         # Create vacation day for institution A
-        vacation_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/vacation_days/records",
             json={
                 "date": "2025-12-30",
@@ -1043,7 +1043,9 @@ class TestUserVacationDaysIsolation:
         # Verify user A can only see their institution's vacation days
         vacation_dates = [v["date"] for v in vacation_days]
         assert "2025-12-30" in vacation_dates  # Institution A's vacation day
-        assert "2025-12-31" not in vacation_dates  # Institution B's vacation day (MUST NOT be visible)
+        assert (
+            "2025-12-31" not in vacation_dates
+        )  # Institution B's vacation day (MUST NOT be visible)
 
     def test_user_cannot_see_other_institution_vacation_days_by_date(
         self, test_app, pocketbase_admin_client
@@ -1052,7 +1054,7 @@ class TestUserVacationDaysIsolation:
         Test that regular user cannot query specific vacation days from other institutions.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A User Vac Single Test",
@@ -1073,7 +1075,7 @@ class TestUserVacationDaysIsolation:
         ).json()
 
         # Create vacation day for institution B
-        vacation_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/vacation_days/records",
             json={
                 "date": "2025-11-20",
@@ -1101,7 +1103,9 @@ class TestUserVacationDaysIsolation:
 
         # Try to get Institution B's vacation day by date (should fail)
         vacation_response = test_app.get("/api/v1/vacation-days/2025-11-20")
-        assert vacation_response.status_code == 404  # Not found (filtered by institution)
+        assert (
+            vacation_response.status_code == 404
+        )  # Not found (filtered by institution)
 
     def test_user_vacation_days_range_endpoint_filters_by_institution(
         self, test_app, pocketbase_admin_client
@@ -1194,7 +1198,7 @@ class TestAdminPriorityUpdateDeleteIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Priority Update Test",
@@ -1204,7 +1208,7 @@ class TestAdminPriorityUpdateDeleteIsolation:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Priority Update Test",
@@ -1306,7 +1310,7 @@ class TestAdminPriorityUpdateDeleteIsolation:
         This is a CRITICAL security test.
         """
         # Create two institutions
-        inst_a = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution A Priority Delete Test",
@@ -1316,7 +1320,7 @@ class TestAdminPriorityUpdateDeleteIsolation:
             },
         ).json()
 
-        inst_b = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution B Priority Delete Test",
@@ -1424,7 +1428,7 @@ class TestInputValidationFilterInjection:
         Test that manual entry delete endpoint rejects malicious month parameter.
         """
         # Create institution and admin
-        inst = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution Filter Injection Test",
@@ -1482,7 +1486,7 @@ class TestInputValidationFilterInjection:
         Test that manual entry delete endpoint rejects malicious identifier parameter.
         """
         # Create institution and admin
-        inst = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution Identifier Injection Test",
@@ -1540,7 +1544,7 @@ class TestInputValidationFilterInjection:
         Test that manual priority create endpoint rejects malicious identifier.
         """
         # Create institution and admin
-        inst = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution Manual Priority Injection Test",
@@ -1612,7 +1616,7 @@ class TestInputValidationFilterInjection:
         Test that get user for admin endpoint rejects malicious username.
         """
         # Create institution and admin
-        inst = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution Username Injection Test",
@@ -1668,7 +1672,7 @@ class TestInputValidationFilterInjection:
         Test that get manual entries endpoint validates month parameter.
         """
         # Create institution and admin
-        inst = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Institution Month Validation Test",
@@ -1733,7 +1737,7 @@ class TestSecurityAudit4Fixes:
         Security Audit #4 Issue #1: Filter injection in priority GET endpoint.
         """
         # Create institution
-        institution = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Test Institution",
@@ -1764,7 +1768,10 @@ class TestSecurityAudit4Fixes:
 
         # Should reject with 422 (validation error)
         assert get_response.status_code == 422
-        assert "Monat" in get_response.json()["detail"] or "format" in get_response.json()["detail"].lower()
+        assert (
+            "Monat" in get_response.json()["detail"]
+            or "format" in get_response.json()["detail"].lower()
+        )
 
     def test_priority_delete_rejects_malicious_month(
         self, test_app, pocketbase_admin_client
@@ -1775,7 +1782,7 @@ class TestSecurityAudit4Fixes:
         Security Audit #4 Issue #2: Filter injection in priority DELETE endpoint.
         """
         # Create institution
-        institution = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Test Institution",
@@ -1806,7 +1813,10 @@ class TestSecurityAudit4Fixes:
 
         # Should reject with 422 (validation error)
         assert delete_response.status_code == 422
-        assert "Monat" in delete_response.json()["detail"] or "format" in delete_response.json()["detail"].lower()
+        assert (
+            "Monat" in delete_response.json()["detail"]
+            or "format" in delete_response.json()["detail"].lower()
+        )
 
     def test_vacation_day_get_rejects_malicious_date(
         self, test_app, pocketbase_admin_client
@@ -1828,7 +1838,7 @@ class TestSecurityAudit4Fixes:
         ).json()
 
         # Create institution admin
-        admin_response = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/users/records",
             json={
                 "username": "admin_vd_get@inst.edu",
@@ -1856,9 +1866,7 @@ class TestSecurityAudit4Fixes:
 
         # Try to get vacation day with malicious date
         malicious_date = '2025-01-01" || type="public_holiday'
-        get_response = test_app.get(
-            f"/api/v1/admin/vacation-days/{malicious_date}"
-        )
+        get_response = test_app.get(f"/api/v1/admin/vacation-days/{malicious_date}")
 
         # Should reject with 422 (validation error)
         assert get_response.status_code == 422
@@ -1884,7 +1892,7 @@ class TestSecurityAudit4Fixes:
         ).json()
 
         # Create institution admin
-        admin_response = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/users/records",
             json={
                 "username": "admin_vd_put@inst.edu",
@@ -1941,7 +1949,7 @@ class TestSecurityAudit4Fixes:
         ).json()
 
         # Create institution admin
-        admin_response = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/users/records",
             json={
                 "username": "admin_vd_del@inst.edu",
@@ -1987,7 +1995,7 @@ class TestSecurityAudit4Fixes:
         This is the MOST CRITICAL fix - ensures old sessions are invalidated.
         """
         # Create institution
-        institution = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Test Institution PW",
@@ -2051,7 +2059,9 @@ class TestSecurityAudit4Fixes:
             },
         )
         assert change_pw_response.status_code == 200
-        session3_cookies = change_pw_response.cookies  # New session after password change
+        session3_cookies = (
+            change_pw_response.cookies
+        )  # New session after password change
 
         # Verify that session 1 (old session) is now INVALID
         test_app.cookies.clear()
@@ -2085,16 +2095,14 @@ class TestSecurityAudit4Fixes:
         )
         assert login_new_pw_response.status_code == 200
 
-    def test_account_deletion_rate_limiting(
-        self, test_app, pocketbase_admin_client
-    ):
+    def test_account_deletion_rate_limiting(self, test_app, pocketbase_admin_client):
         """
         Test that account deletion endpoint has rate limiting.
 
         Security Audit #4 Issue #6: No rate limiting on account deletion.
         """
         # Create institution
-        institution = pocketbase_admin_client.post(
+        pocketbase_admin_client.post(
             "/api/collections/institutions/records",
             json={
                 "name": "Test Institution Delete",

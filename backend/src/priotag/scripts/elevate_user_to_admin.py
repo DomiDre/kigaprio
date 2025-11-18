@@ -26,7 +26,7 @@ def main():
     parser.add_argument(
         "--super",
         action="store_true",
-        help="Elevate to super_admin instead of institution_admin"
+        help="Elevate to super_admin instead of institution_admin",
     )
     args = parser.parse_args()
 
@@ -75,7 +75,7 @@ def main():
     user_data = users[0]
     user_id = user_data["id"]
 
-    print(f"\nFound user:")
+    print("\nFound user:")
     print(f"  ID: {user_id}")
     print(f"  Username: {user_data['username']}")
     print(f"  Current role: {user_data.get('role', 'user')}")
@@ -89,7 +89,7 @@ def main():
             "role": new_role,
             "institution_id": None,  # Super admins have no institution
         }
-        print(f"Elevating to: super_admin (no institution)")
+        print("Elevating to: super_admin (no institution)")
     else:
         new_role = "institution_admin"
 
@@ -118,7 +118,9 @@ def main():
 
                 print("\nAvailable institutions:")
                 for i, inst in enumerate(institutions, 1):
-                    print(f"{i}. {inst['name']} ({inst['short_code']}) - ID: {inst['id']}")
+                    print(
+                        f"{i}. {inst['name']} ({inst['short_code']}) - ID: {inst['id']}"
+                    )
 
                 inst_choice = int(input("\nSelect institution number: ")) - 1
                 if inst_choice < 0 or inst_choice >= len(institutions):

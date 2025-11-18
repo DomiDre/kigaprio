@@ -203,15 +203,21 @@
 								Institution
 							</label>
 							{#if loadingInstitutions}
-								<div class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-500 dark:border-gray-600 dark:bg-gray-700">
+								<div
+									class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-500 dark:border-gray-600 dark:bg-gray-700"
+								>
 									<span class="animate-spin">⟳</span> Loading institutions...
 								</div>
 							{:else if institutions.length === 0}
-								<div class="mt-1 block w-full rounded-md border border-red-300 px-3 py-2 text-red-600 dark:border-red-600 dark:bg-gray-700">
+								<div
+									class="mt-1 block w-full rounded-md border border-red-300 px-3 py-2 text-red-600 dark:border-red-600 dark:bg-gray-700"
+								>
 									No institutions available
 								</div>
 							{:else if institutions.length === 1}
-								<div class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+								<div
+									class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								>
 									{institutions[0].name}
 								</div>
 							{:else}

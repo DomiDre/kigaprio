@@ -6,7 +6,6 @@ using real PocketBase and Redis containers.
 """
 
 import pytest
-import httpx
 
 
 @pytest.mark.integration
@@ -171,6 +170,7 @@ class TestMagicWordVerification:
 
         # Verify token is stored in Redis with institution_id
         import json
+
         token = data["token"]
         token_data_str = clean_redis.get(f"reg_token:{token}")
         assert token_data_str is not None
@@ -343,4 +343,7 @@ class TestUserRegistrationWithInstitutions:
         # Verify they're in different institutions
         assert users_a["items"][0]["institution_id"] == inst_a["id"]
         assert users_b["items"][0]["institution_id"] == inst_b["id"]
-        assert users_a["items"][0]["institution_id"] != users_b["items"][0]["institution_id"]
+        assert (
+            users_a["items"][0]["institution_id"]
+            != users_b["items"][0]["institution_id"]
+        )

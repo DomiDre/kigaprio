@@ -27,9 +27,28 @@ def generate_magic_word():
     """Generate a random magic word."""
     # Generate a pronounceable-ish magic word
     words = [
-        "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta",
-        "Iota", "Kappa", "Lambda", "Sigma", "Omega", "Phoenix", "Dragon",
-        "Tiger", "Eagle", "Falcon", "Hawk", "Lion", "Bear", "Wolf"
+        "Alpha",
+        "Beta",
+        "Gamma",
+        "Delta",
+        "Epsilon",
+        "Zeta",
+        "Eta",
+        "Theta",
+        "Iota",
+        "Kappa",
+        "Lambda",
+        "Sigma",
+        "Omega",
+        "Phoenix",
+        "Dragon",
+        "Tiger",
+        "Eagle",
+        "Falcon",
+        "Hawk",
+        "Lion",
+        "Bear",
+        "Wolf",
     ]
     numbers = secrets.randbelow(10000)
     word = secrets.choice(words)
@@ -49,9 +68,11 @@ async def create_institution():
         print("Error: Institution name cannot be empty")
         return
 
-    institution_short_code = input(
-        "Enter institution short code (uppercase, e.g., 'MIT', 'STANFORD'): "
-    ).strip().upper()
+    institution_short_code = (
+        input("Enter institution short code (uppercase, e.g., 'MIT', 'STANFORD'): ")
+        .strip()
+        .upper()
+    )
     if not institution_short_code:
         print("Error: Short code cannot be empty")
         return
@@ -105,7 +126,9 @@ async def create_institution():
         service_token = await authenticate_service_account(client)
         if not service_token:
             print("Error: Failed to authenticate service account")
-            print("Make sure you're running this as a super admin or with service account credentials")
+            print(
+                "Make sure you're running this as a super admin or with service account credentials"
+            )
             return
 
         headers = {"Authorization": f"Bearer {service_token}"}
@@ -141,9 +164,13 @@ async def create_institution():
             print()
             print("Next steps:")
             print("1. Generate QR codes for registration:")
-            print(f"   python generate_qr_codes.py --institution {institution_short_code} --magic-word \"{magic_word}\"")
+            print(
+                f'   python generate_qr_codes.py --institution {institution_short_code} --magic-word "{magic_word}"'
+            )
             print("2. Elevate users to institution_admin for this institution:")
-            print(f"   python elevate_user_to_admin.py --institution-id {institution['id']}")
+            print(
+                f"   python elevate_user_to_admin.py --institution-id {institution['id']}"
+            )
             print()
         else:
             error_data = response.json()

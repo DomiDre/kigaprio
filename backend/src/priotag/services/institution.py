@@ -1,18 +1,15 @@
 """Institution service for managing institutions"""
 
 import logging
-from typing import Optional
 
 import httpx
 from fastapi import HTTPException
 
 from priotag.models.institution import (
     CreateInstitutionRequest,
-    InstitutionDetailResponse,
-    InstitutionResponse,
     UpdateInstitutionRequest,
 )
-from priotag.models.pocketbase_schemas import InstitutionRecord
+from priotag.models.pocketbase_schemas import InstitutionRecord, InstitutionViewRecord
 from priotag.services.pocketbase_service import POCKETBASE_URL
 from priotag.services.service_account import authenticate_service_account
 
@@ -24,7 +21,7 @@ class InstitutionService:
 
     @staticmethod
     async def get_institution(
-        institution_id: str, auth_token: Optional[str] = None
+        institution_id: str, auth_token: str | None = None
     ) -> InstitutionRecord:
         """
         Get an institution by ID.
@@ -74,7 +71,7 @@ class InstitutionService:
 
     @staticmethod
     async def get_by_short_code(
-        short_code: str, auth_token: Optional[str] = None
+        short_code: str, auth_token: str | None = None
     ) -> InstitutionRecord:
         """
         Get an institution by short code.
@@ -130,36 +127,69 @@ class InstitutionService:
 
     @staticmethod
     async def list_institutions(
-        auth_token: Optional[str] = None, active_only: bool = True
-    ) -> list[InstitutionRecord]:
+        auth_token: str | None = None, list_all=False
+    ) -> list[InstitutionViewRecord]:
         """
-        List all institutions.
+        List all active institutions.
 
         Args:
             auth_token: Optional authentication token
-            active_only: If True, only return active institutions
 
         Returns:
             List of institution records
         """
         try:
             async with httpx.AsyncClient() as client:
+                if not auth_token:
+                    auth_token = await authenticate_service_account(client)
+
                 headers = {}
-                if auth_token:
-                    headers["Authorization"] = f"Bearer {auth_token}"
+                headers["Authorization"] = f"Bearer {auth_token}"
+                response = await client.get(
+                    f"{POCKETBASE_URL}/api/collections/institutionsView/records",
+                    headers=headers,
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get("items", [])
+                    return [InstitutionViewRecord(**item) for item in items]
                 else:
-                    # Use service account if no auth token provided
-                    service_token = await authenticate_service_account(client)
-                    if service_token:
-                        headers["Authorization"] = f"Bearer {service_token}"
+                    raise HTTPException(
+                        status_code=response.status_code,
+                        detail=f"Error listing institutions: {response.text}",
+                    )
 
-                params = {}
-                if active_only:
-                    params["filter"] = "active=true"
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error listing institutions: {e}")
+            raise HTTPException(
+                status_code=500, detail="Error listing institutions"
+            ) from e
 
+    @staticmethod
+    async def list_all_institutions(
+        auth_token: str | None = None,
+    ) -> list[InstitutionRecord]:
+        """
+        Get all institutions (also inactive) including their magic keys.
+
+        Args:
+            auth_token: Optional authentication token
+
+        Returns:
+            List of institution records
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                if not auth_token:
+                    auth_token = await authenticate_service_account(client)
+
+                headers = {}
+                headers["Authorization"] = f"Bearer {auth_token}"
                 response = await client.get(
                     f"{POCKETBASE_URL}/api/collections/institutions/records",
-                    params=params,
                     headers=headers,
                 )
 
@@ -172,6 +202,7 @@ class InstitutionService:
                         status_code=response.status_code,
                         detail=f"Error listing institutions: {response.text}",
                     )
+
         except HTTPException:
             raise
         except Exception as e:

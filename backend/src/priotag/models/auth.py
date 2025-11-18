@@ -1,6 +1,6 @@
 """Pydantic models for auth routes"""
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -65,7 +65,7 @@ class SessionInfo(BaseModel):
     username: str
     is_admin: bool  # Kept for backward compatibility
     role: Literal["user", "institution_admin", "super_admin", "service"]
-    institution_id: Optional[str] = None  # None for super_admin
+    institution_id: str | None = None  # None for super_admin
 
 
 class ChangePasswordRequest(BaseModel):

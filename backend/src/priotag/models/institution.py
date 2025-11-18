@@ -1,7 +1,5 @@
 """Pydantic models for institution-related requests and responses"""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -11,9 +9,6 @@ class InstitutionResponse(BaseModel):
     id: str
     name: str
     short_code: str
-    active: bool
-    created: str
-    updated: str
 
 
 class InstitutionDetailResponse(BaseModel):
@@ -23,8 +18,8 @@ class InstitutionDetailResponse(BaseModel):
     name: str
     short_code: str
     registration_magic_word: str
-    admin_public_key: Optional[str] = None
-    settings: dict = {}
+    admin_public_key: str | None = None
+    settings: dict | None = None
     active: bool
     created: str
     updated: str
@@ -36,18 +31,20 @@ class CreateInstitutionRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     short_code: str = Field(..., min_length=1, max_length=50, pattern="^[A-Z0-9_]+$")
     registration_magic_word: str = Field(..., min_length=1)
-    admin_public_key: Optional[str] = None
-    settings: dict = {}
+    admin_public_key: str | None = None
+    settings: dict | None = None
 
 
 class UpdateInstitutionRequest(BaseModel):
     """Request to update an institution"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    short_code: Optional[str] = Field(None, min_length=1, max_length=50, pattern="^[A-Z0-9_]+$")
-    admin_public_key: Optional[str] = None
-    settings: Optional[dict] = None
-    active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    short_code: str | None = Field(
+        None, min_length=1, max_length=50, pattern="^[A-Z0-9_]+$"
+    )
+    admin_public_key: str | None = None
+    settings: dict | None = None
+    active: bool | None = None
 
 
 class UpdateMagicWordRequest(BaseModel):
