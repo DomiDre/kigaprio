@@ -292,13 +292,14 @@ async def save_priority(
                     detail="Verschlüsselung der Daten fehlgeschlagen",
                 ) from e
 
-            # Create encrypted record
+            # Create encrypted record with institution_id
             encrypted_priority = {
                 "userId": user_id,
                 "month": month,
                 "encrypted_fields": encrypted_data,
                 "identifier": None,
                 "manual": False,
+                "institution_id": auth_data.institution_id,
             }
 
             track_priority_submission(month)
