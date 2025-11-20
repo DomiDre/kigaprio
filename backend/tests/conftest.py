@@ -64,15 +64,12 @@ def admin_rsa_keypair():
 
 
 @pytest.fixture
-def test_secrets_dir(tmp_path, admin_rsa_keypair):
+def test_secrets_dir(tmp_path):
     """Create temporary secrets directory with test secrets."""
     secrets_dir = tmp_path / "secrets"
     secrets_dir.mkdir()
 
-    # Write admin public key
-    (secrets_dir / "admin_public_key.pem").write_bytes(admin_rsa_keypair["public_pem"])
-
-    # Write other secrets
+    # Write secrets (admin_public_key no longer needed - it's per-institution now)
     (secrets_dir / "redis_pass").write_text("test_redis_password")
     (secrets_dir / "server_cache_key").write_text("test_cache_key_32_bytes_long_!!")
     (secrets_dir / "pb_service_id").write_text("test_service")
@@ -83,15 +80,11 @@ def test_secrets_dir(tmp_path, admin_rsa_keypair):
 
 
 @pytest.fixture(autouse=True)
-def mock_admin_key(monkeypatch, admin_rsa_keypair, tmp_path):
-    """Mock the admin public key file path for all tests."""
+def mock_encryption_secrets(monkeypatch, tmp_path):
+    """Mock encryption secrets for all tests."""
     # Create temporary secrets directory
     secrets_dir = tmp_path / "run" / "secrets"
     secrets_dir.mkdir(parents=True)
-
-    # Write admin public key
-    admin_key_file = secrets_dir / "admin_public_key.pem"
-    admin_key_file.write_bytes(admin_rsa_keypair["public_pem"])
 
     # Write server cache key
     cache_key_file = secrets_dir / "server_cache_key"
@@ -101,21 +94,18 @@ def mock_admin_key(monkeypatch, admin_rsa_keypair, tmp_path):
     redis_pass_file = secrets_dir / "redis_pass"
     redis_pass_file.write_text("test_redis_password")
 
-    # Mock the Path objects in EncryptionManager
+    # Mock the server cache key in EncryptionManager
     from priotag.services.encryption import EncryptionManager
 
-    # Save original values
-    original_admin_key = EncryptionManager.ADMIN_PUBLIC_KEY_PEM
+    # Save original value
     original_cache_key = EncryptionManager._SERVER_CACHE_KEY
 
-    # Set test values
-    EncryptionManager.ADMIN_PUBLIC_KEY_PEM = admin_rsa_keypair["public_pem"]
+    # Set test value
     EncryptionManager._SERVER_CACHE_KEY = b"test_cache_key_32_bytes_long_!!"
 
     yield
 
-    # Restore original values (important for integration tests)
-    EncryptionManager.ADMIN_PUBLIC_KEY_PEM = original_admin_key
+    # Restore original value (important for integration tests)
     EncryptionManager._SERVER_CACHE_KEY = original_cache_key
 
 

@@ -19,6 +19,9 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 # Check if we should use docker-compose services
 USE_DOCKER_SERVICES = os.getenv("USE_DOCKER_SERVICES", "").lower() == "true"
 
+# Store setup results globally for session scope
+_POCKETBASE_SETUP_RESULT = None
+
 
 @pytest.fixture(scope="session")
 def redis_container() -> Generator[DockerContainer | None, None, None]:
@@ -88,11 +91,14 @@ def clean_redis(redis_client: redis.Redis) -> Generator[redis.Redis, None, None]
     redis_client.flushdb()
 
 
-def _setup_pocketbase(pocketbase_url: str) -> None:
-    """Set up PocketBase with required data (admin, settings, service account)."""
+def _setup_pocketbase(pocketbase_url: str) -> dict:
+    """Set up PocketBase with required data (admin, institution, service account).
+
+    Returns:
+        dict: Contains 'institution' record and 'institution_keypair' with private key for testing
+    """
     superuser_login = "admin@example.com"
     superuser_password = "admintest"
-    magic_word = "test"
 
     # Wait for PocketBase to be ready
     for i in range(60):
@@ -119,44 +125,90 @@ def _setup_pocketbase(pocketbase_url: str) -> None:
             "password": superuser_password,
         },
     )
-    assert response.status_code == 200, (
-        f"Failed to authenticate as admin: {response.status_code} - {response.text}"
-    )
+    assert (
+        response.status_code == 200
+    ), f"Failed to authenticate as admin: {response.status_code} - {response.text}"
     token = response.json()["token"]
     client.headers["Authorization"] = f"Bearer {token}"
     print("✓ Authenticated as admin")
 
-    # Create magic word setting
-    print(f"Creating magic word setting (value='{magic_word}')...")
+    # Create default test institution
+    print("Creating default test institution...")
+
+    # Generate a test admin keypair for the institution (save for test use)
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    admin_public_key = public_pem.decode()
+
+    institution_data = {
+        "name": "Test Institution",
+        "short_code": "TEST",
+        "registration_magic_word": "test",
+        "admin_public_key": admin_public_key,
+        "active": True,
+        "settings": {},
+    }
     create_response = client.post(
-        "/api/collections/system_settings/records",
-        json={
-            "key": "registration_magic_word",
-            "value": magic_word,
-            "description": "Magic word required for user registration",
-            "last_updated_by": superuser_login,
-        },
+        "/api/collections/institutions/records",
+        json=institution_data,
     )
-    assert create_response.status_code == 200, (
-        f"Failed to create magic word: {create_response.status_code} - {create_response.text}"
+    assert (
+        create_response.status_code == 200
+    ), f"Failed to create institution: {create_response.status_code} - {create_response.text}"
+    institution = create_response.json()
+    print(
+        f"✓ Institution created (id={institution['id']}, short_code={institution['short_code']})"
     )
-    print("✓ Magic word created")
 
     # Create service account
     from priotag.services import service_account
 
     print(f"Creating service account ({service_account.SERVICE_ACCOUNT_ID})...")
-    client.post(
+    service_response = client.post(
         "/api/collections/users/records",
         json={
             "username": service_account.SERVICE_ACCOUNT_ID,
             "password": service_account.SERVICE_ACCOUNT_PASSWORD,
             "passwordConfirm": service_account.SERVICE_ACCOUNT_PASSWORD,
             "role": "service",
+            "institution_id": institution[
+                "id"
+            ],  # Associate service account with institution
         },
     )
     # Note: It's OK if this fails with 400 (duplicate) - the account may already exist
+    if service_response.status_code == 200:
+        print("✓ Service account created")
+    else:
+        print(
+            f"  Service account creation returned {service_response.status_code} (may already exist)"
+        )
+
     client.close()
+
+    # Return institution and keypair for tests to use
+    return {
+        "institution": institution,
+        "institution_keypair": {
+            "private_key": private_key,
+            "public_pem": public_pem,
+            "private_pem": private_pem,
+        }
+    }
 
 
 @pytest.fixture(scope="session")
@@ -198,7 +250,9 @@ def pocketbase_container(redis_client) -> Generator[DockerContainer | None, None
     port = container.get_exposed_port(8090)
     pocketbase_url = f"http://{host}:{port}"
 
-    _setup_pocketbase(pocketbase_url)
+    # Store setup result globally for access by fixtures
+    global _POCKETBASE_SETUP_RESULT
+    _POCKETBASE_SETUP_RESULT = _setup_pocketbase(pocketbase_url)
 
     yield container
 
@@ -223,18 +277,37 @@ def pocketbase_url(monkeypatch, pocketbase_container):
         # This is necessary because Python imports create local copies of the constant
         try:
             from priotag.api.routes import account, auth, priorities, vacation_days
-            from priotag.services import magic_word
+            from priotag.services import institution
 
             monkeypatch.setattr(priorities, "POCKETBASE_URL", pocketbase_url)
             monkeypatch.setattr(vacation_days, "POCKETBASE_URL", pocketbase_url)
             monkeypatch.setattr(account, "POCKETBASE_URL", pocketbase_url)
             monkeypatch.setattr(auth, "POCKETBASE_URL", pocketbase_url)
-            monkeypatch.setattr(magic_word, "POCKETBASE_URL", pocketbase_url)
+            monkeypatch.setattr(institution, "POCKETBASE_URL", pocketbase_url)
         except (ImportError, AttributeError):
             # Modules may not be imported yet
             pass
 
     return pocketbase_url
+
+
+@pytest.fixture(scope="session")
+def test_institution_keypair(pocketbase_container):
+    """
+    Get the test institution's admin keypair for integration tests.
+
+    This keypair can be used to decrypt admin_wrapped_dek fields in tests.
+    Returns None in docker-compose mode (keypair not available).
+    """
+    if USE_DOCKER_SERVICES:
+        # In docker-compose mode, we don't have access to the keypair
+        return None
+
+    global _POCKETBASE_SETUP_RESULT
+    if _POCKETBASE_SETUP_RESULT is None:
+        return None
+
+    return _POCKETBASE_SETUP_RESULT.get("institution_keypair")
 
 
 @pytest.fixture(scope="function")
@@ -286,6 +359,87 @@ def reset_redis_singleton():
 
     # Clean up after test
     redis_service.close_redis()
+
+
+def register_and_login_user(test_app, username: str = None, password: str = None, name: str = None) -> dict:
+    """
+    Helper function to register and login a test user.
+
+    Args:
+        test_app: FastAPI TestClient
+        username: Username for the user (auto-generated if not provided)
+        password: Password for the user (default: "SecurePassword123!")
+        name: Display name for the user (default: "Test User")
+
+    Returns:
+        dict with:
+            - username: The username used
+            - password: The password used
+            - name: The display name used
+            - cookies: Authentication cookies from login
+            - user_record: The user record from registration
+    """
+    import secrets
+
+    # Generate unique username if not provided
+    if username is None:
+        unique_suffix = secrets.token_hex(4)
+        username = f"testuser_{unique_suffix}"
+
+    user_data = {
+        "username": username,
+        "password": password or "SecurePassword123!",
+        "name": name or "Test User",
+        "magic_word": "test",  # Default test institution magic word
+        "institution_short_code": "TEST",  # Default test institution
+    }
+
+    # Verify magic word
+    verify_response = test_app.post(
+        "/api/v1/auth/verify-magic-word",
+        json={
+            "magic_word": user_data["magic_word"],
+            "institution_short_code": user_data["institution_short_code"],
+        },
+    )
+    assert verify_response.status_code == 200, (
+        f"Failed to verify magic word: {verify_response.status_code} - {verify_response.text}"
+    )
+    magic_word_body = verify_response.json()
+    user_data["reg_token"] = magic_word_body["token"]
+
+    # Register user
+    register_response = test_app.post(
+        "/api/v1/auth/register",
+        json={
+            "identity": user_data["username"],
+            "password": user_data["password"],
+            "passwordConfirm": user_data["password"],
+            "name": user_data["name"],
+            "registration_token": user_data["reg_token"],
+        },
+    )
+    assert register_response.status_code == 200, (
+        f"Failed to register user: {register_response.status_code} - {register_response.text}"
+    )
+    register_body = register_response.json()
+    if "record" in register_body:
+        user_data["user_record"] = register_body["record"]
+
+    # Login
+    login_response = test_app.post(
+        "/api/v1/auth/login",
+        json={
+            "identity": user_data["username"],
+            "password": user_data["password"],
+        },
+    )
+    assert login_response.status_code == 200, (
+        f"Failed to login: {login_response.status_code} - {login_response.text}"
+    )
+    user_data["cookies"] = dict(login_response.cookies)
+
+    return user_data
 
 
 @pytest.fixture(scope="function")

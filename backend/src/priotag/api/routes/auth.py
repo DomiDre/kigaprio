@@ -231,21 +231,32 @@ async def register_user(
     redis_client.setex(identity_key, 300, "registering")
 
     try:
-        # Create data encryption key
-        encryption_data = EncryptionManager.create_user_encryption_data(
-            request.password
-        )
-        dek = EncryptionManager.get_user_dek(
-            request.password,
-            encryption_data["salt"],
-            encryption_data["user_wrapped_dek"],
-        )
-
-        # encrypt sensitive data
-        encrypted_fields = EncryptionManager.encrypt_fields({"name": request.name}, dek)
-
         # Proxy registration to PocketBase
         async with httpx.AsyncClient() as client:
+            # Fetch institution to get its admin_public_key
+            from priotag.services.institution import InstitutionService
+
+            institution = await InstitutionService.get_institution(institution_id)
+            admin_public_key_pem = institution.admin_public_key.encode() if institution.admin_public_key else b""
+
+            if not admin_public_key_pem:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Institution has no admin public key configured"
+                )
+
+            # Create data encryption key using institution's admin public key
+            encryption_data = EncryptionManager.create_user_encryption_data(
+                request.password, admin_public_key_pem
+            )
+            dek = EncryptionManager.get_user_dek(
+                request.password,
+                encryption_data["salt"],
+                encryption_data["user_wrapped_dek"],
+            )
+
+            # encrypt sensitive data
+            encrypted_fields = EncryptionManager.encrypt_fields({"name": request.name}, dek)
             # Authenticate as service account
             service_token = await authenticate_service_account(client)
 
@@ -421,9 +432,18 @@ async def register_user_qr(
     redis_client.setex(identity_key, 300, "registering")
 
     try:
-        # Create data encryption key
+        # Get institution's admin public key
+        admin_public_key_pem = institution.admin_public_key.encode() if institution.admin_public_key else b""
+
+        if not admin_public_key_pem:
+            raise HTTPException(
+                status_code=500,
+                detail="Institution has no admin public key configured"
+            )
+
+        # Create data encryption key using institution's admin public key
         encryption_data = EncryptionManager.create_user_encryption_data(
-            request.password
+            request.password, admin_public_key_pem
         )
         dek = EncryptionManager.get_user_dek(
             request.password,

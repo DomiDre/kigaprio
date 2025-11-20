@@ -64,7 +64,7 @@ class InstitutionRecord(BaseModel):
     name: str
     short_code: str
     registration_magic_word: str
-    admin_public_key: str | None = None
+    admin_public_key: str
     settings: dict | None = None
     active: bool = True
     collectionId: str

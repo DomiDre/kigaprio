@@ -12,11 +12,10 @@ import httpx
 
 
 def setup_pocketbase():
-    """Set up PocketBase with required data (magic word and service account)."""
+    """Set up PocketBase with required data (institution and service account)."""
     pocketbase_url = os.getenv("POCKETBASE_URL", "http://pocketbase:8090")
     superuser_login = "admin@example.com"
     superuser_password = "admintest"
-    magic_word = "test"
 
     print(f"Setting up PocketBase at {pocketbase_url}...")
 
@@ -54,22 +53,46 @@ def setup_pocketbase():
     client.headers["Authorization"] = f"Bearer {token}"
     print("✓ Authenticated as admin")
 
-    # Create magic word setting
-    print(f"Creating magic word setting (value='{magic_word}')...")
+    # Create default test institution
+    print("Creating default test institution...")
+
+    # Generate a test admin keypair for the institution
+    # Note: In docker-compose CI mode, the private key is not saved/accessible
+    # Integration tests that need to decrypt admin_wrapped_dek should use testcontainers mode
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    admin_public_key = public_pem.decode()
+
+    # Note: private_key is not persisted in docker-compose mode
+    # Tests that need it should use testcontainers with the test_institution_keypair fixture
+
+    institution_data = {
+        "name": "Test Institution",
+        "short_code": "TEST",
+        "registration_magic_word": "test",
+        "admin_public_key": admin_public_key,
+        "active": True,
+        "settings": {},
+    }
     create_response = client.post(
-        "/api/collections/system_settings/records",
-        json={
-            "key": "registration_magic_word",
-            "value": magic_word,
-            "description": "Magic word required for user registration",
-            "last_updated_by": superuser_login,
-        },
+        "/api/collections/institutions/records",
+        json=institution_data,
     )
     if create_response.status_code != 200:
         raise RuntimeError(
-            f"Failed to create magic word: {create_response.status_code} - {create_response.text}"
+            f"Failed to create institution: {create_response.status_code} - {create_response.text}"
         )
-    print("✓ Magic word created")
+    institution = create_response.json()
+    print(f"✓ Institution created (id={institution['id']}, short_code={institution['short_code']})")
 
     # Create service account
     from priotag.services import service_account
@@ -82,6 +105,7 @@ def setup_pocketbase():
             "password": service_account.SERVICE_ACCOUNT_PASSWORD,
             "passwordConfirm": service_account.SERVICE_ACCOUNT_PASSWORD,
             "role": "service",
+            "institution_id": institution["id"],  # Associate service account with institution
         },
     )
     if service_response.status_code != 200:

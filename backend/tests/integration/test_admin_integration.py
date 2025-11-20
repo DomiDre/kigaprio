@@ -14,7 +14,6 @@ Covers:
 - DELETE /api/v1/admin/manual-entry/{month}/{identifier} - Delete manual entry
 """
 
-import re
 import secrets
 from datetime import datetime
 
@@ -22,65 +21,12 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from .conftest import register_and_login_user
+
 
 @pytest.mark.integration
 class TestAdminIntegration:
     """Integration tests for admin endpoints."""
-
-    def _register_and_login(self, test_app: TestClient) -> dict:
-        """Helper: Register a new user and return cookies + user data."""
-        unique_suffix = secrets.token_hex(4)
-        user_data = {
-            "username": f"testuser_{unique_suffix}",
-            "password": "SecurePassword123!",
-            "name": "Test User",
-            "magic_word": "test",
-        }
-
-        # Verify magic word
-        verify_response = test_app.post(
-            "/api/v1/auth/verify-magic-word",
-            json={"magic_word": user_data["magic_word"]},
-        )
-        assert verify_response.status_code == 200
-        magic_word_body = verify_response.json()
-        user_data["reg_token"] = magic_word_body["token"]
-
-        # Register user
-        register_response = test_app.post(
-            "/api/v1/auth/register",
-            json={
-                "identity": user_data["username"],
-                "password": user_data["password"],
-                "passwordConfirm": user_data["password"],
-                "name": user_data["name"],
-                "registration_token": user_data["reg_token"],
-            },
-        )
-        assert register_response.status_code == 200
-
-        # Login
-        login_response = test_app.post(
-            "/api/v1/auth/login",
-            json={
-                "identity": user_data["username"],
-                "password": user_data["password"],
-            },
-        )
-        assert login_response.status_code == 200
-
-        # Extract cookies
-        set_cookie_headers = login_response.headers.get_list("set-cookie")
-        cookies = {}
-        for cookie_header in set_cookie_headers:
-            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
-            if cookie_match:
-                cookies[cookie_match.group(1)] = cookie_match.group(2)
-
-        assert "auth_token" in cookies
-        assert "dek" in cookies
-
-        return {"cookies": cookies, "user_data": user_data}
 
     def _elevate_to_admin(
         self, username: str, pocketbase_admin_client: httpx.Client
@@ -108,30 +54,26 @@ class TestAdminIntegration:
         self, test_app: TestClient, pocketbase_admin_client: httpx.Client
     ) -> dict:
         """Helper: Register a user, elevate to admin, and login."""
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
 
         # Elevate to admin
-        self._elevate_to_admin(auth["user_data"]["username"], pocketbase_admin_client)
+        self._elevate_to_admin(auth["username"], pocketbase_admin_client)
 
         # Login again to get admin session
         login_response = test_app.post(
             "/api/v1/auth/login",
             json={
-                "identity": auth["user_data"]["username"],
-                "password": auth["user_data"]["password"],
+                "identity": auth["username"],
+                "password": auth["password"],
             },
         )
         assert login_response.status_code == 200
 
-        # Extract cookies
-        set_cookie_headers = login_response.headers.get_list("set-cookie")
-        cookies = {}
-        for cookie_header in set_cookie_headers:
-            cookie_match = re.match(r"([^=]+)=([^;]+)", cookie_header)
-            if cookie_match:
-                cookies[cookie_match.group(1)] = cookie_match.group(2)
-
-        return {"cookies": cookies, "user_data": auth["user_data"]}
+        return {
+            "cookies": dict(login_response.cookies),
+            "username": auth["username"],
+            "password": auth["password"],
+        }
 
     def test_get_total_users(
         self, test_app: TestClient, pocketbase_admin_client: httpx.Client
@@ -154,7 +96,7 @@ class TestAdminIntegration:
     def test_get_total_users_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot get total user count."""
         # Setup: Regular user
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
         test_app.cookies = auth["cookies"]
 
         response = test_app.get("/api/v1/admin/total-users")
@@ -165,7 +107,7 @@ class TestAdminIntegration:
     ):
         """Test retrieving user submissions for a month."""
         # Setup: Create regular user with priorities
-        user_auth = self._register_and_login(test_app)
+        user_auth = register_and_login_user(test_app)
         test_app.cookies = user_auth["cookies"]
 
         current_month = datetime.now().strftime("%Y-%m")
@@ -201,7 +143,7 @@ class TestAdminIntegration:
 
         # Verify submission structure
         submission = next(
-            (s for s in data if s["userName"] == user_auth["user_data"]["username"]),
+            (s for s in data if s["userName"] == user_auth["username"]),
             None,
         )
         assert submission is not None
@@ -233,7 +175,7 @@ class TestAdminIntegration:
     def test_get_user_submissions_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot get user submissions."""
         # Setup: Regular user
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
         test_app.cookies = auth["cookies"]
 
         current_month = datetime.now().strftime("%Y-%m")
@@ -245,22 +187,20 @@ class TestAdminIntegration:
     ):
         """Test retrieving user info by user ID."""
         # Setup: Create a regular user
-        user_auth = self._register_and_login(test_app)
+        user_auth = register_and_login_user(test_app)
 
         # Setup: Create admin and login
         admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
         test_app.cookies = admin_auth["cookies"]
 
         # Get user info
-        response = test_app.get(
-            f"/api/v1/admin/users/info/{user_auth['user_data']['username']}"
-        )
+        response = test_app.get(f"/api/v1/admin/users/info/{user_auth['username']}")
 
         assert response.status_code == 200
         data = response.json()
 
         assert "username" in data
-        assert data["username"] == user_auth["user_data"]["username"]
+        assert data["username"] == user_auth["username"]
         assert "admin_wrapped_dek" in data
         assert "encrypted_fields" in data
         assert "created" in data
@@ -281,12 +221,10 @@ class TestAdminIntegration:
     def test_get_user_info_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot get user info."""
         # Setup: Regular user
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
         test_app.cookies = auth["cookies"]
 
-        response = test_app.get(
-            f"/api/v1/admin/users/info/{auth['user_data']['username']}"
-        )
+        response = test_app.get(f"/api/v1/admin/users/info/{auth['username']}")
         assert response.status_code == 403
 
     def test_create_manual_priority(
@@ -409,7 +347,7 @@ class TestAdminIntegration:
     def test_create_manual_priority_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot create manual priorities."""
         # Setup: Regular user
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
         test_app.cookies = auth["cookies"]
 
         current_month = datetime.now().strftime("%Y-%m")
@@ -484,7 +422,7 @@ class TestAdminIntegration:
     def test_get_manual_entries_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot get manual entries."""
         # Setup: Regular user
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
         test_app.cookies = auth["cookies"]
 
         current_month = datetime.now().strftime("%Y-%m")
@@ -542,7 +480,7 @@ class TestAdminIntegration:
     def test_delete_manual_entry_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot delete manual entries."""
         # Setup: Regular user
-        auth = self._register_and_login(test_app)
+        auth = register_and_login_user(test_app)
         test_app.cookies = auth["cookies"]
 
         current_month = datetime.now().strftime("%Y-%m")
@@ -553,7 +491,7 @@ class TestAdminIntegration:
 
     def test_unauthenticated_access_to_admin_endpoints(self, test_app: TestClient):
         """Test that unauthenticated requests to admin endpoints are rejected."""
-        test_app.cookies = {}
+        test_app.cookies.clear()
 
         current_month = datetime.now().strftime("%Y-%m")
 
