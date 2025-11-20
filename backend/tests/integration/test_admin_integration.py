@@ -216,7 +216,7 @@ class TestAdminIntegration:
         # Try to get non-existent user
         response = test_app.get("/api/v1/admin/users/info/nonexistent_user_12345")
 
-        assert response.status_code == 204
+        assert response.status_code == 404
 
     def test_get_user_info_unauthorized(self, test_app: TestClient):
         """Test that non-admin users cannot get user info."""
@@ -405,13 +405,15 @@ class TestAdminIntegration:
         self, test_app: TestClient, pocketbase_admin_client: httpx.Client
     ):
         """Test retrieving manual entries for month with no entries."""
+        from datetime import datetime, timedelta
+
         # Setup: Create admin and login
         admin_auth = self._register_and_login_admin(test_app, pocketbase_admin_client)
         test_app.cookies = admin_auth["cookies"]
 
-        # Get entries for future month (no data)
-        future_month = "2099-12"
-        response = test_app.get(f"/api/v1/admin/manual-entries/{future_month}")
+        # Get entries for next month (no data, but within valid range)
+        next_month = (datetime.now() + timedelta(days=32)).strftime("%Y-%m")
+        response = test_app.get(f"/api/v1/admin/manual-entries/{next_month}")
 
         assert response.status_code == 200
         data = response.json()
@@ -495,10 +497,8 @@ class TestAdminIntegration:
 
         current_month = datetime.now().strftime("%Y-%m")
 
-        # Test all admin endpoints
+        # Test existing admin endpoints
         endpoints: list[tuple[str, str, dict] | tuple[str, str]] = [
-            ("GET", "/api/v1/admin/magic-word-info"),
-            ("POST", "/api/v1/admin/update-magic-word", {"new_magic_word": "test"}),
             ("GET", "/api/v1/admin/total-users"),
             ("GET", f"/api/v1/admin/users/{current_month}"),
             ("GET", "/api/v1/admin/users/info/test_user"),
