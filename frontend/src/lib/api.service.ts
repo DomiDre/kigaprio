@@ -72,7 +72,31 @@ export class ApiService {
 		return response.json();
 	}
 
+	// ==================== Institutions ====================
+
+	async getInstitutions() {
+		return this.requestJson('/institutions', {
+			method: 'GET'
+		});
+	}
+
+	async getInstitutionByShortCode(shortCode: string) {
+		return this.requestJson(`/institutions/${shortCode}`, {
+			method: 'GET'
+		});
+	}
+
 	// ==================== Authentication ====================
+
+	async verifyMagicWord(magicWord: string, institutionShortCode: string) {
+		return this.requestJson('/auth/verify-magic-word', {
+			method: 'POST',
+			body: JSON.stringify({
+				magic_word: magicWord,
+				institution_short_code: institutionShortCode
+			})
+		});
+	}
 
 	async login(identity: string, password: string, keepLoggedIn: boolean) {
 		const response = await this.requestJson('/auth/login', {
@@ -137,6 +161,7 @@ export class ApiService {
 		passwordConfirm: string;
 		name: string;
 		magic_word: string;
+		institution_short_code: string;
 		keep_logged_in: boolean;
 	}) {
 		const response = await this.requestJson('/auth/register-qr', {

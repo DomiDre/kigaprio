@@ -12,6 +12,9 @@
 	let passwordConfirm = $state('');
 	let fullName = $state('');
 	let magicWord = $state('');
+	let institutionShortCode = $state('');
+	let institutions = $state<Array<{ id: string; name: string; short_code: string }>>([]);
+	let loadingInstitutions = $state(false);
 	let keepLoggedIn = $state(false);
 	let error = $state('');
 	let loading = $state(false);
@@ -25,11 +28,34 @@
 		}
 	});
 
-	// Check for magic word in URL query parameters (QR code flow)
+	// Load institutions on mount
+	$effect(() => {
+		async function loadInstitutions() {
+			loadingInstitutions = true;
+			try {
+				const data = await apiService.getInstitutions();
+				institutions = data;
+				// If only one institution, auto-select it
+				if (institutions.length === 1) {
+					institutionShortCode = institutions[0].short_code;
+				}
+			} catch (err) {
+				console.error('Failed to load institutions:', err);
+				error = 'Failed to load institutions. Please refresh the page.';
+			} finally {
+				loadingInstitutions = false;
+			}
+		}
+		loadInstitutions();
+	});
+
+	// Check for magic word and institution in URL query parameters (QR code flow)
 	$effect(() => {
 		const magicFromUrl = $page.url.searchParams.get('magic');
-		if (magicFromUrl) {
+		const institutionFromUrl = $page.url.searchParams.get('institution');
+		if (magicFromUrl && institutionFromUrl) {
 			magicWord = magicFromUrl;
+			institutionShortCode = institutionFromUrl;
 			magicWordVerified = true;
 			isQRMode = true;
 		}
@@ -40,21 +66,15 @@
 		error = '';
 		loading = true;
 
+		// Validate institution selection
+		if (!institutionShortCode) {
+			error = 'Please select an institution';
+			loading = false;
+			return;
+		}
+
 		try {
-			const response = await fetch(`${apiService.baseUrl}/auth/verify-magic-word`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ magic_word: magicWord })
-			});
-
-			if (!response.ok) {
-				const data = await response.json();
-				throw new Error(data.detail || $LL.auth.register.errorInvalidMagicWord());
-			}
-
-			const data = await response.json();
+			const data = await apiService.verifyMagicWord(magicWord, institutionShortCode);
 			registrationToken = data.token;
 			magicWordVerified = true;
 			error = '';
@@ -92,6 +112,7 @@
 					passwordConfirm: password,
 					name: fullName,
 					magic_word: magicWord,
+					institution_short_code: institutionShortCode,
 					keep_logged_in: keepLoggedIn
 				});
 			} else {
@@ -172,6 +193,53 @@
 						</p>
 					</div>
 
+					<!-- Institution Selection (only if not in QR mode or not set from URL) -->
+					{#if !isQRMode || !institutionShortCode}
+						<div>
+							<label
+								for="institution"
+								class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+							>
+								Institution
+							</label>
+							{#if loadingInstitutions}
+								<div
+									class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-500 dark:border-gray-600 dark:bg-gray-700"
+								>
+									<span class="animate-spin">⟳</span> Loading institutions...
+								</div>
+							{:else if institutions.length === 0}
+								<div
+									class="mt-1 block w-full rounded-md border border-red-300 px-3 py-2 text-red-600 dark:border-red-600 dark:bg-gray-700"
+								>
+									No institutions available
+								</div>
+							{:else if institutions.length === 1}
+								<div
+									class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								>
+									{institutions[0].name}
+								</div>
+							{:else}
+								<select
+									id="institution"
+									bind:value={institutionShortCode}
+									required
+									disabled={loading}
+									class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm
+										   focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none
+										   disabled:cursor-not-allowed disabled:opacity-50
+										   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								>
+									<option value="">Select your institution</option>
+									{#each institutions as institution (institution.short_code)}
+										<option value={institution.short_code}>{institution.name}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+					{/if}
+
 					<div>
 						<label
 							for="magicWord"
@@ -216,7 +284,7 @@
 
 					<button
 						type="submit"
-						disabled={loading || !magicWord}
+						disabled={loading || !magicWord || !institutionShortCode || loadingInstitutions}
 						class="w-full transform rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-4
 							   font-semibold text-white shadow-lg transition hover:scale-105
 							   disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"

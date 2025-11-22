@@ -11,6 +11,7 @@ SecurityMode = Literal["session", "persistent"]
 
 class MagicWordRequest(BaseModel):
     magic_word: str = Field(..., min_length=1)
+    institution_short_code: str = Field(..., min_length=1)
 
 
 class MagicWordResponse(BaseModel):
@@ -36,6 +37,7 @@ class QRRegisterRequest(BaseModel):
     passwordConfirm: str
     name: str = Field(..., min_length=1)
     magic_word: str = Field(..., min_length=1)
+    institution_short_code: str = Field(..., min_length=1)
     keep_logged_in: bool = False
 
 
@@ -61,7 +63,9 @@ class LoginResponse(BaseModel):
 class SessionInfo(BaseModel):
     id: str
     username: str
-    is_admin: bool
+    is_admin: bool  # Kept for backward compatibility
+    role: Literal["user", "institution_admin", "super_admin", "service"]
+    institution_id: str | None = None  # None for super_admin
 
 
 class ChangePasswordRequest(BaseModel):
