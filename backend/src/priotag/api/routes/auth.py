@@ -207,7 +207,7 @@ async def register_user(
 
     # Parse token data to get institution_id
     try:
-        token_info = json.loads(token_data)
+        token_info = json.loads(str(token_data))
         institution_id = token_info.get("institution_id")
         if not institution_id:
             raise HTTPException(
@@ -237,12 +237,16 @@ async def register_user(
             from priotag.services.institution import InstitutionService
 
             institution = await InstitutionService.get_institution(institution_id)
-            admin_public_key_pem = institution.admin_public_key.encode() if institution.admin_public_key else b""
+            admin_public_key_pem = (
+                institution.admin_public_key.encode()
+                if institution.admin_public_key
+                else b""
+            )
 
             if not admin_public_key_pem:
                 raise HTTPException(
                     status_code=500,
-                    detail="Institution has no admin public key configured"
+                    detail="Institution has no admin public key configured",
                 )
 
             # Create data encryption key using institution's admin public key
@@ -256,7 +260,9 @@ async def register_user(
             )
 
             # encrypt sensitive data
-            encrypted_fields = EncryptionManager.encrypt_fields({"name": request.name}, dek)
+            encrypted_fields = EncryptionManager.encrypt_fields(
+                {"name": request.name}, dek
+            )
             # Authenticate as service account
             service_token = await authenticate_service_account(client)
 
@@ -352,6 +358,7 @@ async def register_user(
                 "success": True,
                 "message": "Registrierung erfolgreich",
                 "username": user_data.get("username"),
+                "id": user_data.get("id"),
             }
     finally:
         # Remove email lock
@@ -433,12 +440,15 @@ async def register_user_qr(
 
     try:
         # Get institution's admin public key
-        admin_public_key_pem = institution.admin_public_key.encode() if institution.admin_public_key else b""
+        admin_public_key_pem = (
+            institution.admin_public_key.encode()
+            if institution.admin_public_key
+            else b""
+        )
 
         if not admin_public_key_pem:
             raise HTTPException(
-                status_code=500,
-                detail="Institution has no admin public key configured"
+                status_code=500, detail="Institution has no admin public key configured"
             )
 
         # Create data encryption key using institution's admin public key
@@ -551,6 +561,7 @@ async def register_user_qr(
                 "success": True,
                 "message": "Registrierung erfolgreich",
                 "username": user_data.get("username"),
+                "id": user_data.get("id"),
             }
     finally:
         # Remove identity lock

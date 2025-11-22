@@ -136,8 +136,8 @@ def _setup_pocketbase(pocketbase_url: str) -> dict:
     print("Creating default test institution...")
 
     # Generate a test admin keypair for the institution (save for test use)
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
     private_key = rsa.generate_private_key(
         public_exponent=65537,
@@ -207,7 +207,7 @@ def _setup_pocketbase(pocketbase_url: str) -> dict:
             "private_key": private_key,
             "public_pem": public_pem,
             "private_pem": private_pem,
-        }
+        },
     }
 
 
@@ -361,7 +361,12 @@ def reset_redis_singleton():
     redis_service.close_redis()
 
 
-def register_and_login_user(test_app, username: str = None, password: str = None, name: str = None) -> dict:
+def register_and_login_user(
+    test_app,
+    username: str | None = None,
+    password: str | None = None,
+    name: str | None = None,
+) -> dict:
     """
     Helper function to register and login a test user.
 
@@ -386,7 +391,7 @@ def register_and_login_user(test_app, username: str = None, password: str = None
         unique_suffix = secrets.token_hex(4)
         username = f"testuser_{unique_suffix}"
 
-    user_data = {
+    user_data: dict[str, str | dict] = {
         "username": username,
         "password": password or "SecurePassword123!",
         "name": name or "Test User",
@@ -402,9 +407,9 @@ def register_and_login_user(test_app, username: str = None, password: str = None
             "institution_short_code": user_data["institution_short_code"],
         },
     )
-    assert verify_response.status_code == 200, (
-        f"Failed to verify magic word: {verify_response.status_code} - {verify_response.text}"
-    )
+    assert (
+        verify_response.status_code == 200
+    ), f"Failed to verify magic word: {verify_response.status_code} - {verify_response.text}"
     magic_word_body = verify_response.json()
     user_data["reg_token"] = magic_word_body["token"]
 
@@ -419,9 +424,9 @@ def register_and_login_user(test_app, username: str = None, password: str = None
             "registration_token": user_data["reg_token"],
         },
     )
-    assert register_response.status_code == 200, (
-        f"Failed to register user: {register_response.status_code} - {register_response.text}"
-    )
+    assert (
+        register_response.status_code == 200
+    ), f"Failed to register user: {register_response.status_code} - {register_response.text}"
     register_body = register_response.json()
     if "record" in register_body:
         user_data["user_record"] = register_body["record"]
@@ -434,9 +439,9 @@ def register_and_login_user(test_app, username: str = None, password: str = None
             "password": user_data["password"],
         },
     )
-    assert login_response.status_code == 200, (
-        f"Failed to login: {login_response.status_code} - {login_response.text}"
-    )
+    assert (
+        login_response.status_code == 200
+    ), f"Failed to login: {login_response.status_code} - {login_response.text}"
     user_data["cookies"] = dict(login_response.cookies)
 
     return user_data

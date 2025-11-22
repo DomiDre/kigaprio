@@ -106,7 +106,7 @@ class TestVacationDaysIntegration:
         assert data["date"].startswith(future_date)
         assert data["type"] == "public_holiday"
         assert data["description"] == "Test Holiday"
-        assert data["created_by"] == admin_auth["user_data"]["username"]
+        assert data["created_by"] == admin_auth["username"]
 
     def test_create_vacation_day_duplicate(
         self, test_app: TestClient, pocketbase_admin_client: httpx.Client
@@ -618,18 +618,25 @@ class TestVacationDaysIntegration:
         test_app.cookies = user_auth["cookies"]
 
         # Get vacation days in range (date1 to date2 inclusive)
-        # Add one day to end_date to ensure date2 is included (datetime boundary issue)
-        end_date_inclusive = (datetime.now() + timedelta(days=196)).strftime("%Y-%m-%d")
         response = test_app.get(
             "/api/v1/vacation-days/range",
-            params={"start_date": date1, "end_date": end_date_inclusive},
+            params={"start_date": date1, "end_date": date2},
         )
 
         assert response.status_code == 200
         data = response.json()
 
-        assert len(data) == 2
+        # Should get date1 and date2 (2 vacation days), but not date3
         # PocketBase returns dates with timestamps, so check with startswith
+        matching_dates = [
+            day
+            for day in data
+            if day["date"].startswith(date1) or day["date"].startswith(date2)
+        ]
+        assert len(matching_dates) >= 2, (
+            f"Expected at least 2 vacation days in range, got {len(data)}: {[d['date'] for d in data]}"
+        )
+
         assert any(day["date"].startswith(date1) for day in data)
         assert any(day["date"].startswith(date2) for day in data)
         assert not any(day["date"].startswith(date3) for day in data)

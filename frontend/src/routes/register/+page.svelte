@@ -232,7 +232,7 @@
 										   dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 								>
 									<option value="">Select your institution</option>
-									{#each institutions as institution}
+									{#each institutions as institution (institution.short_code)}
 										<option value={institution.short_code}>{institution.name}</option>
 									{/each}
 								</select>

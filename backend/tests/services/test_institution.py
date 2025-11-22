@@ -22,7 +22,7 @@ async def test_get_institution_success(mock_client_class, sample_institution_dat
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     mock_response = MagicMock()
@@ -33,7 +33,9 @@ async def test_get_institution_success(mock_client_class, sample_institution_dat
     mock_client_class.return_value = mock_client
 
     # Test
-    result = await InstitutionService.get_institution("institution_123", "test_token")
+    result = await InstitutionService.get_institution(
+        "institution_123", auth_token="test_token"
+    )
 
     # Verify
     assert isinstance(result, InstitutionRecord)
@@ -49,7 +51,7 @@ async def test_get_institution_not_found(mock_client_class):
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = False  # Don't suppress exceptions
 
     # Setup mock response
     mock_response = MagicMock()
@@ -61,7 +63,7 @@ async def test_get_institution_not_found(mock_client_class):
 
     # Test and verify
     with pytest.raises(HTTPException) as exc_info:
-        await InstitutionService.get_institution("nonexistent", "test_token")
+        await InstitutionService.get_institution("nonexistent", auth_token="test_token")
 
     assert exc_info.value.status_code == 404
 
@@ -73,7 +75,7 @@ async def test_get_by_short_code_success(mock_client_class, sample_institution_d
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     mock_response = MagicMock()
@@ -84,7 +86,9 @@ async def test_get_by_short_code_success(mock_client_class, sample_institution_d
     mock_client_class.return_value = mock_client
 
     # Test
-    result = await InstitutionService.get_by_short_code("TEST_UNIV", "test_token")
+    result = await InstitutionService.get_by_short_code(
+        "TEST_UNIV", auth_token="test_token"
+    )
 
     # Verify
     assert isinstance(result, InstitutionRecord)
@@ -99,7 +103,7 @@ async def test_get_by_short_code_not_found(mock_client_class):
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = False  # Don't suppress exceptions
 
     # Setup mock response
     mock_response = MagicMock()
@@ -111,7 +115,9 @@ async def test_get_by_short_code_not_found(mock_client_class):
 
     # Test and verify
     with pytest.raises(HTTPException) as exc_info:
-        await InstitutionService.get_by_short_code("NONEXISTENT", "test_token")
+        await InstitutionService.get_by_short_code(
+            "NONEXISTENT", auth_token="test_token"
+        )
 
     assert exc_info.value.status_code == 404
 
@@ -125,30 +131,37 @@ async def test_list_institutions_active_only(
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
-    # Setup mock response
+    # Setup mock response - InstitutionView records (no magic_word field)
+    from priotag.models.pocketbase_schemas import InstitutionViewRecord
+
+    view_data_1 = {
+        k: v
+        for k, v in sample_institution_data.items()
+        if k != "registration_magic_word"
+    }
+    view_data_2 = {
+        k: v
+        for k, v in sample_institution_data_2.items()
+        if k != "registration_magic_word"
+    }
+
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "items": [sample_institution_data, sample_institution_data_2]
-    }
+    mock_response.json.return_value = {"items": [view_data_1, view_data_2]}
     mock_client.get.return_value = mock_response
 
     mock_client_class.return_value = mock_client
 
-    # Test
-    result = await InstitutionService.list_institutions("test_token", active_only=True)
+    # Test - list_institutions returns InstitutionViewRecords (active only by default)
+    result = await InstitutionService.list_institutions(auth_token="test_token")
 
     # Verify
     assert len(result) == 2
-    assert all(isinstance(inst, InstitutionRecord) for inst in result)
+    assert all(isinstance(inst, InstitutionViewRecord) for inst in result)
     assert result[0].short_code == "TEST_UNIV"
     assert result[1].short_code == "SECOND_UNIV"
-
-    # Verify filter was applied
-    call_params = mock_client.get.call_args[1]["params"]
-    assert call_params["filter"] == "active=true"
 
 
 @pytest.mark.asyncio
@@ -158,7 +171,7 @@ async def test_list_institutions_all(mock_client_class, sample_institution_data)
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     inactive_institution = sample_institution_data.copy()
@@ -174,14 +187,11 @@ async def test_list_institutions_all(mock_client_class, sample_institution_data)
 
     mock_client_class.return_value = mock_client
 
-    # Test
-    result = await InstitutionService.list_institutions("test_token", active_only=False)
+    # Test - use list_all_institutions for all institutions including inactive
+    result = await InstitutionService.list_all_institutions(auth_token="test_token")
 
     # Verify
     assert len(result) == 2
-    # Verify no filter was applied
-    call_params = mock_client.get.call_args[1].get("params", {})
-    assert "filter" not in call_params or not call_params.get("filter")
 
 
 @pytest.mark.asyncio
@@ -191,7 +201,7 @@ async def test_create_institution_success(mock_client_class, sample_institution_
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     mock_response = MagicMock()
@@ -206,8 +216,11 @@ async def test_create_institution_success(mock_client_class, sample_institution_
         name="Test University",
         short_code="TEST_UNIV",
         registration_magic_word="TestMagic123",
+        admin_public_key="-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n-----END PUBLIC KEY-----",
     )
-    result = await InstitutionService.create_institution(create_data, "test_token")
+    result = await InstitutionService.create_institution(
+        create_data, auth_token="test_token"
+    )
 
     # Verify
     assert isinstance(result, InstitutionRecord)
@@ -222,7 +235,7 @@ async def test_create_institution_duplicate_short_code(mock_client_class):
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = False  # Don't suppress exceptions
 
     # Setup mock response for duplicate
     mock_response = MagicMock()
@@ -237,10 +250,13 @@ async def test_create_institution_duplicate_short_code(mock_client_class):
         name="Duplicate Uni",
         short_code="EXISTING",
         registration_magic_word="Magic123",
+        admin_public_key="-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----",
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        await InstitutionService.create_institution(create_data, "test_token")
+        await InstitutionService.create_institution(
+            create_data, auth_token="test_token"
+        )
 
     assert exc_info.value.status_code == 400
 
@@ -252,7 +268,7 @@ async def test_update_institution_success(mock_client_class, sample_institution_
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     updated_data = sample_institution_data.copy()
@@ -268,7 +284,7 @@ async def test_update_institution_success(mock_client_class, sample_institution_
     # Test
     update_data = UpdateInstitutionRequest(name="Updated University Name")
     result = await InstitutionService.update_institution(
-        "institution_123", update_data, "test_token"
+        "institution_123", update_data, auth_token="test_token"
     )
 
     # Verify
@@ -284,7 +300,7 @@ async def test_update_magic_word_success(mock_client_class, sample_institution_d
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     updated_data = sample_institution_data.copy()
@@ -299,7 +315,7 @@ async def test_update_magic_word_success(mock_client_class, sample_institution_d
 
     # Test
     result = await InstitutionService.update_magic_word(
-        "institution_123", "NewMagic456", "test_token"
+        "institution_123", "NewMagic456", auth_token="test_token"
     )
 
     # Verify
@@ -314,7 +330,7 @@ async def test_update_magic_word_not_found(mock_client_class):
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = False  # Don't suppress exceptions
 
     # Setup mock response
     mock_response = MagicMock()
@@ -327,7 +343,7 @@ async def test_update_magic_word_not_found(mock_client_class):
     # Test and verify
     with pytest.raises(HTTPException) as exc_info:
         await InstitutionService.update_magic_word(
-            "nonexistent", "NewMagic", "test_token"
+            "nonexistent", "NewMagic", auth_token="test_token"
         )
 
     assert exc_info.value.status_code == 404
@@ -343,9 +359,9 @@ async def test_get_institution_without_auth_token(
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
-    # Mock service account authentication
+    # Mock service account authentication (must be async)
     mock_auth_service.return_value = "service_token"
 
     # Setup mock response for institution
@@ -376,7 +392,7 @@ async def test_update_institution_partial_update(
     # Setup mock client
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    mock_client.__aexit__.return_value = AsyncMock()
 
     # Setup mock response
     updated_data = sample_institution_data.copy()
@@ -392,7 +408,7 @@ async def test_update_institution_partial_update(
     # Test - only update active status
     update_data = UpdateInstitutionRequest(active=False)
     await InstitutionService.update_institution(
-        "institution_123", update_data, "test_token"
+        "institution_123", update_data, auth_token="test_token"
     )
 
     # Verify only active field was sent

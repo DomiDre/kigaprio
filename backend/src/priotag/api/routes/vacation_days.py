@@ -605,7 +605,14 @@ async def get_vacation_days_in_range(
         filters.append(f'institution_id="{session.institution_id}"')
 
         # Add date range filter
-        filters.append(f'date >= "{start_date}" && date <= "{end_date}"')
+        # Include end_date by adding one day and using < instead of <=
+        # This handles the datetime field properly (2026-06-05 00:00:00.000Z should be included)
+        from datetime import datetime, timedelta
+
+        end_date_inclusive = (
+            datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        filters.append(f'date >= "{start_date}" && date < "{end_date_inclusive}"')
 
         if type:
             filters.append(f'type="{type}"')

@@ -42,7 +42,9 @@ def generate_admin_keypair():
     with open("admin_private_key.pem", "wb") as f:
         f.write(private_pem)
     print("✓ Private key saved to admin_private_key.pem")
-    print("  Store this securely - NOT on the server! Admin needs it to decrypt user data.")
+    print(
+        "  Store this securely - NOT on the server! Admin needs it to decrypt user data."
+    )
 
     with open("admin_public_key.pem", "wb") as f:
         f.write(public_pem)

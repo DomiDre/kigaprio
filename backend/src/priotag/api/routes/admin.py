@@ -120,7 +120,7 @@ async def get_total_users(
         # Build filter with institution isolation
         filter_str = build_institution_filter(session, "")
 
-        params = {"perPage": 1}
+        params: dict[str, int | str] = {"perPage": 1}
         if filter_str:
             params["filter"] = filter_str
 

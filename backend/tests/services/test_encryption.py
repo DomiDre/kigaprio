@@ -207,7 +207,9 @@ class TestRSAKeyWrapping:
 
     def test_wrap_dek_with_admin_key(self, test_dek, admin_rsa_keypair):
         """DEK should be wrapped with admin RSA public key."""
-        wrapped = EncryptionManager.wrap_dek_with_admin_key(test_dek, admin_rsa_keypair["public_pem"])
+        wrapped = EncryptionManager.wrap_dek_with_admin_key(
+            test_dek, admin_rsa_keypair["public_pem"]
+        )
         assert isinstance(wrapped, str)
         assert len(wrapped) > 0
         # Wrapped should be base64
@@ -216,7 +218,9 @@ class TestRSAKeyWrapping:
 
     def test_unwrap_dek_with_admin_private_key(self, test_dek, admin_rsa_keypair):
         """Wrapped DEK should be unwrappable with admin private key."""
-        wrapped = EncryptionManager.wrap_dek_with_admin_key(test_dek, admin_rsa_keypair["public_pem"])
+        wrapped = EncryptionManager.wrap_dek_with_admin_key(
+            test_dek, admin_rsa_keypair["public_pem"]
+        )
         wrapped_bytes = base64.b64decode(wrapped)
 
         # Unwrap using private key
@@ -232,8 +236,12 @@ class TestRSAKeyWrapping:
 
     def test_wrap_dek_unique_each_time(self, test_dek, admin_rsa_keypair):
         """RSA-OAEP wrapping should produce different ciphertexts."""
-        wrapped1 = EncryptionManager.wrap_dek_with_admin_key(test_dek, admin_rsa_keypair["public_pem"])
-        wrapped2 = EncryptionManager.wrap_dek_with_admin_key(test_dek, admin_rsa_keypair["public_pem"])
+        wrapped1 = EncryptionManager.wrap_dek_with_admin_key(
+            test_dek, admin_rsa_keypair["public_pem"]
+        )
+        wrapped2 = EncryptionManager.wrap_dek_with_admin_key(
+            test_dek, admin_rsa_keypair["public_pem"]
+        )
         # Due to OAEP padding with random data, wrappings should differ
         assert wrapped1 != wrapped2
 
@@ -244,7 +252,9 @@ class TestUserEncryptionDataCreation:
 
     def test_create_user_encryption_data(self, test_password, admin_rsa_keypair):
         """Should create all required encryption data for new user."""
-        result = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        result = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Check all required fields are present
         assert "salt" in result
@@ -267,7 +277,9 @@ class TestUserEncryptionDataCreation:
 
     def test_created_dek_can_be_unwrapped(self, test_password, admin_rsa_keypair):
         """User should be able to unwrap their DEK with password."""
-        result = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        result = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Unwrap using password
         unwrapped_dek = EncryptionManager.get_user_dek(
@@ -280,7 +292,9 @@ class TestUserEncryptionDataCreation:
 
     def test_admin_can_unwrap_admin_wrapped_dek(self, test_password, admin_rsa_keypair):
         """Admin should be able to unwrap admin_wrapped_dek."""
-        result = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        result = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Admin unwrap
         admin_wrapped_bytes = base64.b64decode(result["admin_wrapped_dek"])
@@ -312,7 +326,9 @@ class TestPasswordChange:
     def test_change_password_preserves_dek(self, test_password, admin_rsa_keypair):
         """DEK should remain the same after password change."""
         # Create initial encryption data
-        initial_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        initial_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Get original DEK
         original_dek = EncryptionManager.get_user_dek(
@@ -336,10 +352,13 @@ class TestPasswordChange:
 
     def test_change_password_new_salt(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Password change should generate new salt."""
-        initial_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        initial_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         new_password = "NewPassword456!"
         result = EncryptionManager.change_password(
@@ -353,10 +372,13 @@ class TestPasswordChange:
 
     def test_old_password_fails_after_change(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Old password should not work after password change."""
-        initial_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        initial_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         new_password = "NewPassword456!"
         result = EncryptionManager.change_password(
@@ -374,11 +396,14 @@ class TestPasswordChange:
 
     def test_encrypted_data_decryptable_after_password_change(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Data encrypted before password change should still be decryptable."""
         # Create initial data and encrypt something
-        initial_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        initial_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Get original DEK and encrypt something
         original_dek = EncryptionManager.get_user_dek(
@@ -412,10 +437,13 @@ class TestGetUserDEK:
 
     def test_get_user_dek_success(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Should successfully unwrap DEK with correct password."""
-        data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
         dek = EncryptionManager.get_user_dek(
             test_password, data["salt"], data["user_wrapped_dek"]
         )
@@ -426,10 +454,13 @@ class TestGetUserDEK:
 
     def test_get_user_dek_wrong_password_fails(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Wrong password should fail to unwrap DEK."""
-        data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
             EncryptionManager.get_user_dek(
@@ -438,10 +469,13 @@ class TestGetUserDEK:
 
     def test_get_user_dek_wrong_salt_fails(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Wrong salt should fail to unwrap DEK."""
-        data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         wrong_salt = base64.b64encode(b"wrong_salt_16byt").decode()
         with pytest.raises(Exception):  # noqa: B017  # intentional: any cryptographic failure
@@ -456,10 +490,13 @@ class TestEncryptionSecurity:
 
     def test_dek_not_stored_in_plaintext(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """DEK should never be stored in plaintext."""
-        result = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        result = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Unwrap the DEK to get its actual value
         dek = EncryptionManager.get_user_dek(
@@ -476,10 +513,13 @@ class TestEncryptionSecurity:
 
     def test_password_not_stored(
         self,
-        test_password, admin_rsa_keypair,
+        test_password,
+        admin_rsa_keypair,
     ):
         """Password should never appear in encryption data."""
-        result = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        result = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Password should not be in any field
         for value in result.values():
@@ -755,7 +795,9 @@ class TestHelperFunctions:
     def test_get_user_data(self, test_password, admin_rsa_keypair):
         """Should decrypt user data using password."""
         # Create encryption data
-        encryption_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        encryption_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         # Get DEK and encrypt some fields
         dek = EncryptionManager.get_user_dek(
@@ -779,7 +821,9 @@ class TestHelperFunctions:
 
     def test_get_user_data_wrong_password_fails(self, test_password, admin_rsa_keypair):
         """Should fail to decrypt with wrong password."""
-        encryption_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        encryption_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         dek = EncryptionManager.get_user_dek(
             test_password, encryption_data["salt"], encryption_data["user_wrapped_dek"]
@@ -800,7 +844,9 @@ class TestHelperFunctions:
     def test_handle_password_change(self, test_password, admin_rsa_keypair):
         """Should handle password change and return updated encryption data."""
         # Create initial user record
-        encryption_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        encryption_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         user_record = {
             "salt": encryption_data["salt"],
@@ -823,9 +869,13 @@ class TestHelperFunctions:
         )
         assert len(new_dek) == 32
 
-    def test_handle_password_change_preserves_dek(self, test_password, admin_rsa_keypair):
+    def test_handle_password_change_preserves_dek(
+        self, test_password, admin_rsa_keypair
+    ):
         """Password change should preserve the same DEK."""
-        encryption_data = EncryptionManager.create_user_encryption_data(test_password, admin_rsa_keypair["public_pem"])
+        encryption_data = EncryptionManager.create_user_encryption_data(
+            test_password, admin_rsa_keypair["public_pem"]
+        )
 
         user_record = {
             "salt": encryption_data["salt"],

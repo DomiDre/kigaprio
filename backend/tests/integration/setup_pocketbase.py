@@ -59,8 +59,8 @@ def setup_pocketbase():
     # Generate a test admin keypair for the institution
     # Note: In docker-compose CI mode, the private key is not saved/accessible
     # Integration tests that need to decrypt admin_wrapped_dek should use testcontainers mode
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
     private_key = rsa.generate_private_key(
         public_exponent=65537,
@@ -92,7 +92,9 @@ def setup_pocketbase():
             f"Failed to create institution: {create_response.status_code} - {create_response.text}"
         )
     institution = create_response.json()
-    print(f"✓ Institution created (id={institution['id']}, short_code={institution['short_code']})")
+    print(
+        f"✓ Institution created (id={institution['id']}, short_code={institution['short_code']})"
+    )
 
     # Create service account
     from priotag.services import service_account
@@ -105,7 +107,9 @@ def setup_pocketbase():
             "password": service_account.SERVICE_ACCOUNT_PASSWORD,
             "passwordConfirm": service_account.SERVICE_ACCOUNT_PASSWORD,
             "role": "service",
-            "institution_id": institution["id"],  # Associate service account with institution
+            "institution_id": institution[
+                "id"
+            ],  # Associate service account with institution
         },
     )
     if service_response.status_code != 200:
