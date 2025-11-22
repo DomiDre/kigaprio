@@ -13,6 +13,9 @@ from pathlib import Path
 import httpx
 import pytest
 import redis
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
@@ -21,6 +24,42 @@ USE_DOCKER_SERVICES = os.getenv("USE_DOCKER_SERVICES", "").lower() == "true"
 
 # Store setup results globally for session scope
 _POCKETBASE_SETUP_RESULT = None
+
+
+def create_institution_with_rsa_key(pocketbase_client, name, short_code, magic_word):
+    """Helper to create institution with RSA keypair for testing.
+
+    Args:
+        pocketbase_client: Authenticated PocketBase admin client
+        name: Institution name
+        short_code: Institution short code (unique identifier)
+        magic_word: Registration magic word
+
+    Returns:
+        dict: Created institution record with all fields
+    """
+    # Generate RSA keypair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    admin_public_key = public_pem.decode()
+
+    # Create institution
+    response = pocketbase_client.post(
+        "/api/collections/institutions/records",
+        json={
+            "name": name,
+            "short_code": short_code,
+            "registration_magic_word": magic_word,
+            "admin_public_key": admin_public_key,
+            "active": True,
+        },
+    )
+    return response.json()
 
 
 @pytest.fixture(scope="session")
@@ -125,9 +164,9 @@ def _setup_pocketbase(pocketbase_url: str) -> dict:
             "password": superuser_password,
         },
     )
-    assert (
-        response.status_code == 200
-    ), f"Failed to authenticate as admin: {response.status_code} - {response.text}"
+    assert response.status_code == 200, (
+        f"Failed to authenticate as admin: {response.status_code} - {response.text}"
+    )
     token = response.json()["token"]
     client.headers["Authorization"] = f"Bearer {token}"
     print("✓ Authenticated as admin")
@@ -166,9 +205,9 @@ def _setup_pocketbase(pocketbase_url: str) -> dict:
         "/api/collections/institutions/records",
         json=institution_data,
     )
-    assert (
-        create_response.status_code == 200
-    ), f"Failed to create institution: {create_response.status_code} - {create_response.text}"
+    assert create_response.status_code == 200, (
+        f"Failed to create institution: {create_response.status_code} - {create_response.text}"
+    )
     institution = create_response.json()
     print(
         f"✓ Institution created (id={institution['id']}, short_code={institution['short_code']})"
@@ -310,6 +349,79 @@ def test_institution_keypair(pocketbase_container):
     return _POCKETBASE_SETUP_RESULT.get("institution_keypair")
 
 
+def _clean_pocketbase_collections(admin_client: httpx.Client) -> None:
+    """Clean all test data from PocketBase collections.
+
+    This removes all records from user-created collections while preserving
+    system collections, the default test institution, and the service account.
+
+    Args:
+        admin_client: Authenticated PocketBase admin client
+    """
+    # Clean priorities and vacation_days completely
+    for collection in ["priorities", "vacation_days"]:
+        try:
+            response = admin_client.get(
+                f"/api/collections/{collection}/records", params={"perPage": 500}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                items = data.get("items", [])
+
+                for item in items:
+                    delete_response = admin_client.delete(
+                        f"/api/collections/{collection}/records/{item['id']}"
+                    )
+                    if delete_response.status_code not in [200, 204, 404]:
+                        print(
+                            f"Warning: Failed to delete {collection} record {item['id']}: {delete_response.status_code}"
+                        )
+        except Exception as e:
+            print(f"Warning: Error cleaning {collection}: {e}")
+
+    # Clean users but keep the service account (pb_service)
+    try:
+        response = admin_client.get(
+            "/api/collections/users/records",
+            params={"perPage": 500, "filter": 'username!="pb_service"'},
+        )
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+
+            for item in items:
+                delete_response = admin_client.delete(
+                    f"/api/collections/users/records/{item['id']}"
+                )
+                if delete_response.status_code not in [200, 204, 404]:
+                    print(
+                        f"Warning: Failed to delete user {item['id']}: {delete_response.status_code}"
+                    )
+    except Exception as e:
+        print(f"Warning: Error cleaning users: {e}")
+
+    # Clean institutions but keep the default TEST institution
+    try:
+        response = admin_client.get(
+            "/api/collections/institutions/records",
+            params={"perPage": 500, "filter": 'short_code!="TEST"'},
+        )
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+
+            for item in items:
+                delete_response = admin_client.delete(
+                    f"/api/collections/institutions/records/{item['id']}"
+                )
+                if delete_response.status_code not in [200, 204, 404]:
+                    print(
+                        f"Warning: Failed to delete institution {item['id']}: {delete_response.status_code}"
+                    )
+    except Exception as e:
+        print(f"Warning: Error cleaning institutions: {e}")
+
+
 @pytest.fixture(scope="function")
 def pocketbase_admin_client(pocketbase_url: str) -> Generator[httpx.Client, None, None]:
     """
@@ -336,8 +448,13 @@ def pocketbase_admin_client(pocketbase_url: str) -> Generator[httpx.Client, None
 
     client.headers["Authorization"] = f"Bearer {token}"
 
+    # Clean collections before test
+    _clean_pocketbase_collections(client)
+
     yield client
 
+    # Clean collections after test
+    _clean_pocketbase_collections(client)
     client.close()
 
 
@@ -407,9 +524,9 @@ def register_and_login_user(
             "institution_short_code": user_data["institution_short_code"],
         },
     )
-    assert (
-        verify_response.status_code == 200
-    ), f"Failed to verify magic word: {verify_response.status_code} - {verify_response.text}"
+    assert verify_response.status_code == 200, (
+        f"Failed to verify magic word: {verify_response.status_code} - {verify_response.text}"
+    )
     magic_word_body = verify_response.json()
     user_data["reg_token"] = magic_word_body["token"]
 
@@ -424,9 +541,9 @@ def register_and_login_user(
             "registration_token": user_data["reg_token"],
         },
     )
-    assert (
-        register_response.status_code == 200
-    ), f"Failed to register user: {register_response.status_code} - {register_response.text}"
+    assert register_response.status_code == 200, (
+        f"Failed to register user: {register_response.status_code} - {register_response.text}"
+    )
     register_body = register_response.json()
     if "record" in register_body:
         user_data["user_record"] = register_body["record"]
@@ -439,9 +556,9 @@ def register_and_login_user(
             "password": user_data["password"],
         },
     )
-    assert (
-        login_response.status_code == 200
-    ), f"Failed to login: {login_response.status_code} - {login_response.text}"
+    assert login_response.status_code == 200, (
+        f"Failed to login: {login_response.status_code} - {login_response.text}"
+    )
     user_data["cookies"] = dict(login_response.cookies)
 
     return user_data

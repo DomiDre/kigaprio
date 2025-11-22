@@ -7,6 +7,8 @@ using real PocketBase and Redis containers.
 
 import pytest
 
+from .conftest import create_institution_with_rsa_key
+
 
 @pytest.mark.integration
 class TestMultiInstitutionSetup:
@@ -15,31 +17,15 @@ class TestMultiInstitutionSetup:
     def test_can_create_institutions(self, pocketbase_admin_client):
         """Test creating institutions via PocketBase API."""
         # Create first institution
-        response = pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Test University A",
-                "short_code": "TEST_A",
-                "registration_magic_word": "MagicA123",
-                "active": True,
-            },
+        inst_a = create_institution_with_rsa_key(
+            pocketbase_admin_client, "Test University A", "TEST_A", "MagicA123"
         )
-        assert response.status_code == 200
-        inst_a = response.json()
         assert inst_a["short_code"] == "TEST_A"
 
         # Create second institution
-        response = pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Test University B",
-                "short_code": "TEST_B",
-                "registration_magic_word": "MagicB456",
-                "active": True,
-            },
+        inst_b = create_institution_with_rsa_key(
+            pocketbase_admin_client, "Test University B", "TEST_B", "MagicB456"
         )
-        assert response.status_code == 200
-        inst_b = response.json()
         assert inst_b["short_code"] == "TEST_B"
 
         # Verify institutions are different
@@ -48,14 +34,8 @@ class TestMultiInstitutionSetup:
     def test_can_query_institutions_by_short_code(self, pocketbase_admin_client):
         """Test querying institutions by short code."""
         # Create institution
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Query Test University",
-                "short_code": "QUERY_TEST",
-                "registration_magic_word": "QueryMagic",
-                "active": True,
-            },
+        create_institution_with_rsa_key(
+            pocketbase_admin_client, "Query Test University", "QUERY_TEST", "QueryMagic"
         )
 
         # Query by short code
@@ -76,23 +56,11 @@ class TestPublicInstitutionEndpoints:
     def test_list_institutions_endpoint(self, test_app, pocketbase_admin_client):
         """Test listing institutions through the API."""
         # Create test institutions
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Public Test A",
-                "short_code": "PUB_A",
-                "registration_magic_word": "Secret123",
-                "active": True,
-            },
+        create_institution_with_rsa_key(
+            pocketbase_admin_client, "Public Test A", "PUB_A", "Secret123"
         )
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Public Test B",
-                "short_code": "PUB_B",
-                "registration_magic_word": "Secret456",
-                "active": True,
-            },
+        create_institution_with_rsa_key(
+            pocketbase_admin_client, "Public Test B", "PUB_B", "Secret456"
         )
 
         # Call API endpoint
@@ -113,14 +81,8 @@ class TestPublicInstitutionEndpoints:
     ):
         """Test getting institution by short code through the API."""
         # Create test institution
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Short Code Test",
-                "short_code": "SC_TEST",
-                "registration_magic_word": "SCSecret",
-                "active": True,
-            },
+        create_institution_with_rsa_key(
+            pocketbase_admin_client, "Short Code Test", "SC_TEST", "SCSecret"
         )
 
         # Call API endpoint
@@ -144,14 +106,11 @@ class TestMagicWordVerification:
     ):
         """Test verifying correct magic word."""
         # Create institution
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Magic Test University",
-                "short_code": "MAGIC_TEST",
-                "registration_magic_word": "CorrectMagic123",
-                "active": True,
-            },
+        create_institution_with_rsa_key(
+            pocketbase_admin_client,
+            "Magic Test University",
+            "MAGIC_TEST",
+            "CorrectMagic123",
         )
 
         # Verify magic word
@@ -180,14 +139,8 @@ class TestMagicWordVerification:
     def test_verify_wrong_magic_word(self, test_app, pocketbase_admin_client):
         """Test verifying wrong magic word."""
         # Create institution
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Wrong Magic Test",
-                "short_code": "WRONG_TEST",
-                "registration_magic_word": "CorrectMagic",
-                "active": True,
-            },
+        create_institution_with_rsa_key(
+            pocketbase_admin_client, "Wrong Magic Test", "WRONG_TEST", "CorrectMagic"
         )
 
         # Try wrong magic word
@@ -205,15 +158,15 @@ class TestMagicWordVerification:
         self, test_app, pocketbase_admin_client
     ):
         """Test verifying magic word for inactive institution."""
-        # Create inactive institution
-        pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Inactive Test",
-                "short_code": "INACTIVE_TEST",
-                "registration_magic_word": "InactiveMagic",
-                "active": False,
-            },
+        # Create institution and then mark it as inactive
+        institution = create_institution_with_rsa_key(
+            pocketbase_admin_client, "Inactive Test", "INACTIVE_TEST", "InactiveMagic"
+        )
+
+        # Mark institution as inactive
+        pocketbase_admin_client.patch(
+            f"/api/collections/institutions/records/{institution['id']}",
+            json={"active": False},
         )
 
         # Try to verify magic word
@@ -237,17 +190,12 @@ class TestUserRegistrationWithInstitutions:
     ):
         """Test complete QR registration flow with institution."""
         # Create institution
-        create_response = pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Registration Test University",
-                "short_code": "REG_TEST",
-                "registration_magic_word": "RegMagic123",
-                "active": True,
-            },
+        institution = create_institution_with_rsa_key(
+            pocketbase_admin_client,
+            "Registration Test University",
+            "REG_TEST",
+            "RegMagic123",
         )
-        assert create_response.status_code == 200
-        institution = create_response.json()
 
         # Register user via API
         response = test_app.post(
@@ -266,9 +214,17 @@ class TestUserRegistrationWithInstitutions:
         assert response.status_code == 200
         user_data = response.json()
 
-        # Verify user was created with correct institution
-        assert "user" in user_data
-        user = user_data["user"]
+        # Verify user was created successfully
+        assert user_data["success"] is True
+        assert "username" in user_data
+
+        # Fetch user from PocketBase to verify institution_id
+        users = pocketbase_admin_client.get(
+            "/api/collections/users/records",
+            params={"filter": f'username="{user_data["username"]}"'},
+        ).json()
+        assert len(users["items"]) == 1
+        user = users["items"][0]
         assert user["institution_id"] == institution["id"]
 
     def test_users_from_different_institutions_isolated(
@@ -276,30 +232,16 @@ class TestUserRegistrationWithInstitutions:
     ):
         """Test that users from different institutions are isolated."""
         # Create two institutions
-        inst_a_response = pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Institution A",
-                "short_code": "INST_A",
-                "registration_magic_word": "MagicA",
-                "active": True,
-            },
+        inst_a = create_institution_with_rsa_key(
+            pocketbase_admin_client, "Institution A", "INST_A", "MagicA"
         )
-        inst_a = inst_a_response.json()
 
-        inst_b_response = pocketbase_admin_client.post(
-            "/api/collections/institutions/records",
-            json={
-                "name": "Institution B",
-                "short_code": "INST_B",
-                "registration_magic_word": "MagicB",
-                "active": True,
-            },
+        inst_b = create_institution_with_rsa_key(
+            pocketbase_admin_client, "Institution B", "INST_B", "MagicB"
         )
-        inst_b = inst_b_response.json()
 
         # Register user in Institution A
-        test_app.post(
+        reg_a = test_app.post(
             "/api/v1/auth/register-qr",
             json={
                 "identity": "userA@insta.edu",
@@ -311,9 +253,12 @@ class TestUserRegistrationWithInstitutions:
                 "keep_logged_in": False,
             },
         )
+        assert reg_a.status_code == 200, (
+            f"Registration A failed: {reg_a.status_code} - {reg_a.text}"
+        )
 
         # Register user in Institution B
-        test_app.post(
+        reg_b = test_app.post(
             "/api/v1/auth/register-qr",
             json={
                 "identity": "userB@instb.edu",
@@ -324,6 +269,9 @@ class TestUserRegistrationWithInstitutions:
                 "institution_short_code": "INST_B",
                 "keep_logged_in": False,
             },
+        )
+        assert reg_b.status_code == 200, (
+            f"Registration B failed: {reg_b.status_code} - {reg_b.text}"
         )
 
         # Verify users exist in different institutions
